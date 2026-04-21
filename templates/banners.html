@@ -43,21 +43,28 @@
     .pm-card-body { padding: 0.85rem; }
 
     .pm-label { display: block; font-size: 0.72rem; font-weight: 500; color: var(--pm-text-secondary); margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    .pm-select, .pm-input, .pm-textarea { width: 100%; padding: 0.7rem 1rem; background: var(--pm-bg-elevated); border: 1px solid var(--pm-border); border-radius: var(--pm-radius); color: var(--pm-text); font-size: 0.88rem; font-family: inherit; transition: border-color 0.2s; outline: none; box-sizing: border-box; }
-    .pm-select:focus, .pm-input:focus, .pm-textarea:focus { border-color: var(--pm-accent); box-shadow: 0 0 0 2px var(--pm-accent-dim); }
+    .pm-select, .pm-textarea { width: 100%; padding: 0.7rem 1rem; background: var(--pm-bg-elevated); border: 1px solid var(--pm-border); border-radius: var(--pm-radius); color: var(--pm-text); font-size: 0.88rem; font-family: inherit; transition: border-color 0.2s; outline: none; box-sizing: border-box; }
+    .pm-select:focus, .pm-textarea:focus { border-color: var(--pm-accent); box-shadow: 0 0 0 2px var(--pm-accent-dim); }
     .pm-textarea { resize: vertical; min-height: 90px; }
     .pm-select option { background: var(--pm-bg-card); color: var(--pm-text); }
     .pm-group { margin-bottom: 0.6rem; }
     .pm-group:last-child { margin-bottom: 0; }
-    .pm-hint { font-size: 0.72rem; color: var(--pm-text-muted); margin-top: 0.25rem; }
 
-    .pm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.7rem 1.25rem; border: none; border-radius: var(--pm-radius-pill); font-size: 0.88rem; font-weight: 500; font-family: inherit; cursor: pointer; transition: all 0.2s; }
+    .pm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; border-radius: var(--pm-radius-pill); font-family: inherit; cursor: pointer; transition: all 0.2s; }
     .pm-btn-primary { width: 100%; background: var(--pm-accent); color: var(--pm-accent-text); padding: 0.65rem; border-radius: var(--pm-radius-pill); font-size: 0.85rem; font-weight: 600; }
     .pm-btn-primary:hover { background: #cdd98a; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(193, 205, 125, 0.25); }
     .pm-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-    .pm-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    /* Flow-style toggle buttons */
+    .flow-toggle-group { display: flex; gap: 2px; background: var(--pm-bg-elevated); border-radius: var(--pm-radius-pill); padding: 3px; border: 1px solid var(--pm-border); }
+    .flow-toggle-btn { flex: 1; padding: 6px 10px; border-radius: var(--pm-radius-pill); border: none; background: transparent; color: var(--pm-text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: inherit; text-align: center; }
+    .flow-toggle-btn:hover { color: var(--pm-text); }
+    .flow-toggle-btn.active { background: var(--pm-accent); color: var(--pm-accent-text); font-weight: 600; }
 
+    .flow-settings-row { display: flex; gap: 0.75rem; align-items: flex-start; }
+    .flow-settings-row > div { flex: 1; }
+
+    /* Progress */
     .pm-progress { margin-top: 1rem; background: var(--pm-bg-card); border: 1px solid var(--pm-border-light); border-radius: var(--pm-radius); overflow: hidden; }
     .pm-progress-bar { height: 6px; background: var(--pm-bg-elevated); border-radius: 3px; overflow: hidden; }
     .pm-progress-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, var(--pm-accent), #d4de6a, var(--pm-accent)); background-size: 200% 100%; animation: progressShimmer 2s ease infinite; transition: width 0.5s ease; }
@@ -70,7 +77,15 @@
     .pm-progress-info { flex: 1; }
     .pm-progress-title { font-weight: 600; font-size: 0.9rem; color: var(--pm-text); }
     .pm-progress-msg { font-size: 0.78rem; color: var(--pm-text-muted); margin-top: 0.1rem; }
+    .pm-progress-pct { font-weight: 700; font-size: 1.05rem; color: var(--pm-accent); flex-shrink: 0; }
 
+    .pm-steps { display: flex; gap: 0.4rem; margin-top: 0.85rem; }
+    .pm-step { flex: 1; text-align: center; font-size: 0.65rem; font-weight: 500; padding: 0.35rem 0.2rem; border-radius: var(--pm-radius-pill); background: var(--pm-bg-elevated); color: var(--pm-text-muted); opacity: 0.4; transition: all 0.3s; }
+    .pm-step.active { opacity: 1; background: var(--pm-accent-dim); color: var(--pm-accent); animation: stepPulse 1.5s ease infinite; }
+    @keyframes stepPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .pm-step.done { opacity: 1; background: var(--pm-accent); color: var(--pm-accent-text); }
+
+    /* Results */
     .banner-results { margin-top: 1.25rem; }
     .banner-results h3 { font-size: 0.9rem; font-weight: 600; color: var(--pm-text); margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; }
     .banner-results h3 a { color: var(--pm-accent); font-size: 0.78rem; font-weight: 500; text-decoration: none; }
@@ -83,8 +98,7 @@
     .banner-card:hover { border-color: var(--pm-accent-muted); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
     .banner-card img { width: 100%; display: block; cursor: pointer; }
     .banner-card .bc-info { padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--pm-text-muted); }
-    .banner-card .bc-info a { color: var(--pm-accent); text-decoration: none; font-weight: 600; font-size: 0.72rem; }
-    .banner-card .bc-info a:hover { text-decoration: underline; }
+    .banner-card .bc-info a { color: var(--pm-accent); text-decoration: none; font-weight: 600; }
 
     .pm-empty { text-align: center; padding: 2rem 1rem; color: var(--pm-text-muted); }
     .pm-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5; }
@@ -97,13 +111,12 @@
 </div>
 
 <div class="pm-grid">
-
     <!-- LEFT: Banner Setup -->
     <div>
         <div class="pm-card">
             <div class="pm-card-header">
                 <h3>✨ Banner Setup</h3>
-                <span style="font-size: 0.68rem; color: var(--pm-text-muted);">Powered by FLUX AI</span>
+                <span style="font-size: 0.68rem; color: var(--pm-text-muted);">Powered by Google Flow — Nano Banana 2</span>
             </div>
             <div class="pm-card-body">
                 <div class="pm-group">
@@ -111,25 +124,25 @@
                     <textarea id="banner-prompt" class="pm-textarea" rows="4" placeholder="Describe your banner... e.g. Premium skincare product ad with gold and white theme, elegant typography, luxury feel"></textarea>
                 </div>
 
-                <div class="pm-settings-grid">
+                <div class="flow-settings-row">
                     <div class="pm-group">
-                        <label class="pm-label">Banner Size</label>
-                        <select id="aspect-ratio" class="pm-select">
-                            <option value="landscape">🖥 Landscape (16:9)</option>
-                            <option value="story">📱 Story (9:16)</option>
-                            <option value="square">⬜ Square (1:1)</option>
-                            <option value="feed">📷 Feed (4:5)</option>
-                            <option value="wide">📏 Wide (4:1)</option>
-                        </select>
+                        <label class="pm-label">Aspect Ratio</label>
+                        <div class="flow-toggle-group" id="ar-group">
+                            <button class="flow-toggle-btn" data-value="landscape" onclick="selectToggle('ar-group', this)">16:9</button>
+                            <button class="flow-toggle-btn" data-value="wide" onclick="selectToggle('ar-group', this)">4:3</button>
+                            <button class="flow-toggle-btn active" data-value="square" onclick="selectToggle('ar-group', this)">1:1</button>
+                            <button class="flow-toggle-btn" data-value="feed" onclick="selectToggle('ar-group', this)">3:4</button>
+                            <button class="flow-toggle-btn" data-value="story" onclick="selectToggle('ar-group', this)">9:16</button>
+                        </div>
                     </div>
                     <div class="pm-group">
-                        <label class="pm-label">Image Count</label>
-                        <select id="image-count" class="pm-select">
-                            <option value="4" selected>4 images</option>
-                            <option value="3">3 images</option>
-                            <option value="2">2 images</option>
-                            <option value="1">1 image</option>
-                        </select>
+                        <label class="pm-label">Count</label>
+                        <div class="flow-toggle-group" id="count-group">
+                            <button class="flow-toggle-btn" data-value="1" onclick="selectToggle('count-group', this)">x1</button>
+                            <button class="flow-toggle-btn" data-value="2" onclick="selectToggle('count-group', this)">x2</button>
+                            <button class="flow-toggle-btn" data-value="3" onclick="selectToggle('count-group', this)">x3</button>
+                            <button class="flow-toggle-btn active" data-value="4" onclick="selectToggle('count-group', this)">x4</button>
+                        </div>
                     </div>
                 </div>
 
@@ -144,7 +157,7 @@
                 </div>
 
                 <button class="pm-btn pm-btn-primary" onclick="generateBanners()" id="generate-btn">
-                    ✨ Generate Banners
+                    🎨 Generate Banners
                 </button>
 
                 <!-- Progress -->
@@ -156,20 +169,26 @@
                         <div class="pm-progress-row">
                             <div class="pm-progress-icon" id="progress-icon">⏳</div>
                             <div class="pm-progress-info">
-                                <div class="pm-progress-title" id="progress-title">Generating...</div>
-                                <div class="pm-progress-msg" id="progress-msg">Sending prompt to FLUX AI...</div>
+                                <div class="pm-progress-title" id="progress-title">Starting...</div>
+                                <div class="pm-progress-msg" id="progress-msg">Connecting to Flow...</div>
                             </div>
+                            <div class="pm-progress-pct" id="progress-pct">0%</div>
+                        </div>
+                        <div class="pm-steps">
+                            <div class="pm-step" data-step="connecting">🔌 Connect</div>
+                            <div class="pm-step" data-step="navigating">🌐 Navigate</div>
+                            <div class="pm-step" data-step="settings">⚙ Settings</div>
+                            <div class="pm-step" data-step="entering_prompt">✍ Prompt</div>
+                            <div class="pm-step" data-step="generating">🎨 Generate</div>
+                            <div class="pm-step" data-step="downloading">📥 Download</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Error -->
-                <div id="error-state" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); border-radius: var(--pm-radius-sm); font-size: 0.82rem; color: var(--pm-danger);"></div>
             </div>
         </div>
 
         <!-- Results -->
-        <div id="results-grid" style="display: none;" class="banner-results">
+        <div id="results-section" style="display: none;" class="banner-results">
             <h3>
                 Generated Banners
                 <a id="collection-link" href="#">📂 View Collection →</a>
@@ -178,7 +197,7 @@
         </div>
     </div>
 
-    <!-- RIGHT: Tips -->
+    <!-- RIGHT: Tips & Quick Prompts -->
     <div>
         <div class="pm-card">
             <div class="pm-card-header">
@@ -213,98 +232,166 @@
                 </button>
             </div>
         </div>
+
+        <div class="pm-card" style="margin-top: 1rem;">
+            <div class="pm-card-header">
+                <h3>⚠ Requirements</h3>
+            </div>
+            <div class="pm-card-body" style="font-size: 0.78rem; color: var(--pm-text-muted); line-height: 1.5;">
+                <p style="margin: 0;">Chrome must be running with debug port. Double-click <strong style="color: var(--pm-text-secondary);">start_chrome.bat</strong> before generating.</p>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
+function selectToggle(groupId, btn) {
+    document.querySelectorAll('#' + groupId + ' .flow-toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function getToggleValue(groupId) {
+    var active = document.querySelector('#' + groupId + ' .flow-toggle-btn.active');
+    return active ? active.getAttribute('data-value') : null;
+}
+
 function useQuickPrompt(btn) {
     document.getElementById('banner-prompt').value = btn.getAttribute('data-prompt');
 }
 
+var currentJobId = null;
+
 async function generateBanners() {
-    const prompt = document.getElementById('banner-prompt').value.trim();
+    var prompt = document.getElementById('banner-prompt').value.trim();
     if (!prompt) { alert('Enter a banner prompt'); return; }
 
-    const btn = document.getElementById('generate-btn');
-    const progress = document.getElementById('progress-panel');
-    const errorDiv = document.getElementById('error-state');
-    const results = document.getElementById('results-grid');
+    var btn = document.getElementById('generate-btn');
+    var progress = document.getElementById('progress-panel');
+    var results = document.getElementById('results-section');
 
     btn.disabled = true;
-    btn.textContent = '⏳ Generating...';
+    btn.textContent = '⏳ Launching Flow Bot...';
     progress.style.display = 'block';
-    errorDiv.style.display = 'none';
     results.style.display = 'none';
 
-    document.getElementById('progress-bar').style.width = '30%';
+    document.getElementById('progress-bar').style.width = '5%';
     document.getElementById('progress-bar').classList.remove('done', 'error');
-    document.getElementById('progress-icon').textContent = '🎨';
-    document.getElementById('progress-title').textContent = 'Generating...';
-    document.getElementById('progress-msg').textContent = 'Sending prompt to FLUX AI... (~20 seconds)';
+    document.getElementById('progress-icon').textContent = '🔌';
+    document.getElementById('progress-title').textContent = 'Connecting...';
+    document.getElementById('progress-msg').textContent = 'Connecting to Chrome + Flow...';
+    document.getElementById('progress-pct').textContent = '5%';
+    document.getElementById('progress-pct').style.color = '';
+    document.getElementById('progress-title').style.color = '';
+
+    // Reset steps
+    document.querySelectorAll('.pm-step').forEach(s => { s.classList.remove('active', 'done'); });
 
     try {
-        const resp = await fetch('/banners/generate', {
+        var resp = await fetch('/banners/generate', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 prompt: prompt,
-                aspect_ratio: document.getElementById('aspect-ratio').value,
+                aspect_ratio: getToggleValue('ar-group') || 'square',
+                count: parseInt(getToggleValue('count-group') || '4'),
                 collection_id: document.getElementById('collection-select').value,
-                count: parseInt(document.getElementById('image-count').value),
             }),
         });
-
-        const data = await resp.json();
+        var data = await resp.json();
 
         if (data.error) {
-            document.getElementById('progress-bar').style.width = '100%';
-            document.getElementById('progress-bar').classList.add('error');
-            document.getElementById('progress-icon').textContent = '✗';
-            document.getElementById('progress-title').textContent = 'Failed';
-            document.getElementById('progress-title').style.color = 'var(--pm-danger)';
-            document.getElementById('progress-msg').textContent = data.error;
-        } else if (data.images && data.images.length > 0) {
-            document.getElementById('progress-bar').style.width = '100%';
-            document.getElementById('progress-bar').classList.add('done');
-            document.getElementById('progress-icon').textContent = '✓';
-            document.getElementById('progress-title').textContent = 'Complete!';
-            document.getElementById('progress-title').style.color = 'var(--pm-success)';
-            document.getElementById('progress-msg').textContent = data.count + ' banners generated successfully';
+            showError(data.error);
+            btn.disabled = false;
+            btn.textContent = '🎨 Generate Banners';
+            return;
+        }
 
-            results.style.display = 'block';
-            document.getElementById('collection-link').href = '/collections/' + data.collection_id;
-            const grid = document.getElementById('images-grid');
-            grid.innerHTML = '';
-            data.images.forEach((img, i) => {
-                const sizeKB = Math.round(img.size / 1024);
-                const card = document.createElement('div');
-                card.className = 'banner-card';
-                card.innerHTML = '<a href="' + img.path + '" target="_blank"><img src="' + img.path + '" alt="Banner ' + (i+1) + '" loading="lazy"></a><div class="bc-info"><span>' + sizeKB + ' KB</span><a href="' + img.path + '" download="' + img.filename + '">⬇ Download</a></div>';
-                grid.appendChild(card);
-            });
-
-            if (data.errors && data.errors.length > 0) {
-                errorDiv.style.display = 'block';
-                errorDiv.textContent = 'Some failed: ' + data.errors.join('; ');
-            }
-        } else {
-            document.getElementById('progress-bar').style.width = '100%';
-            document.getElementById('progress-bar').classList.add('error');
-            document.getElementById('progress-icon').textContent = '✗';
-            document.getElementById('progress-title').textContent = 'Failed';
-            document.getElementById('progress-title').style.color = 'var(--pm-danger)';
-            document.getElementById('progress-msg').textContent = data.errors ? data.errors.join('; ') : 'No images generated';
+        if (data.job_id) {
+            currentJobId = data.job_id;
+            pollJobStatus(data.job_id, data.collection_id);
         }
     } catch (err) {
-        document.getElementById('progress-bar').style.width = '100%';
-        document.getElementById('progress-bar').classList.add('error');
-        document.getElementById('progress-icon').textContent = '✗';
-        document.getElementById('progress-title').textContent = 'Error';
-        document.getElementById('progress-title').style.color = 'var(--pm-danger)';
-        document.getElementById('progress-msg').textContent = 'Network error: ' + err.message;
-    } finally {
+        showError('Network error: ' + err.message);
         btn.disabled = false;
-        btn.textContent = '✨ Generate Banners';
+        btn.textContent = '🎨 Generate Banners';
+    }
+}
+
+function showError(msg) {
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('progress-bar').classList.add('error');
+    document.getElementById('progress-icon').textContent = '✗';
+    document.getElementById('progress-title').textContent = 'Failed';
+    document.getElementById('progress-title').style.color = 'var(--pm-danger)';
+    document.getElementById('progress-msg').textContent = msg;
+    document.getElementById('progress-pct').textContent = '';
+}
+
+var stepOrder = ['connecting', 'navigating', 'settings', 'entering_prompt', 'generating', 'downloading'];
+var stepIcons = { connecting: '🔌', navigating: '🌐', settings: '⚙', entering_prompt: '✍', generating: '🎨', downloading: '📥', complete: '✓', error: '✗' };
+var stepTitles = { connecting: 'Connecting', navigating: 'Navigating', settings: 'Settings', entering_prompt: 'Typing Prompt', generating: 'Generating', downloading: 'Downloading 2K', complete: 'Complete!', error: 'Failed', starting: 'Starting...' };
+
+async function pollJobStatus(jobId, collectionId) {
+    for (var i = 0; i < 120; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+            var resp = await fetch('/banners/status/' + jobId);
+            var data = await resp.json();
+
+            var status = data.status || 'starting';
+            var progress = data.progress || 0;
+            var message = data.message || '';
+
+            document.getElementById('progress-bar').style.width = progress + '%';
+            document.getElementById('progress-icon').textContent = stepIcons[status] || '⏳';
+            document.getElementById('progress-title').textContent = stepTitles[status] || status;
+            document.getElementById('progress-msg').textContent = message;
+            document.getElementById('progress-pct').textContent = progress + '%';
+
+            // Update step indicators
+            var currentIdx = stepOrder.indexOf(status);
+            document.querySelectorAll('.pm-step').forEach(function(dot, idx) {
+                dot.classList.remove('active', 'done');
+                if (idx < currentIdx) dot.classList.add('done');
+                else if (idx === currentIdx) dot.classList.add('active');
+            });
+
+            // Complete
+            if (status === 'complete') {
+                document.getElementById('progress-bar').classList.add('done');
+                document.getElementById('progress-title').style.color = 'var(--pm-success)';
+                document.getElementById('progress-pct').style.color = 'var(--pm-success)';
+                document.querySelectorAll('.pm-step').forEach(s => { s.classList.add('done'); s.classList.remove('active'); });
+
+                if (data.images && data.images.length > 0) {
+                    var results = document.getElementById('results-section');
+                    results.style.display = 'block';
+                    document.getElementById('collection-link').href = '/collections/' + (data.collection_id || collectionId);
+                    var grid = document.getElementById('images-grid');
+                    grid.innerHTML = '';
+                    data.images.forEach(function(img, idx) {
+                        var sizeKB = Math.round(img.size / 1024);
+                        var card = document.createElement('div');
+                        card.className = 'banner-card';
+                        card.innerHTML = '<a href="' + img.path + '" target="_blank"><img src="' + img.path + '" alt="Banner ' + (idx+1) + '" loading="lazy"></a><div class="bc-info"><span>' + sizeKB + ' KB</span><a href="' + img.path + '" download="' + img.filename + '">⬇ Download</a></div>';
+                        grid.appendChild(card);
+                    });
+                }
+
+                document.getElementById('generate-btn').disabled = false;
+                document.getElementById('generate-btn').textContent = '🎨 Generate Banners';
+                return;
+            }
+
+            // Error
+            if (status === 'error') {
+                showError(message);
+                document.getElementById('generate-btn').disabled = false;
+                document.getElementById('generate-btn').textContent = '🎨 Generate Banners';
+                return;
+            }
+
+        } catch (e) {}
     }
 }
 </script>

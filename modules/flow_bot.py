@@ -50,7 +50,7 @@ class FlowBot:
 
     def __init__(self, driver, download_dir=None):
         self.driver = driver
-        self.download_dir = download_dir or os.path.abspath('./static/downloads')
+        self.download_dir = download_dir or os.path.expanduser('~/Downloads')
         os.makedirs(self.download_dir, exist_ok=True)
         self.status = 'idle'
         self.status_message = ''
@@ -380,7 +380,7 @@ class FlowBot:
         """)
         time.sleep(2)
 
-        # Try 2K Upscaled first, fall back to regular download
+        # Try 2K Upscaled — if not available, standard download already started
         clicked_2k = self._js_click("""
             var btns = document.querySelectorAll('button');
             for (var b of btns) { if (b.offsetParent && b.textContent.includes('2K') && b.textContent.includes('Upscaled')) return b; }
@@ -391,23 +391,51 @@ class FlowBot:
         else:
             self._update_status('downloading', 'Downloading standard image...')
 
-        # Wait for download — detect "Upscaling complete" toast or timeout
+        # Wait for download toast or timeout
         for _ in range(DOWNLOAD_WAIT):
             done = self.driver.execute_script("""
-                return document.body.innerText.includes('Upscaling complete')
-                    || document.body.innerText.includes('image has been downloaded')
-                    || document.body.innerText.includes('Download complete');
+                var text = document.body.innerText;
+                if (text.includes('Something went wrong')) return 'error';
+                if (text.includes('Upscaling complete') || text.includes('image has been downloaded') || text.includes('Download complete')) return 'done';
+                return 'waiting';
             """)
-            if done:
+            if done == 'done':
                 self._update_status('downloading', 'Download complete!')
-                # Dismiss the toast
                 self.driver.execute_script("""
                     var els = document.querySelectorAll('*');
-                    for (var el of els) {
-                        if (el.offsetParent && el.textContent.trim() === 'Dismiss') { el.click(); break; }
-                    }
+                    for (var el of els) { if (el.offsetParent && el.textContent.trim() === 'Dismiss') { el.click(); break; } }
                 """)
                 time.sleep(1)
+                break
+            elif done == 'error':
+                self._update_status('downloading', '2K failed — downloading standard...')
+                # Dismiss error toast
+                self.driver.execute_script("""
+                    var els = document.querySelectorAll('*');
+                    for (var el of els) { if (el.offsetParent && el.textContent.trim() === 'Dismiss') { el.click(); break; } }
+                """)
+                time.sleep(1)
+                # Click Download again for standard quality
+                self._js_click("""
+                    var btns = document.querySelectorAll('button');
+                    for (var b of btns) { if (b.offsetParent && b.textContent.includes('downloadDownload')) return b; }
+                    for (var b of btns) { if (b.offsetParent && b.textContent.includes('Download')) return b; }
+                    return null;
+                """)
+                time.sleep(2)
+                # Click standard download (not 2K)
+                self._js_click("""
+                    var btns = document.querySelectorAll('button');
+                    for (var b of btns) {
+                        if (b.offsetParent && b.textContent.includes('Standard') && !b.textContent.includes('2K')) return b;
+                    }
+                    // Or just click the first download option that's not 2K
+                    for (var b of btns) {
+                        if (b.offsetParent && b.textContent.includes('Download') && !b.textContent.includes('2K')) return b;
+                    }
+                    return null;
+                """)
+                time.sleep(5)
                 break
             time.sleep(1)
 
@@ -436,7 +464,8 @@ class FlowBot:
         downloaded_after = set(os.listdir(self.download_dir))
         new_files = downloaded_after - downloaded_before
         files = [os.path.join(self.download_dir, f) for f in new_files
-                if not f.endswith(('.crdownload', '.tmp'))]
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
+                and not f.endswith(('.crdownload', '.tmp'))]
         print(f"[FlowBot] Total new files: {len(files)}")
         return files
 

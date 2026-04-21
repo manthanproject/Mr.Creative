@@ -30,6 +30,7 @@ class Config:
     # Selenium settings
     CHROME_DRIVER_PATH = os.environ.get('CHROME_DRIVER_PATH', '')
     DOWNLOAD_DIR = os.path.join(BASE_DIR, 'static', 'downloads')
+    CHROME_DOWNLOAD_DIR = r'C:\Users\Admin\Downloads'
     HEADLESS_MODE = False  # Set True for production
     CHROME_PROFILE_DIR = os.path.join(BASE_DIR, 'chrome_session')
 
