@@ -1,0 +1,654 @@
+{% extends "base.html" %}
+{% block title %}Collections — Mr.Creative{% endblock %}
+
+{% block content %}
+<style>
+    /* ═══════════════════
+       BULK SELECT MODE
+    ═══════════════════ */
+    .bulk-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: var(--card-bg, #1e1f20);
+        border: 1px solid #333537;
+        border-radius: 14px;
+        margin-bottom: 1rem;
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: all 0.25s ease;
+        position: sticky;
+        top: 12px;
+        z-index: 100;
+    }
+
+    .bulk-toolbar.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: all;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .bulk-select-all {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .bulk-checkbox {
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        border: 2px solid #444746;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+        position: relative;
+    }
+
+    .bulk-checkbox:hover {
+        border-color: #c1cd7d;
+    }
+
+    .bulk-checkbox.checked {
+        background: #c1cd7d;
+        border-color: #c1cd7d;
+    }
+
+    .bulk-checkbox.checked::after {
+        content: '✓';
+        color: #2c3400;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .bulk-checkbox.partial::after {
+        content: '—';
+        color: #2c3400;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .bulk-checkbox.partial {
+        background: #c1cd7d;
+        border-color: #c1cd7d;
+    }
+
+    .bulk-count {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #c1cd7d;
+        min-width: 100px;
+    }
+
+    .bulk-actions {
+        display: flex;
+        gap: 0.4rem;
+        margin-left: auto;
+    }
+
+    .bulk-btn {
+        padding: 0.4rem 0.9rem;
+        border-radius: 9999px;
+        border: none;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .bulk-btn-delete {
+        background: rgba(248, 113, 113, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(248, 113, 113, 0.3);
+    }
+
+    .bulk-btn-delete:hover {
+        background: rgba(248, 113, 113, 0.25);
+    }
+
+    .bulk-btn-delete:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .bulk-btn-cancel {
+        background: #282a2c;
+        color: #c7c8b6;
+        border: 1px solid #333537;
+    }
+
+    .bulk-btn-cancel:hover {
+        background: #333537;
+        color: #e5e3d9;
+    }
+
+    /* Card checkbox overlay */
+    .collection-card {
+        position: relative;
+    }
+
+    .card-checkbox {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 10;
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        background: rgba(27, 27, 27, 0.6);
+        backdrop-filter: blur(4px);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transform: scale(0.8);
+        transition: all 0.15s ease;
+        pointer-events: none;
+    }
+
+    .card-checkbox::after {
+        content: '✓';
+        color: transparent;
+        font-size: 13px;
+        font-weight: 700;
+        transition: color 0.1s;
+    }
+
+    /* Show checkboxes when bulk mode is active */
+    .bulk-mode .card-checkbox {
+        opacity: 1;
+        transform: scale(1);
+        pointer-events: all;
+    }
+
+    /* Also show on hover even outside bulk mode (entry point) */
+    .collection-card:hover .card-checkbox {
+        opacity: 0.7;
+        transform: scale(1);
+        pointer-events: all;
+    }
+
+    .card-checkbox:hover {
+        opacity: 1 !important;
+        border-color: #c1cd7d;
+    }
+
+    .card-checkbox.checked {
+        opacity: 1 !important;
+        background: #c1cd7d;
+        border-color: #c1cd7d;
+    }
+
+    .card-checkbox.checked::after {
+        color: #2c3400;
+    }
+
+    /* Selected card visual feedback */
+    .collection-card.selected {
+        outline: 2px solid #c1cd7d;
+        outline-offset: -2px;
+        box-shadow: 0 0 0 4px rgba(193, 205, 125, 0.15);
+    }
+
+    .collection-card.selected .collection-cover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(193, 205, 125, 0.08);
+        pointer-events: none;
+    }
+
+    .collection-cover {
+        position: relative;
+    }
+
+    /* Shake animation for delete */
+    @keyframes cardShake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-3px); }
+        40% { transform: translateX(3px); }
+        60% { transform: translateX(-2px); }
+        80% { transform: translateX(2px); }
+    }
+
+    .collection-card.deleting {
+        animation: cardShake 0.3s ease;
+    }
+
+    /* Header button for entering bulk mode */
+    .bulk-mode-trigger {
+        padding: 0.4rem 0.85rem;
+        border-radius: 9999px;
+        border: 1px solid #333537;
+        background: #282a2c;
+        color: #c7c8b6;
+        font-size: 0.78rem;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .bulk-mode-trigger:hover {
+        background: #333537;
+        color: #e5e3d9;
+        border-color: #444746;
+    }
+
+    .bulk-mode-trigger.active {
+        background: rgba(193, 205, 125, 0.12);
+        color: #c1cd7d;
+        border-color: rgba(193, 205, 125, 0.3);
+    }
+</style>
+
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>Collections</h1>
+            <p>Organize your generated creatives into collections</p>
+        </div>
+        <div class="header-btns">
+            {% if collections %}
+            <button class="bulk-mode-trigger" id="bulkModeBtn" onclick="toggleBulkMode()">
+                ☐ Select
+            </button>
+            {% endif %}
+            <button class="btn btn-primary" onclick="openModal('createCollectionModal')">+ New Collection</button>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Action Toolbar (sticky, appears when selections exist) -->
+<div class="bulk-toolbar" id="bulkToolbar">
+    <label class="bulk-select-all" onclick="toggleSelectAll()">
+        <div class="bulk-checkbox" id="selectAllCheckbox"></div>
+        <span style="font-size: 0.78rem; color: #c7c8b6;">Select all</span>
+    </label>
+    <div class="bulk-count" id="bulkCount">0 selected</div>
+    <div class="bulk-actions">
+        <button class="bulk-btn bulk-btn-delete" id="bulkDeleteBtn" disabled onclick="bulkDeleteSelected()">
+            🗑 Delete Selected
+        </button>
+        <button class="bulk-btn bulk-btn-cancel" onclick="exitBulkMode()">
+            ✕ Cancel
+        </button>
+    </div>
+</div>
+
+{% if collections %}
+<div class="collections-grid" id="collectionsGrid">
+    {% for col in collections %}
+    <div class="collection-card animate-fade-up delay-{{ loop.index if loop.index <= 8 else 8 }}"
+         id="col-{{ col.id }}" data-id="{{ col.id }}">
+        <!-- Bulk select checkbox -->
+        <div class="card-checkbox" data-id="{{ col.id }}" onclick="event.stopPropagation(); toggleCardSelect('{{ col.id }}')"></div>
+
+        <div class="collection-cover" onclick="handleCardClick(event, '{{ col.id }}', '{{ url_for('collections.view', collection_id=col.id) }}')">
+            {% if col.cover_image %}
+            <img src="{{ url_for('static', filename=col.cover_image) }}" alt="{{ col.name }}">
+            {% else %}
+            <span>◫</span>
+            {% endif %}
+        </div>
+        <div class="collection-info" onclick="handleCardClick(event, '{{ col.id }}', '{{ url_for('collections.view', collection_id=col.id) }}')">
+            <h4>{{ col.name }}</h4>
+            <p>{{ col.description or 'No description' }}</p>
+            <div class="collection-meta">
+                <span>{{ col.item_count }} items</span>
+                <span>{{ col.created_at.strftime('%b %d, %Y') }}</span>
+                {% if col.is_public %}<span class="text-accent">🔗 Shared</span>{% endif %}
+            </div>
+        </div>
+        <div class="collection-actions">
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); toggleCollectionShare('{{ col.id }}')">🔗 {% if col.is_public %}Shared{% else %}Share{% endif %}</button>
+            <button class="btn btn-danger-outline btn-sm" onclick="event.stopPropagation(); deleteCollection('{{ col.id }}', '{{ col.name }}')">✕ Delete</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state animate-fade-up delay-1">
+    <div class="empty-icon">◫</div>
+    <h3>No collections yet</h3>
+    <p>Create your first collection to organize generated creatives</p>
+    <button class="btn btn-primary" onclick="openModal('createCollectionModal')">+ Create Collection</button>
+</div>
+{% endif %}
+
+<div class="modal-overlay" id="createCollectionModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>New Collection</h3>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('createCollectionModal')">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('collections.create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Collection Name</label>
+                    <input type="text" name="name" class="form-input" placeholder="e.g. Summer Campaign 2026" required>
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea name="description" class="textarea" rows="3" placeholder="What's this collection about?"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createCollectionModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Collection</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ════════════════════════════
+// BULK SELECT STATE
+// ════════════════════════════
+var bulkMode = false;
+var selectedIds = new Set();
+var allCollectionIds = [];
+
+// Gather all collection IDs on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.collection-card[data-id]').forEach(function(card) {
+        allCollectionIds.push(card.dataset.id);
+    });
+});
+
+// ════════════════════════════
+// TOGGLE BULK MODE
+// ════════════════════════════
+function toggleBulkMode() {
+    bulkMode = !bulkMode;
+    var btn = document.getElementById('bulkModeBtn');
+    var grid = document.getElementById('collectionsGrid');
+
+    if (bulkMode) {
+        btn.classList.add('active');
+        btn.innerHTML = '☑ Selecting...';
+        if (grid) grid.classList.add('bulk-mode');
+    } else {
+        exitBulkMode();
+    }
+}
+
+function exitBulkMode() {
+    bulkMode = false;
+    selectedIds.clear();
+
+    var btn = document.getElementById('bulkModeBtn');
+    if (btn) {
+        btn.classList.remove('active');
+        btn.innerHTML = '☐ Select';
+    }
+
+    var grid = document.getElementById('collectionsGrid');
+    if (grid) grid.classList.remove('bulk-mode');
+
+    // Clear all selections
+    document.querySelectorAll('.card-checkbox').forEach(function(cb) {
+        cb.classList.remove('checked');
+    });
+    document.querySelectorAll('.collection-card').forEach(function(card) {
+        card.classList.remove('selected');
+    });
+
+    updateBulkUI();
+}
+
+// ════════════════════════════
+// CARD CLICK HANDLING
+// ════════════════════════════
+function handleCardClick(event, id, url) {
+    if (bulkMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleCardSelect(id);
+    } else {
+        window.location = url;
+    }
+}
+
+function toggleCardSelect(id) {
+    // Auto-enter bulk mode if clicking checkbox outside bulk mode
+    if (!bulkMode) {
+        bulkMode = true;
+        var btn = document.getElementById('bulkModeBtn');
+        if (btn) {
+            btn.classList.add('active');
+            btn.innerHTML = '☑ Selecting...';
+        }
+        var grid = document.getElementById('collectionsGrid');
+        if (grid) grid.classList.add('bulk-mode');
+    }
+
+    var card = document.getElementById('col-' + id);
+    var checkbox = card ? card.querySelector('.card-checkbox') : null;
+
+    if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+        if (checkbox) checkbox.classList.remove('checked');
+        if (card) card.classList.remove('selected');
+    } else {
+        selectedIds.add(id);
+        if (checkbox) checkbox.classList.add('checked');
+        if (card) card.classList.add('selected');
+    }
+
+    updateBulkUI();
+}
+
+// ════════════════════════════
+// SELECT ALL / NONE
+// ════════════════════════════
+function toggleSelectAll() {
+    var allSelected = selectedIds.size === allCollectionIds.length;
+
+    if (allSelected) {
+        // Deselect all
+        selectedIds.clear();
+        document.querySelectorAll('.card-checkbox').forEach(function(cb) {
+            cb.classList.remove('checked');
+        });
+        document.querySelectorAll('.collection-card').forEach(function(card) {
+            card.classList.remove('selected');
+        });
+    } else {
+        // Select all
+        allCollectionIds.forEach(function(id) {
+            selectedIds.add(id);
+            var card = document.getElementById('col-' + id);
+            var cb = card ? card.querySelector('.card-checkbox') : null;
+            if (cb) cb.classList.add('checked');
+            if (card) card.classList.add('selected');
+        });
+    }
+
+    updateBulkUI();
+}
+
+// ════════════════════════════
+// UPDATE TOOLBAR UI
+// ════════════════════════════
+function updateBulkUI() {
+    var toolbar = document.getElementById('bulkToolbar');
+    var count = document.getElementById('bulkCount');
+    var deleteBtn = document.getElementById('bulkDeleteBtn');
+    var selectAllCb = document.getElementById('selectAllCheckbox');
+    var n = selectedIds.size;
+
+    // Show/hide toolbar
+    if (n > 0 || bulkMode) {
+        toolbar.classList.add('visible');
+    } else {
+        toolbar.classList.remove('visible');
+    }
+
+    // Count text
+    count.textContent = n + ' selected';
+
+    // Delete button state
+    deleteBtn.disabled = n === 0;
+    if (n > 0) {
+        deleteBtn.innerHTML = '🗑 Delete ' + n + ' Collection' + (n > 1 ? 's' : '');
+    } else {
+        deleteBtn.innerHTML = '🗑 Delete Selected';
+    }
+
+    // Select-all checkbox state
+    if (n === 0) {
+        selectAllCb.classList.remove('checked', 'partial');
+    } else if (n === allCollectionIds.length) {
+        selectAllCb.classList.add('checked');
+        selectAllCb.classList.remove('partial');
+    } else {
+        selectAllCb.classList.remove('checked');
+        selectAllCb.classList.add('partial');
+    }
+}
+
+// ════════════════════════════
+// BULK DELETE
+// ════════════════════════════
+async function bulkDeleteSelected() {
+    var n = selectedIds.size;
+    if (n === 0) return;
+
+    var msg = 'Permanently delete ' + n + ' collection' + (n > 1 ? 's' : '') + '? This cannot be undone.';
+    if (!await showConfirm(msg)) return;
+
+    var ids = Array.from(selectedIds);
+    var deleteBtn = document.getElementById('bulkDeleteBtn');
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '⏳ Deleting...';
+
+    try {
+        var res = await fetch('/collections/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            // Animate cards out
+            ids.forEach(function(id, i) {
+                var card = document.getElementById('col-' + id);
+                if (card) {
+                    card.classList.add('deleting');
+                    setTimeout(function() {
+                        card.style.transition = 'all 0.35s ease';
+                        card.style.opacity = '0';
+                        card.style.transform = 'scale(0.85) translateY(8px)';
+                        setTimeout(function() { card.remove(); }, 350);
+                    }, i * 60);
+                }
+            });
+
+            // Update local state
+            allCollectionIds = allCollectionIds.filter(function(id) {
+                return ids.indexOf(id) === -1;
+            });
+            selectedIds.clear();
+
+            showToast(data.message || n + ' collections deleted!', 'success');
+
+            // Exit bulk mode after animation
+            setTimeout(function() {
+                exitBulkMode();
+                // Show empty state if no collections left
+                if (allCollectionIds.length === 0) {
+                    var grid = document.getElementById('collectionsGrid');
+                    if (grid) {
+                        grid.outerHTML = '<div class="empty-state animate-fade-up delay-1">' +
+                            '<div class="empty-icon">◫</div>' +
+                            '<h3>No collections yet</h3>' +
+                            '<p>Create your first collection to organize generated creatives</p>' +
+                            '<button class="btn btn-primary" onclick="openModal(\'createCollectionModal\')">+ Create Collection</button>' +
+                            '</div>';
+                    }
+                    // Hide bulk mode button
+                    var bmBtn = document.getElementById('bulkModeBtn');
+                    if (bmBtn) bmBtn.style.display = 'none';
+                }
+            }, ids.length * 60 + 400);
+        } else {
+            showToast(data.error || 'Failed to delete.', 'error');
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = '🗑 Delete ' + n + ' Collection' + (n > 1 ? 's' : '');
+        }
+    } catch (err) {
+        showToast('Error deleting collections.', 'error');
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = '🗑 Delete ' + n + ' Collection' + (n > 1 ? 's' : '');
+    }
+}
+
+// ════════════════════════════
+// EXISTING FUNCTIONS
+// ════════════════════════════
+async function deleteCollection(id, name) {
+    if (!await showConfirm('Delete "' + name + '"? This cannot be undone.')) return;
+    var res = await fetch('/collections/' + id + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        var card = document.getElementById('col-' + id);
+        card.style.transition = 'all 0.4s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.9)';
+        setTimeout(function() { card.remove(); }, 400);
+
+        // Update local state
+        allCollectionIds = allCollectionIds.filter(function(x) { return x !== id; });
+        selectedIds.delete(id);
+        updateBulkUI();
+
+        showToast('Collection deleted!', 'success');
+    }
+}
+
+async function toggleCollectionShare(id) {
+    var res = await fetch('/collections/' + id + '/toggle-share', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        if (data.is_public) {
+            copyToClipboard(window.location.origin + data.share_url);
+            showToast('Share link copied!', 'success');
+        } else {
+            showToast('Collection unshared', 'info');
+        }
+        setTimeout(function() { location.reload(); }, 1000);
+    }
+}
+
+// Keyboard shortcut: Escape exits bulk mode
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && bulkMode) {
+        exitBulkMode();
+    }
+});
+</script>
+{% endblock %}

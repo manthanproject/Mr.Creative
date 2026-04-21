@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Compare — Mr.Creative{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>⇄ Before / After Compare</h1>
+            <p>Compare your original inputs with Pomelli-generated outputs</p>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 12px;">
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 300px;">
+            <!-- Before (Input) -->
+            <div>
+                <h3 style="text-align: center; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Before (Input)</h3>
+                <div id="beforeZone" class="upload-zone" style="min-height: 250px; max-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center;"
+                     onclick="document.getElementById('beforeInput').click()">
+                    <div id="beforePlaceholder">
+                        <span style="font-size: 2rem; color: var(--text-muted);">📷</span>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">Click to upload original image</p>
+                    </div>
+                    <img id="beforeImage" style="max-width: 100%; max-height: 280px; border-radius: var(--radius-sm); display: none;" alt="Before">
+                    <input type="file" id="beforeInput" accept="image/*" style="display: none;" onchange="loadCompareImage(this, 'before')">
+                </div>
+            </div>
+
+            <!-- After (Output) -->
+            <div>
+                <h3 style="text-align: center; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">After (Generated)</h3>
+                <div id="afterZone" class="upload-zone" style="min-height: 250px; max-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center;"
+                     onclick="document.getElementById('afterInput').click()">
+                    <div id="afterPlaceholder">
+                        <span style="font-size: 2rem; color: var(--text-muted);">✨</span>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">Click to upload generated image</p>
+                    </div>
+                    <img id="afterImage" style="max-width: 100%; max-height: 280px; border-radius: var(--radius-sm); display: none;" alt="After">
+                    <input type="file" id="afterInput" accept="image/*" style="display: none;" onchange="loadCompareImage(this, 'after')">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Or select from collections -->
+<div class="card">
+    <div class="card-header">
+        <h3>Or Select From Collections</h3>
+    </div>
+    <div class="card-body">
+        {% if collections %}
+        <div class="collections-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+            {% for col in collections %}
+            <a href="{{ url_for('collections.view', collection_id=col.id) }}" class="collection-card" style="cursor: pointer;">
+                <div class="collection-cover" style="height: 100px;">
+                    {% if col.cover_image_path %}
+                    <img src="{{ url_for('static', filename=col.cover_image_path) }}" alt="{{ col.name }}">
+                    {% else %}
+                    <span>◫</span>
+                    {% endif %}
+                </div>
+                <div class="collection-info" style="padding: 0.85rem;">
+                    <h4 style="font-size: 0.9rem;">{{ col.name }}</h4>
+                    <div class="collection-meta">
+                        <span>{{ col.item_count }} items</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 2rem;">
+            <p>No collections yet. Create one and add images to compare.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadCompareImage(input, side) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById(side + 'Image');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.getElementById(side + 'Placeholder').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+{% endblock %}

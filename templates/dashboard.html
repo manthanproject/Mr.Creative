@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Mr.Creative{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>Welcome back, {{ current_user.username }} 👋</h1>
+            <p>Here's your creative workspace overview</p>
+        </div>
+        <div class="header-btns">
+            <a href="{{ url_for('prompts.index') }}" class="btn btn-primary">
+                ✦ New Prompt
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card animate-fade-up delay-1">
+        <div class="stat-icon" style="background: rgba(193,205,125,0.12); color: var(--accent);">✎</div>
+        <div class="stat-value">{{ stats.prompts }}</div>
+        <div class="stat-label">Total Prompts</div>
+    </div>
+    <div class="stat-card animate-fade-up delay-2">
+        <div class="stat-icon" style="background: rgba(74,222,128,0.12); color: var(--success);">◫</div>
+        <div class="stat-value">{{ stats.generations }}</div>
+        <div class="stat-label">Generations</div>
+    </div>
+    <div class="stat-card animate-fade-up delay-3">
+        <div class="stat-icon" style="background: rgba(251,191,36,0.12); color: var(--warning);">★</div>
+        <div class="stat-value">{{ stats.favorites }}</div>
+        <div class="stat-label">Favorites</div>
+    </div>
+    <div class="stat-card animate-fade-up delay-4">
+        <div class="stat-icon" style="background: rgba(96,165,250,0.12); color: var(--info);">▦</div>
+        <div class="stat-value">{{ stats.collections }}</div>
+        <div class="stat-label">Collections</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <!-- Recent Prompts -->
+    <div class="card animate-fade-up delay-5">
+        <div class="card-header">
+            <h3>Recent Prompts</h3>
+            <a href="{{ url_for('prompts.index') }}" class="btn btn-ghost btn-sm">View all →</a>
+        </div>
+        <div class="card-body">
+            {% if recent_prompts %}
+            <div class="prompt-list">
+                {% for prompt in recent_prompts %}
+                <div class="prompt-card" style="border: none; box-shadow: none; padding: 0.65rem 0; border-bottom: 1px solid var(--border-light);">
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="prompt-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ prompt.text }}</div>
+                        <div class="prompt-meta">
+                            <span class="badge badge-{{ prompt.status }}">{{ prompt.status }}</span>
+                            <span>{{ prompt.created_at.strftime('%b %d, %H:%M') }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 2rem;">
+                <div class="empty-icon">✎</div>
+                <h3>No prompts yet</h3>
+                <p>Start by creating your first creative prompt</p>
+                <a href="{{ url_for('prompts.index') }}" class="btn btn-primary btn-sm">Create Prompt</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Queue Status -->
+    <div class="card animate-fade-up delay-6">
+        <div class="card-header">
+            <h3>Queue Status</h3>
+            <div class="flex gap-1">
+                {% if stats.processing > 0 %}
+                <span class="badge badge-processing">{{ stats.processing }} processing</span>
+                {% endif %}
+                {% if stats.queued > 0 %}
+                <span class="badge badge-queued">{{ stats.queued }} queued</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            {% if stats.queued == 0 and stats.processing == 0 %}
+            <div class="empty-state" style="padding: 2rem;">
+                <div class="empty-icon">⚡</div>
+                <h3>Queue is empty</h3>
+                <p>Approve prompts to start generating with Pomelli</p>
+            </div>
+            {% else %}
+            <div id="queueList">
+                <!-- Populated via JS -->
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent Generations -->
+<div class="card animate-fade-up delay-7" style="margin-top: 12px;">
+    <div class="card-header">
+        <h3>Recent Generations</h3>
+        <a href="{{ url_for('collections.index') }}" class="btn btn-ghost btn-sm">All collections →</a>
+    </div>
+    <div class="card-body">
+        {% if recent_generations %}
+        <div class="gallery-grid">
+            {% for gen in recent_generations %}
+            <div class="gallery-item">
+                <div class="gallery-thumb">
+                    {% if gen.thumbnail_path %}
+                    <img src="{{ url_for('static', filename=gen.thumbnail_path) }}" alt="Generation">
+                    {% else %}
+                    <span style="font-size: 2rem; color: var(--text-muted);">
+                        {% if gen.output_type == 'video' %}▶{% else %}◫{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="gallery-info">
+                    <div class="type-tag">{{ gen.pomelli_feature }} · {{ gen.output_type }}</div>
+                    <div class="time">{{ gen.created_at.strftime('%b %d, %Y at %H:%M') }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 2rem;">
+            <div class="empty-icon">◫</div>
+            <h3>No generations yet</h3>
+            <p>Create and approve prompts to start generating creative assets with Pomelli</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Collections -->
+{% if collections %}
+<div style="margin-top: 12px;">
+    <div class="flex-between mb-2 animate-fade-up delay-8">
+        <h2 style="font-size: 1.25rem;">Your Collections</h2>
+        <a href="{{ url_for('collections.index') }}" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <div class="collections-grid">
+        {% for col in collections %}
+        <a href="{{ url_for('collections.view', collection_id=col.id) }}" class="collection-card animate-fade-up delay-{{ loop.index + 4 }}">
+            <div class="collection-cover">
+                {% if col.cover_image_path %}
+                <img src="{{ url_for('static', filename=col.cover_image_path) }}" alt="{{ col.name }}">
+                {% else %}
+                ◫
+                {% endif %}
+            </div>
+            <div class="collection-info">
+                <h4>{{ col.name }}</h4>
+                <p>{{ col.description or 'No description' }}</p>
+                <div class="collection-meta">
+                    <span>{{ col.item_count }} items</span>
+                    <span>{{ col.created_at.strftime('%b %d, %Y') }}</span>
+                    {% if col.is_public %}<span class="text-accent">🔗 Shared</span>{% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

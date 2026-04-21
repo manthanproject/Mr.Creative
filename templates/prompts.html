@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+{% block title %}Prompt Studio — Mr.Creative{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>Prompt Studio</h1>
+            <p>Create, generate, and manage your creative prompts</p>
+        </div>
+        <div class="header-btns">
+            <button class="btn btn-secondary" onclick="generatePrompts()" id="genBtn">✦ AI Generate</button>
+        </div>
+    </div>
+</div>
+
+<!-- Prompt Input Area -->
+<div class="card" style="margin-bottom: 12px;">
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('prompts.create') }}" id="promptForm">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+                <textarea name="text" id="promptText" class="textarea" placeholder="Describe your creative vision... e.g. 'Create a summer sale campaign for organic skincare products with tropical vibes'" rows="4"></textarea>
+                <input type="hidden" name="prompt_type" id="promptType" value="manual">
+            </div>
+
+            <!-- Category Selector -->
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                <button type="button" class="tab active" data-cat="general" onclick="selectCategory(this)">🎨 All</button>
+                <button type="button" class="tab" data-cat="product" onclick="selectCategory(this)">📦 Product</button>
+                <button type="button" class="tab" data-cat="campaign" onclick="selectCategory(this)">📣 Campaign</button>
+                <button type="button" class="tab" data-cat="social" onclick="selectCategory(this)">📱 Social</button>
+                <button type="button" class="tab" data-cat="photoshoot" onclick="selectCategory(this)">📸 Photoshoot</button>
+                <button type="button" class="tab" data-cat="video" onclick="selectCategory(this)">🎬 Video</button>
+            </div>
+
+            <!-- Image Upload Zone -->
+            <div id="uploadZone" class="upload-zone"
+                 ondragover="event.preventDefault(); this.classList.add('drag-over');"
+                 ondragleave="this.classList.remove('drag-over');"
+                 ondrop="handleDrop(event)"
+                 onclick="document.getElementById('imageInput').click()">
+                <div id="uploadPlaceholder">
+                    <span style="font-size: 1.5rem; color: var(--text-muted);">📷</span>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">Drop an image here or click to upload (for Photoshoot)</p>
+                </div>
+                <div id="uploadPreview" style="display: none;">
+                    <img id="previewImage" style="max-height: 120px; border-radius: var(--radius-sm);" alt="Preview">
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;" id="fileName"></p>
+                </div>
+                <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleFileSelect(this)">
+            </div>
+
+            <div class="flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+                <div class="flex gap-1" style="flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary" onclick="enhancePrompt()">
+                        ✨ Enhance
+                    </button>
+                    <button type="button" class="btn btn-ghost" onclick="clearPrompt()">
+                        Clear
+                    </button>
+                </div>
+                <div class="flex gap-1" style="flex-wrap: wrap;">
+                    <button type="submit" class="btn btn-secondary">
+                        Save Draft
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveAndApprove()">
+                        ⚡ Approve & Queue
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- AI Generated Suggestions -->
+<div id="suggestionsPanel" class="card" style="margin-bottom: 12px; display: none;">
+    <div class="card-header">
+        <h3>✦ AI Prompt Suggestions</h3>
+        <div class="flex gap-1">
+            <button class="btn btn-ghost btn-sm" onclick="generatePrompts()" title="Regenerate">↺ Regenerate</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeSuggestions()">✕</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="suggestionsLoading" style="text-align: center; padding: 2.5rem; display: none;">
+            <div style="font-size: 2rem; animation: pulse 1.2s infinite;">✦</div>
+            <p style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.9rem; font-weight: 500;">Generating creative prompts with Gemini AI...</p>
+        </div>
+        <div id="suggestionsError" style="text-align: center; padding: 2rem; display: none;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
+            <p style="color: var(--danger); font-size: 0.9rem; font-weight: 500;" id="errorText"></p>
+            <button class="btn btn-secondary btn-sm" onclick="generatePrompts()" style="margin-top: 0.75rem;">Try Again</button>
+        </div>
+        <div id="suggestionsList" class="prompt-list"></div>
+    </div>
+</div>
+
+<!-- Refine Modal -->
+<div class="modal-overlay" id="refineModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>✨ Refine Prompt</h3>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('refineModal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Original Prompt</label>
+                <div id="refineOriginal" style="padding: 0.85rem; background: var(--bg-subtle); border-radius: var(--radius-sm); font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; border: 1px solid var(--border-light);"></div>
+            </div>
+            <div class="form-group">
+                <label>How should I change it?</label>
+                <input type="text" id="refineInstruction" class="form-input" placeholder="e.g. make it more luxury, add winter theme, target Gen Z...">
+            </div>
+            <div id="refineResult" style="display: none;">
+                <label style="display: block; font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em;">Refined Result</label>
+                <div id="refineResultText" style="padding: 0.85rem; background: var(--accent-glow); border-radius: var(--radius-sm); font-size: 0.9rem; line-height: 1.6; border: 1px solid var(--accent-light);"></div>
+            </div>
+            <div id="refineLoading" style="text-align: center; padding: 1rem; display: none;">
+                <span style="animation: pulse 1.2s infinite;">✦</span> Refining...
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="doRefine()" id="refineBtn">Refine</button>
+            <button class="btn btn-primary" onclick="useRefinedPrompt()" id="useRefinedBtn" style="display: none;">Use This Prompt</button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+    <a href="{{ url_for('prompts.index', tab='all') }}" class="tab {% if active_tab == 'all' %}active{% endif %}">All Prompts</a>
+    <a href="{{ url_for('prompts.index', tab='favorites') }}" class="tab {% if active_tab == 'favorites' %}active{% endif %}">★ Favorites</a>
+    <a href="{{ url_for('prompts.index', tab='approved') }}" class="tab {% if active_tab == 'approved' %}active{% endif %}">Approved</a>
+</div>
+
+<!-- Search -->
+<div class="form-group" style="max-width: 400px; margin-bottom: 10px;">
+    <input type="text" class="form-input" placeholder="Search prompts..." id="searchInput" oninput="filterPrompts(this.value)">
+</div>
+
+<!-- Prompts List -->
+<div class="prompt-list" id="promptsList">
+    {% if prompts %}
+        {% for prompt in prompts %}
+        <div class="prompt-card animate-fade-up delay-{{ loop.index if loop.index <= 8 else 8 }}" id="prompt-{{ prompt.id }}">
+            <div style="flex: 1; min-width: 0;">
+                <div class="prompt-text">{{ prompt.text }}</div>
+                <div class="prompt-meta">
+                    <span class="badge badge-{{ prompt.status }}">{{ prompt.status }}</span>
+                    <span>{{ prompt.prompt_type }}</span>
+                    <span>{{ prompt.created_at.strftime('%b %d, %Y · %H:%M') }}</span>
+                </div>
+            </div>
+            <div class="prompt-actions">
+                <button class="fav-btn {% if prompt.is_favorite %}active{% endif %}" onclick="toggleFavorite('{{ prompt.id }}', this)" title="Favorite">
+                    {% if prompt.is_favorite %}★{% else %}☆{% endif %}
+                </button>
+                {% if not prompt.is_approved %}
+                <button class="btn btn-primary btn-sm" onclick="approvePrompt('{{ prompt.id }}', this)">
+                    ⚡ Approve
+                </button>
+                {% endif %}
+                <button class="btn btn-ghost btn-sm" onclick="openRefineModal('{{ prompt.text|e }}')" title="Refine with AI">
+                    ✨
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="usePrompt(`{{ prompt.text|e }}`)" title="Reuse">
+                    ↺
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="deletePrompt('{{ prompt.id }}')" style="color: var(--danger);" title="Delete">
+                    ✕
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">✎</div>
+        <h3>No prompts {% if active_tab == 'favorites' %}favorited{% elif active_tab == 'approved' %}approved{% endif %} yet</h3>
+        <p>{% if active_tab == 'all' %}Write your first prompt above or click "AI Generate" to get started{% else %}Start by favoriting or approving prompts{% endif %}</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedCategory = localStorage.getItem('ps_category') || 'general';
+
+// ==========================================
+// RESTORE STATE ON PAGE LOAD
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    // Restore textarea
+    var savedText = localStorage.getItem('ps_prompt_text');
+    if (savedText) document.getElementById('promptText').value = savedText;
+
+    // Restore category
+    if (selectedCategory !== 'general') {
+        var catBtn = document.querySelector('[data-cat="' + selectedCategory + '"]');
+        if (catBtn) {
+            document.querySelectorAll('[data-cat]').forEach(function(b) { b.classList.remove('active'); });
+            catBtn.classList.add('active');
+        }
+    }
+
+    // Restore last AI suggestions
+    var savedSuggestions = localStorage.getItem('ps_suggestions');
+    var savedSugCategory = localStorage.getItem('ps_suggestions_cat');
+    if (savedSuggestions) {
+        try {
+            var prompts = JSON.parse(savedSuggestions);
+            if (prompts && prompts.length > 0) {
+                renderSuggestions(prompts, savedSugCategory || selectedCategory);
+            }
+        } catch(e) {}
+    }
+
+    // Auto-save textarea on every keystroke
+    document.getElementById('promptText').addEventListener('input', function() {
+        localStorage.setItem('ps_prompt_text', this.value);
+    });
+
+    // Clear textarea cache on form submit (Save Draft)
+    document.getElementById('promptForm').addEventListener('submit', function() {
+        localStorage.removeItem('ps_prompt_text');
+    });
+});
+
+// Category selector
+function selectCategory(btn) {
+    document.querySelectorAll('[data-cat]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCategory = btn.dataset.cat;
+    localStorage.setItem('ps_category', selectedCategory);
+}
+
+// Image upload
+function handleFileSelect(input) {
+    if (input.files && input.files[0]) showPreview(input.files[0]);
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.target.closest('#uploadZone').classList.remove('drag-over');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        document.getElementById('imageInput').files = e.dataTransfer.files;
+        showPreview(e.dataTransfer.files[0]);
+    }
+}
+
+function showPreview(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('previewImage').src = e.target.result;
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('uploadPlaceholder').style.display = 'none';
+        document.getElementById('uploadPreview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearPrompt() {
+    document.getElementById('promptText').value = '';
+    document.getElementById('imageInput').value = '';
+    document.getElementById('uploadPlaceholder').style.display = 'block';
+    document.getElementById('uploadPreview').style.display = 'none';
+    document.getElementById('promptType').value = 'manual';
+    localStorage.removeItem('ps_prompt_text');
+}
+
+// Save and approve
+function saveAndApprove() {
+    const text = document.getElementById('promptText').value.trim();
+    if (!text) { showToast('Please enter a prompt first.', 'error'); return; }
+    const form = document.getElementById('promptForm');
+    const input = document.createElement('input');
+    input.type = 'hidden'; input.name = 'auto_approve'; input.value = '1';
+    form.appendChild(input);
+    localStorage.removeItem('ps_prompt_text');
+    form.submit();
+}
+
+// ==========================================
+// AI GENERATE PROMPTS
+// ==========================================
+async function generatePrompts() {
+    const baseText = document.getElementById('promptText').value.trim();
+    const panel = document.getElementById('suggestionsPanel');
+    const loading = document.getElementById('suggestionsLoading');
+    const errorDiv = document.getElementById('suggestionsError');
+    const list = document.getElementById('suggestionsList');
+
+    panel.style.display = 'block';
+    loading.style.display = 'block';
+    errorDiv.style.display = 'none';
+    list.innerHTML = '';
+
+    // Scroll to suggestions
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+        const res = await fetch('/api/generate-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                base_text: baseText,
+                category: selectedCategory,
+                count: 5
+            })
+        });
+        const data = await res.json();
+        loading.style.display = 'none';
+
+        if (data.error) {
+            document.getElementById('errorText').textContent = data.error;
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        if (data.prompts && data.prompts.length > 0) {
+            // Cache suggestions so they survive refresh
+            localStorage.setItem('ps_suggestions', JSON.stringify(data.prompts));
+            localStorage.setItem('ps_suggestions_cat', selectedCategory);
+            renderSuggestions(data.prompts, selectedCategory);
+        } else {
+            document.getElementById('errorText').textContent = 'No prompts generated. Try adding more detail.';
+            errorDiv.style.display = 'block';
+        }
+    } catch (err) {
+        loading.style.display = 'none';
+        document.getElementById('errorText').textContent = 'Connection error. Check your internet and try again.';
+        errorDiv.style.display = 'block';
+    }
+}
+
+function renderSuggestions(prompts, category) {
+    const panel = document.getElementById('suggestionsPanel');
+    const list = document.getElementById('suggestionsList');
+    panel.style.display = 'block';
+    document.getElementById('suggestionsLoading').style.display = 'none';
+    document.getElementById('suggestionsError').style.display = 'none';
+    list.innerHTML = '';
+
+    prompts.forEach((prompt, i) => {
+        const card = document.createElement('div');
+        card.className = 'prompt-card animate-fade-up';
+        card.style.animationDelay = (i * 0.08) + 's';
+        card.innerHTML = `
+            <div style="flex: 1; min-width: 0;">
+                <div class="prompt-text">${escapeHtml(prompt)}</div>
+                <div class="prompt-meta">
+                    <span class="badge" style="background: var(--accent-glow); color: var(--accent);">AI Generated</span>
+                    <span>${category || 'general'}</span>
+                </div>
+            </div>
+            <div class="prompt-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openRefineModal(\`${escapeForJs(prompt)}\`)" title="Refine">✨</button>
+                <button class="btn btn-secondary btn-sm" onclick="usePrompt(\`${escapeForJs(prompt)}\`)">Use</button>
+                <button class="btn btn-primary btn-sm" onclick="quickSaveApprove(\`${escapeForJs(prompt)}\`)">⚡ Approve</button>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function closeSuggestions() {
+    document.getElementById('suggestionsPanel').style.display = 'none';
+    localStorage.removeItem('ps_suggestions');
+    localStorage.removeItem('ps_suggestions_cat');
+}
+
+// ==========================================
+// ENHANCE PROMPT
+// ==========================================
+async function enhancePrompt() {
+    const textarea = document.getElementById('promptText');
+    const text = textarea.value.trim();
+    if (!text) { showToast('Write a prompt first, then click Enhance.', 'error'); return; }
+
+    const originalText = textarea.value;
+    textarea.value = '✦ Enhancing your prompt...';
+    textarea.disabled = true;
+
+    try {
+        const res = await fetch('/api/enhance-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+        const data = await res.json();
+        textarea.disabled = false;
+
+        if (data.enhanced) {
+            textarea.value = data.enhanced;
+            document.getElementById('promptType').value = 'enhanced';
+            localStorage.setItem('ps_prompt_text', data.enhanced);
+            showToast('Prompt enhanced!', 'success');
+        } else {
+            textarea.value = originalText;
+            showToast(data.error || 'Could not enhance. Try again.', 'error');
+        }
+    } catch (err) {
+        textarea.disabled = false;
+        textarea.value = originalText;
+        showToast('Connection error. Try again.', 'error');
+    }
+}
+
+// ==========================================
+// REFINE PROMPT
+// ==========================================
+let currentRefineText = '';
+
+function openRefineModal(text) {
+    currentRefineText = text;
+    document.getElementById('refineOriginal').textContent = text;
+    document.getElementById('refineInstruction').value = '';
+    document.getElementById('refineResult').style.display = 'none';
+    document.getElementById('refineLoading').style.display = 'none';
+    document.getElementById('refineBtn').style.display = 'inline-flex';
+    document.getElementById('useRefinedBtn').style.display = 'none';
+    openModal('refineModal');
+    setTimeout(() => document.getElementById('refineInstruction').focus(), 300);
+}
+
+async function doRefine() {
+    const instruction = document.getElementById('refineInstruction').value.trim();
+    if (!instruction) { showToast('Tell me how to change it.', 'error'); return; }
+
+    document.getElementById('refineLoading').style.display = 'block';
+    document.getElementById('refineBtn').style.display = 'none';
+
+    try {
+        const res = await fetch('/api/refine-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ original: currentRefineText, instruction: instruction })
+        });
+        const data = await res.json();
+        document.getElementById('refineLoading').style.display = 'none';
+
+        if (data.refined) {
+            currentRefineText = data.refined;
+            document.getElementById('refineResultText').textContent = data.refined;
+            document.getElementById('refineResult').style.display = 'block';
+            document.getElementById('useRefinedBtn').style.display = 'inline-flex';
+            document.getElementById('refineBtn').textContent = 'Refine More';
+            document.getElementById('refineBtn').style.display = 'inline-flex';
+        } else {
+            showToast(data.error || 'Could not refine. Try again.', 'error');
+            document.getElementById('refineBtn').style.display = 'inline-flex';
+        }
+    } catch (err) {
+        document.getElementById('refineLoading').style.display = 'none';
+        document.getElementById('refineBtn').style.display = 'inline-flex';
+        showToast('Connection error.', 'error');
+    }
+}
+
+function useRefinedPrompt() {
+    document.getElementById('promptText').value = currentRefineText;
+    document.getElementById('promptType').value = 'refined';
+    localStorage.setItem('ps_prompt_text', currentRefineText);
+    closeModal('refineModal');
+    showToast('Refined prompt loaded!', 'success');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ==========================================
+// PROMPT ACTIONS
+// ==========================================
+function usePrompt(text) {
+    document.getElementById('promptText').value = text;
+    document.getElementById('promptType').value = 'generated';
+    localStorage.setItem('ps_prompt_text', text);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('Prompt loaded into editor.', 'info');
+}
+
+async function quickSaveApprove(text) {
+    try {
+        const res = await fetch('/api/prompts/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, prompt_type: 'generated', auto_approve: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Prompt approved & queued!', 'success');
+            setTimeout(() => location.reload(), 800);
+        }
+    } catch (err) {
+        showToast('Error saving prompt.', 'error');
+    }
+}
+
+async function toggleFavorite(id, btn) {
+    const res = await fetch(`/prompts/${id}/favorite`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        btn.classList.toggle('active');
+        btn.innerHTML = data.is_favorite ? '★' : '☆';
+    }
+}
+
+async function approvePrompt(id, btn) {
+    const res = await fetch(`/prompts/${id}/approve`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        btn.outerHTML = '<span class="badge badge-approved">approved</span>';
+        const card = document.getElementById('prompt-' + id);
+        const badge = card.querySelector('.badge');
+        if (badge) { badge.className = 'badge badge-approved'; badge.textContent = 'approved'; }
+        showToast('Prompt approved!', 'success');
+    }
+}
+
+async function deletePrompt(id) {
+    if (!await showConfirm('Delete this prompt?')) return;
+    const res = await fetch(`/prompts/${id}/delete`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        const card = document.getElementById('prompt-' + id);
+        card.style.transition = 'all 0.3s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(20px)';
+        setTimeout(() => card.remove(), 300);
+    }
+}
+
+function filterPrompts(query) {
+    const cards = document.querySelectorAll('#promptsList .prompt-card');
+    const q = query.toLowerCase();
+    cards.forEach(card => {
+        const text = card.querySelector('.prompt-text')?.textContent.toLowerCase() || '';
+        card.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+}
+
+// ==========================================
+// UTILITIES
+// ==========================================
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function escapeForJs(text) {
+    return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+}
+</script>
+{% endblock %}

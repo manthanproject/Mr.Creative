@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mr.Creative{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23c1cd7d'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='%232c3400' font-size='18' font-family='sans-serif' font-weight='bold'>M</text></svg>">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <!-- Flash Messages -->
+    <div class="flash-container" id="flashContainer">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}" onclick="this.remove()">
+            {% if category == 'success' %}✓{% elif category == 'error' %}✕{% else %}ℹ{% endif %}
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endwith %}
+    </div>
+
+    <!-- Mobile Toggle -->
+    <button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+        ☰
+    </button>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <div class="logo-mark">✦</div>
+                    <div>
+                        <div class="logo-text">Mr.Creative</div>
+                        <div class="logo-tag">AI Creative Engine</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">Main</div>
+                <a href="{{ url_for('dashboard.index') }}" class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
+                    <span class="nav-icon">◉</span>
+                    Dashboard
+                </a>
+                <a href="{{ url_for('prompts.index') }}" class="nav-link {% if request.endpoint and 'prompts' in request.endpoint %}active{% endif %}">
+                    <span class="nav-icon">✎</span>
+                    Prompt Studio
+                </a>
+                <a href="{{ url_for('collections.index') }}" class="nav-link {% if request.endpoint and 'collections' in request.endpoint and request.endpoint != 'collections.compare' %}active{% endif %}">
+                    <span class="nav-icon">◫</span>
+                    Collections
+                </a>
+                <a href="{{ url_for('projects.index') }}" class="nav-link {% if request.endpoint and 'projects' in request.endpoint %}active{% endif %}">
+                    <span class="nav-icon">▦</span>
+                    Projects
+                </a>
+
+                <div class="nav-section-label">Tools</div>
+                <a href="{{ url_for('generate.index') }}" class="nav-link {% if request.endpoint and 'generate' in request.endpoint %}active{% endif %}" id="navGenerate">
+                    <span class="nav-icon">⚡</span>
+                    Generate
+                    <span class="nav-badge" id="queueBadge" style="display:none;">0</span>
+                </a>
+                <a href="/banners" class="nav-link {% if request.path.startswith('/banners') %}active{% endif %}">
+                    <span class="nav-icon">🎨</span>
+                    Banners
+                </a>
+                <a href="{{ url_for('scheduler.index') }}" class="nav-link {% if request.endpoint and 'scheduler' in request.endpoint %}active{% endif %}" id="navSchedule">
+                    <span class="nav-icon">⏱</span>
+                    Scheduler
+                    <span class="nav-badge" id="schedulerBadge" style="display:none;">0</span>
+                </a>
+                <a href="{{ url_for('collections.compare') }}" class="nav-link {% if request.endpoint == 'collections.compare' %}active{% endif %}" id="navCompare">
+                    <span class="nav-icon">⇄</span>
+                    Compare
+                </a>
+
+                <div class="nav-section-label">Account</div>
+                <a href="{{ url_for('settings.index') }}" class="nav-link {% if request.endpoint and 'settings' in request.endpoint %}active{% endif %}" id="navSettings">
+                    <span class="nav-icon">⚙</span>
+                    Settings
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar" style="background-color: {{ current_user.avatar_color }};">
+                        {{ current_user.initials }}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">{{ current_user.username }}</div>
+                        <div class="user-email">{{ current_user.email }}</div>
+                    </div>
+                    <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm" title="Logout">↗</a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% else %}
+        {% block auth_content %}{% endblock %}
+    {% endif %}
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+
+    <!-- Custom Confirm Modal -->
+    <div id="mcConfirmOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(27,27,27,0.85);align-items:center;justify-content:center;">
+        <div style="background:#1e1f20;border:1px solid #333537;border-radius:16px;max-width:400px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,0.5);animation:pmFadeIn 0.15s ease;">
+            <div style="padding:1.5rem 1.5rem 1rem;">
+                <p id="mcConfirmMsg" style="color:#e5e3d9;font-size:0.9rem;line-height:1.5;margin:0;"></p>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1.5rem 1.25rem;">
+                <button id="mcConfirmCancel" style="padding:0.5rem 1.2rem;border-radius:9999px;border:1px solid #333537;background:#282a2c;color:#c7c8b6;font-size:0.82rem;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>
+                <button id="mcConfirmOk" style="padding:0.5rem 1.2rem;border-radius:9999px;border:none;background:#c1cd7d;color:#2c3400;font-size:0.82rem;font-weight:600;cursor:pointer;font-family:inherit;">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global custom confirm
+        window.showConfirm = function(message) {
+            return new Promise(function(resolve) {
+                var overlay = document.getElementById('mcConfirmOverlay');
+                var msg = document.getElementById('mcConfirmMsg');
+                var okBtn = document.getElementById('mcConfirmOk');
+                var cancelBtn = document.getElementById('mcConfirmCancel');
+                msg.textContent = message;
+                overlay.style.display = 'flex';
+                function done(val) {
+                    overlay.style.display = 'none';
+                    okBtn.onclick = null; cancelBtn.onclick = null; overlay.onclick = null;
+                    document.removeEventListener('keydown', onKey);
+                    resolve(val);
+                }
+                function onKey(e) { if (e.key === 'Escape') done(false); }
+                okBtn.onclick = function() { done(true); };
+                cancelBtn.onclick = function() { done(false); };
+                overlay.onclick = function(e) { if (e.target === overlay) done(false); };
+                document.addEventListener('keydown', onKey);
+            });
+        };
+
+        // Auto-dismiss flash messages
+        setTimeout(() => {
+            document.querySelectorAll('.flash-message').forEach((el, i) => {
+                setTimeout(() => {
+                    el.style.animation = 'toastOut 0.3s ease forwards';
+                    setTimeout(() => el.remove(), 300);
+                }, i * 200);
+            });
+        }, 3000);
+
+        // Fetch scheduler badge count
+        (function() {
+            function updateSchedulerBadge() {
+                fetch('/scheduler/badge-count')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var badge = document.getElementById('schedulerBadge');
+                        if (badge && data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.style.display = '';
+                        } else if (badge) {
+                            badge.style.display = 'none';
+                        }
+                    })
+                    .catch(function() {});
+            }
+            updateSchedulerBadge();
+            // Refresh every 60 seconds
+            setInterval(updateSchedulerBadge, 60000);
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Projects — Mr.Creative{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>Projects</h1>
+            <p>Organize your work by business or brand</p>
+        </div>
+        <div class="header-btns">
+            <button class="btn btn-primary" onclick="openModal('createProjectModal')">
+                + New Project
+            </button>
+        </div>
+    </div>
+</div>
+
+{% if projects %}
+<div class="collections-grid">
+    {% set gradients = ['project-gradient-1', 'project-gradient-2', 'project-gradient-3', 'project-gradient-4', 'project-gradient-5', 'project-gradient-6'] %}
+    {% for project in projects %}
+    <div class="collection-card animate-fade-up delay-{{ loop.index if loop.index <= 8 else 8 }}" id="proj-{{ project.id }}">
+        <div class="collection-cover {{ gradients[(loop.index0) % 6] }}" onclick="window.location='{{ url_for('projects.view', project_id=project.id) }}'" style="cursor: pointer;">
+            <span style="font-size: 2rem; color: rgba(255,255,255,0.9);">▦</span>
+        </div>
+        <div class="collection-info" onclick="window.location='{{ url_for('projects.view', project_id=project.id) }}'" style="cursor: pointer;">
+            <h4>{{ project.name }}</h4>
+            <p>{{ project.description or 'No description' }}</p>
+            <div class="collection-meta">
+                {% if project.website_url %}
+                <span>🌐 {{ project.website_url[:30] }}{% if project.website_url|length > 30 %}...{% endif %}</span>
+                {% endif %}
+                <span>{{ project.created_at.strftime('%b %d, %Y') }}</span>
+            </div>
+        </div>
+        <div class="collection-actions">
+            <a href="{{ url_for('projects.view', project_id=project.id) }}" class="btn btn-ghost btn-sm">
+                Open →
+            </a>
+            <button class="btn btn-danger-outline btn-sm" data-id="{{ project.id }}" data-name="{{ project.name | e }}" onclick="event.stopPropagation(); deleteProject(this.dataset.id, this.dataset.name)">
+                ✕ Delete
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state animate-fade-up delay-1">
+    <div class="empty-icon">▦</div>
+    <h3>No projects yet</h3>
+    <p>Create a project to organize prompts and generations by brand or business</p>
+    <button class="btn btn-primary" onclick="openModal('createProjectModal')">+ Create Project</button>
+</div>
+{% endif %}
+
+<!-- Create Project Modal -->
+<div class="modal-overlay" id="createProjectModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>New Project</h3>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('createProjectModal')">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('projects.create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Project Name</label>
+                    <input type="text" name="name" class="form-input" placeholder="e.g. My Skincare Brand" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" class="textarea" rows="3" placeholder="Brief description of this project"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Website URL (for Pomelli)</label>
+                    <input type="url" name="website_url" class="form-input" placeholder="https://yourbusiness.com">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createProjectModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteProject(id, name) {
+    if (!await showConfirm(`Delete project "${name}" and all its data? This cannot be undone.`)) return;
+    const res = await fetch(`/projects/${id}/delete`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        const card = document.getElementById('proj-' + id);
+        card.style.transition = 'all 0.4s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.9)';
+        setTimeout(() => card.remove(), 400);
+        showToast('Project deleted!', 'success');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}{{ collection.name }} — Mr.Creative{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <a href="{{ url_for('collections.index') }}" style="font-size: 0.85rem; color: var(--text-muted);">← Collections</a>
+            <h1 style="margin-top: 0.25rem;">{{ collection.name }}</h1>
+            <p>{{ collection.description or 'No description' }}</p>
+        </div>
+        <div class="header-btns">
+            <button class="btn btn-secondary" onclick="document.getElementById('fileUpload').click()">📤 Upload Files</button>
+            <a href="{{ url_for('collections.export_zip', collection_id=collection.id) }}" class="btn btn-secondary">📦 Export ZIP</a>
+            <button class="btn btn-secondary" onclick="toggleShare('{{ collection.id }}')">
+                🔗 {% if collection.is_public %}Unshare{% else %}Share{% endif %}
+            </button>
+            <button class="btn btn-danger-outline" onclick="deleteCollection('{{ collection.id }}')">✕ Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden file upload input -->
+<input type="file" id="fileUpload" multiple accept="image/*,video/*" style="display: none;" onchange="uploadFiles(this.files)">
+
+{% if collection.is_public %}
+<div class="card" style="margin-bottom: 12px; background: var(--accent-glow); border-color: var(--accent-light);">
+    <div class="card-body" style="padding: 1rem 1.25rem;">
+        <div class="flex-between">
+            <div>
+                <span style="font-weight: 600; font-size: 0.9rem; color: var(--accent);">🔗 Public Link Active</span>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;" id="shareUrl">{{ request.host_url }}collections/shared/{{ collection.share_token }}</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyShareLink()">Copy Link</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Upload Drop Zone -->
+<div id="dropZone" class="upload-zone" style="margin-bottom: 12px; display: none;"
+     ondragover="event.preventDefault(); this.classList.add('drag-over');"
+     ondragleave="this.classList.remove('drag-over');"
+     ondrop="handleCollectionDrop(event)">
+    <span style="font-size: 1.5rem;">📤</span>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">Drop files here to add to collection</p>
+</div>
+
+<!-- Upload Progress -->
+<div id="uploadProgress" style="display: none; margin-bottom: 1rem;">
+    <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 1rem; text-align: center;">
+        <span style="animation: pulse 1.2s infinite;">📤</span>
+        <span id="uploadStatusText" style="margin-left: 0.5rem; font-size: 0.9rem;">Uploading...</span>
+    </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="flex-between" style="margin-bottom: 10px;">
+    <div class="flex gap-1">
+        <span class="badge badge-completed">{{ (generations|length) + (folder_files|length) }} items</span>
+        {% if collection.is_public %}<span class="badge badge-approved">Shared</span>{% endif %}
+    </div>
+    <div class="flex gap-1">
+        <button class="btn btn-ghost btn-sm" onclick="toggleDropZone()">📤 Drop Zone</button>
+    </div>
+</div>
+
+<!-- Gallery Grid -->
+{% set all_items = folder_files %}
+{% if all_items or generations %}
+<div class="gallery-grid">
+    <!-- Folder files -->
+    {% for file in folder_files %}
+    <div class="gallery-item animate-fade-up delay-{{ loop.index if loop.index <= 8 else 8 }}"
+         data-type="{{ file.file_type }}"
+         data-src="{{ url_for('static', filename=file.path) }}">
+        <div class="gallery-thumb">
+            {% if file.file_type == 'image' %}
+            <img src="{{ url_for('static', filename=file.path) }}" alt="{{ file.filename }}" loading="lazy">
+            {% elif file.file_type == 'video' %}
+            <video src="{{ url_for('static', filename=file.path) }}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>
+            <div class="video-play-overlay">
+                <span>▶</span>
+            </div>
+            {% else %}
+            <span style="font-size: 2rem; color: var(--text-muted);">◫</span>
+            {% endif %}
+        </div>
+        <div class="gallery-info">
+            <div class="type-tag">{{ file.file_type|upper }}</div>
+            <div class="time">{{ file.modified.strftime('%b %d, %Y') }}</div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Generation records (only if no folder files exist) -->
+    {% if not folder_files %}
+    {% for gen in generations %}
+    {% if gen.output_path %}
+    <div class="gallery-item animate-fade-up delay-{{ loop.index if loop.index <= 8 else 8 }}"
+         data-type="{{ gen.output_type }}"
+         data-src="{{ url_for('static', filename=gen.output_path) }}">
+        <div class="gallery-thumb">
+            {% if gen.output_type == 'video' %}
+            <video src="{{ url_for('static', filename=gen.output_path) }}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>
+            <div class="video-play-overlay">
+                <span>▶</span>
+            </div>
+            {% else %}
+            <img src="{{ url_for('static', filename=gen.output_path) }}" alt="Generation" loading="lazy">
+            {% endif %}
+        </div>
+        <div class="gallery-info">
+            <div class="type-tag">{{ gen.output_type|upper }}</div>
+            <div class="time">{{ gen.created_at.strftime('%b %d, %Y') }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">◫</div>
+    <h3>Collection is empty</h3>
+    <p>Upload files or generate creatives with Pomelli to fill this collection</p>
+    <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">📤 Upload Files</button>
+</div>
+{% endif %}
+
+<!-- Lightbox (supports both images and videos) -->
+<div id="lightbox" onclick="lightboxClick(event)">
+    <img id="lightboxImg" alt="">
+    <video id="lightboxVideo" controls autoplay></video>
+    <button id="lightboxClose" onclick="closeLightbox()">✕</button>
+    <a id="lightboxDownload" download>⬇ Download</a>
+</div>
+
+<style>
+    .video-play-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.25);
+        transition: background 0.2s;
+    }
+    .video-play-overlay span {
+        font-size: 2.5rem;
+        color: white;
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+        transition: transform 0.2s;
+    }
+    .gallery-item:hover .video-play-overlay {
+        background: rgba(0,0,0,0.4);
+    }
+    .gallery-item:hover .video-play-overlay span {
+        transform: scale(1.15);
+    }
+
+    #lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.92);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    #lightbox.active {
+        display: flex;
+    }
+    #lightboxImg, #lightboxVideo {
+        max-width: 90vw;
+        max-height: 85vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        cursor: default;
+    }
+    #lightboxImg { display: none; }
+    #lightboxVideo { display: none; outline: none; }
+    #lightboxClose {
+        position: absolute;
+        top: 1.5rem;
+        right: 1.5rem;
+        background: rgba(255,255,255,0.15);
+        border: none;
+        color: white;
+        font-size: 1.3rem;
+        cursor: pointer;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+    }
+    #lightboxClose:hover { background: rgba(255,255,255,0.3); }
+    #lightboxDownload {
+        position: absolute;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        background: rgba(255,255,255,0.15);
+        color: white;
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+    #lightboxDownload:hover { background: rgba(255,255,255,0.3); }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ════════════════════
+// LIGHTBOX (Image + Video)
+// ════════════════════
+function openLightbox(type, src) {
+    var lb = document.getElementById('lightbox');
+    var img = document.getElementById('lightboxImg');
+    var vid = document.getElementById('lightboxVideo');
+    var dl = document.getElementById('lightboxDownload');
+
+    img.style.display = 'none';
+    vid.style.display = 'none';
+    vid.pause();
+    vid.src = '';
+
+    if (type === 'video') {
+        vid.src = src;
+        vid.style.display = 'block';
+        vid.play();
+    } else {
+        img.src = src;
+        img.style.display = 'block';
+    }
+
+    dl.href = src;
+    lb.classList.add('active');
+}
+
+function closeLightbox() {
+    var lb = document.getElementById('lightbox');
+    var vid = document.getElementById('lightboxVideo');
+    vid.pause();
+    vid.src = '';
+    lb.classList.remove('active');
+}
+
+function lightboxClick(event) {
+    // Close lightbox when clicking backdrop (not the content)
+    if (event.target === document.getElementById('lightbox')) {
+        closeLightbox();
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLightbox();
+});
+
+// Attach click handlers to gallery items
+document.querySelectorAll('.gallery-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+        var type = this.getAttribute('data-type');
+        var src = this.getAttribute('data-src');
+        if (src) openLightbox(type, src);
+    });
+});
+
+// ════════════════════
+// UPLOAD
+// ════════════════════
+async function uploadFiles(files) {
+    if (!files || files.length === 0) return;
+
+    var progress = document.getElementById('uploadProgress');
+    var statusText = document.getElementById('uploadStatusText');
+    progress.style.display = 'block';
+    statusText.textContent = 'Uploading ' + files.length + ' files...';
+
+    var formData = new FormData();
+    for (var i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+    }
+
+    try {
+        var res = await fetch('{{ url_for("collections.upload", collection_id=collection.id) }}', {
+            method: 'POST',
+            body: formData
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            statusText.textContent = data.message;
+            showToast(data.message, 'success');
+            setTimeout(function() { location.reload(); }, 1000);
+        } else {
+            statusText.textContent = data.error || 'Upload failed';
+            showToast(data.error || 'Upload failed', 'error');
+        }
+    } catch (err) {
+        statusText.textContent = 'Upload error';
+        showToast('Upload error', 'error');
+    }
+
+    setTimeout(function() { progress.style.display = 'none'; }, 3000);
+}
+
+// ════════════════════
+// DROP ZONE
+// ════════════════════
+function toggleDropZone() {
+    var dz = document.getElementById('dropZone');
+    dz.style.display = dz.style.display === 'none' ? 'block' : 'none';
+}
+
+function handleCollectionDrop(event) {
+    event.preventDefault();
+    event.target.closest('#dropZone').classList.remove('drag-over');
+    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        uploadFiles(event.dataTransfer.files);
+    }
+}
+
+// ════════════════════
+// SHARE / DELETE
+// ════════════════════
+async function toggleShare(id) {
+    var res = await fetch('/collections/' + id + '/toggle-share', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) location.reload();
+}
+
+function copyShareLink() {
+    var url = document.getElementById('shareUrl').textContent;
+    navigator.clipboard.writeText(url).then(function() { showToast('Link copied!', 'success'); });
+}
+
+async function deleteCollection(id) {
+    if (!await showConfirm('Delete this collection and all its files?')) return;
+    var res = await fetch('/collections/' + id + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) window.location = '{{ url_for("collections.index") }}';
+}
+</script>
+{% endblock %}

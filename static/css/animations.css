@@ -1,0 +1,685 @@
+/* ═══════════════════════════════════════════════════════
+   MR.CREATIVE — ANIMATIONS & MICRO-INTERACTIONS
+   Drop-in addon. Does not override existing styles.
+   Just add: <link rel="stylesheet" href="css/animations.css">
+═══════════════════════════════════════════════════════ */
+
+/* ═══════════════════
+   PAGE LOAD ENTRANCE
+═══════════════════ */
+@keyframes mcFadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mcFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes mcSlideRight {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mcSlideLeft {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mcScaleIn {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mcDropIn {
+    from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Staggered fade-up for cards/lists */
+.animate-fade-up {
+    opacity: 0;
+    animation: mcFadeUp 0.5s ease forwards;
+}
+.delay-1 { animation-delay: 0.05s; }
+.delay-2 { animation-delay: 0.1s; }
+.delay-3 { animation-delay: 0.15s; }
+.delay-4 { animation-delay: 0.2s; }
+.delay-5 { animation-delay: 0.25s; }
+.delay-6 { animation-delay: 0.3s; }
+.delay-7 { animation-delay: 0.35s; }
+.delay-8 { animation-delay: 0.4s; }
+
+/* ═══════════════════
+   SIDEBAR ANIMATIONS
+═══════════════════ */
+.sidebar {
+    animation: mcSlideRight 0.3s ease;
+}
+
+/* Nav link hover — icon bounce */
+.nav-link {
+    transition: all 0.2s ease, background 0.15s ease, padding-left 0.2s ease;
+}
+
+.nav-link:hover {
+    padding-left: calc(var(--sidebar-padding, 16px) + 4px);
+}
+
+.nav-link:hover .nav-icon {
+    animation: mcIconBounce 0.4s ease;
+}
+
+@keyframes mcIconBounce {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25) rotate(-5deg); }
+    70%  { transform: scale(0.95) rotate(2deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+
+/* Active nav link glow */
+.nav-link.active {
+    position: relative;
+}
+
+.nav-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: #c1cd7d;
+    border-radius: 0 3px 3px 0;
+    animation: mcGlowPulse 2.5s ease infinite;
+}
+
+@keyframes mcGlowPulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(193, 205, 125, 0.4); opacity: 1; }
+    50%      { box-shadow: 0 0 12px rgba(193, 205, 125, 0.7); opacity: 0.8; }
+}
+
+/* Nav badge pop */
+.nav-badge {
+    animation: mcBadgePop 0.3s ease;
+}
+
+@keyframes mcBadgePop {
+    0%   { transform: scale(0); }
+    60%  { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+/* Logo subtle float */
+.sidebar-logo .logo-mark {
+    animation: mcLogoFloat 4s ease-in-out infinite;
+}
+
+@keyframes mcLogoFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25%      { transform: translateY(-2px) rotate(3deg); }
+    75%      { transform: translateY(1px) rotate(-2deg); }
+}
+
+/* ═══════════════════
+   CARD ANIMATIONS
+═══════════════════ */
+/* Collection/project cards */
+.collection-card,
+.pm-card,
+.sch-card,
+.set-section,
+.sch-job {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.collection-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* Card cover image zoom on hover */
+.collection-cover img {
+    transition: transform 0.4s ease;
+}
+
+.collection-card:hover .collection-cover img {
+    transform: scale(1.05);
+}
+
+/* ═══════════════════
+   BUTTON ANIMATIONS
+═══════════════════ */
+/* Primary button shimmer */
+.btn-primary,
+.pm-btn-primary,
+.sch-btn-create {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary::after,
+.pm-btn-primary::after,
+.sch-btn-create::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    animation: mcShimmer 3s ease infinite;
+    pointer-events: none;
+}
+
+@keyframes mcShimmer {
+    0%   { left: -100%; }
+    40%  { left: 150%; }
+    100% { left: 150%; }
+}
+
+/* Button click ripple */
+.btn,
+.pm-btn,
+.pm-btn-primary,
+.pm-btn-ghost,
+.sch-btn-create,
+.set-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.btn:active,
+.pm-btn:active,
+.pm-btn-primary:active,
+.sch-btn-create:active,
+.set-btn:active {
+    transform: scale(0.97);
+}
+
+/* Ghost button hover glow */
+.btn-ghost:hover,
+.pm-btn-ghost:hover {
+    box-shadow: 0 0 0 1px rgba(193, 205, 125, 0.15);
+}
+
+/* Danger button shake on hover */
+.btn-danger-outline:hover,
+.pm-btn-danger:hover,
+.set-btn-danger:hover {
+    animation: mcShake 0.4s ease;
+}
+
+@keyframes mcShake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-2px); }
+    40%      { transform: translateX(2px); }
+    60%      { transform: translateX(-1px); }
+    80%      { transform: translateX(1px); }
+}
+
+/* ═══════════════════
+   INPUT FOCUS GLOW
+═══════════════════ */
+.form-input:focus,
+.textarea:focus,
+.pm-input:focus,
+.pm-select:focus,
+.pm-textarea:focus,
+.sch-input:focus,
+.sch-select:focus,
+.sch-textarea:focus,
+.set-input:focus {
+    animation: mcFocusGlow 0.3s ease;
+}
+
+@keyframes mcFocusGlow {
+    0%   { box-shadow: 0 0 0 0 rgba(193, 205, 125, 0); }
+    50%  { box-shadow: 0 0 0 4px rgba(193, 205, 125, 0.2); }
+    100% { box-shadow: 0 0 0 2px rgba(193, 205, 125, 0.15); }
+}
+
+/* ═══════════════════
+   TOGGLE SWITCH ANIMATION
+═══════════════════ */
+.pm-toggle-switch,
+.sch-job-toggle {
+    transition: background 0.25s ease;
+}
+
+.pm-toggle-switch::after,
+.sch-job-toggle::after {
+    transition: all 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* ═══════════════════
+   TOAST ANIMATIONS
+═══════════════════ */
+@keyframes mcToastIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes mcToastOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+}
+
+.flash-message,
+.toast {
+    animation: mcToastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ═══════════════════
+   MODAL ANIMATIONS
+═══════════════════ */
+.modal-overlay {
+    transition: opacity 0.2s ease;
+}
+
+.modal-overlay .modal,
+#mcConfirmOverlay > div {
+    animation: mcScaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ═══════════════════
+   TEMPLATE CARD HOVER
+═══════════════════ */
+.pm-tmpl {
+    transition: all 0.25s ease;
+}
+
+.pm-tmpl:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.pm-tmpl:hover .pm-tmpl-preview img {
+    transform: scale(1.08);
+    transition: transform 0.4s ease;
+}
+
+.pm-tmpl .pm-tmpl-preview img {
+    transition: transform 0.4s ease;
+}
+
+/* Check mark pop */
+.pm-tmpl .pm-check {
+    transition: all 0.2s ease;
+}
+
+.pm-tmpl.selected .pm-check {
+    animation: mcCheckPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes mcCheckPop {
+    0%   { transform: scale(0) rotate(-20deg); }
+    60%  { transform: scale(1.2) rotate(5deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+
+/* Scheduler template chips */
+.sch-tmpl {
+    transition: all 0.2s ease;
+}
+
+.sch-tmpl:hover {
+    transform: translateY(-2px);
+}
+
+.sch-tmpl.selected {
+    animation: mcChipSelect 0.25s ease;
+}
+
+@keyframes mcChipSelect {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+/* ═══════════════════
+   IDEA CARD STAGGER
+═══════════════════ */
+.idea-card {
+    animation: mcFadeUp 0.35s ease forwards;
+    opacity: 0;
+}
+
+.idea-card:nth-child(1) { animation-delay: 0.05s; }
+.idea-card:nth-child(2) { animation-delay: 0.12s; }
+.idea-card:nth-child(3) { animation-delay: 0.19s; }
+
+.idea-card:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+}
+
+/* ═══════════════════
+   ANIMATE CARD SELECTION
+═══════════════════ */
+.animate-card {
+    transition: all 0.25s ease;
+}
+
+.animate-card:hover {
+    transform: translateY(-4px) scale(1.02);
+}
+
+.animate-card.selected {
+    animation: mcCardSelect 0.3s ease;
+}
+
+@keyframes mcCardSelect {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(0.96); }
+    60%  { transform: scale(1.03); }
+    100% { transform: scale(1); }
+}
+
+/* ═══════════════════
+   PROGRESS BAR
+═══════════════════ */
+.pm-progress {
+    animation: mcFadeUp 0.4s ease;
+}
+
+/* Step indicators pulse when active */
+.pm-step.active {
+    animation: mcStepPulse 1.5s ease infinite;
+}
+
+@keyframes mcStepPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(193, 205, 125, 0.3); }
+    50%      { opacity: 0.7; box-shadow: 0 0 0 4px rgba(193, 205, 125, 0); }
+}
+
+/* Step done checkmark pop */
+.pm-step.done {
+    animation: mcStepDone 0.35s ease;
+}
+
+@keyframes mcStepDone {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+
+/* ═══════════════════
+   JOB QUEUE ITEMS
+═══════════════════ */
+.pm-job {
+    transition: all 0.2s ease;
+}
+
+.pm-job:hover {
+    background: rgba(255, 255, 255, 0.02);
+    padding-left: 4px;
+}
+
+/* Processing dot pulse */
+.pm-job-dot.processing {
+    animation: mcDotPulse 1.2s ease infinite;
+    box-shadow: 0 0 0 0 rgba(193, 205, 125, 0.4);
+}
+
+@keyframes mcDotPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(193, 205, 125, 0.4); }
+    70%  { box-shadow: 0 0 0 6px rgba(193, 205, 125, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(193, 205, 125, 0); }
+}
+
+/* Completed dot pop */
+.pm-job-dot.completed {
+    animation: mcDotComplete 0.5s ease;
+}
+
+@keyframes mcDotComplete {
+    0%   { transform: scale(0); }
+    50%  { transform: scale(1.5); }
+    100% { transform: scale(1); }
+}
+
+/* ═══════════════════
+   UPLOAD ZONE
+═══════════════════ */
+.pm-upload {
+    transition: all 0.3s ease;
+}
+
+.pm-upload:hover .pm-upload-icon {
+    animation: mcUploadBounce 0.6s ease;
+}
+
+@keyframes mcUploadBounce {
+    0%, 100% { transform: translateY(0); }
+    30%      { transform: translateY(-6px); }
+    50%      { transform: translateY(-2px); }
+    70%      { transform: translateY(-4px); }
+}
+
+.pm-upload.drag-over {
+    animation: mcDragPulse 0.8s ease infinite;
+}
+
+@keyframes mcDragPulse {
+    0%, 100% { border-color: #c1cd7d; box-shadow: 0 0 0 0 rgba(193, 205, 125, 0.2); }
+    50%      { border-color: #c1cd7d; box-shadow: 0 0 0 6px rgba(193, 205, 125, 0); }
+}
+
+/* ═══════════════════
+   SETTINGS PAGE
+═══════════════════ */
+/* Avatar color swatch pop */
+.set-swatch {
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.set-swatch:hover {
+    transform: scale(1.2);
+}
+
+.set-swatch:active {
+    transform: scale(0.9);
+}
+
+.set-swatch.active {
+    animation: mcSwatchSelect 0.3s ease;
+}
+
+@keyframes mcSwatchSelect {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.3); }
+    100% { transform: scale(1.15); }
+}
+
+/* Stat counter entrance */
+.set-stat {
+    animation: mcFadeUp 0.4s ease forwards;
+    opacity: 0;
+}
+
+.set-stat:nth-child(1) { animation-delay: 0.05s; }
+.set-stat:nth-child(2) { animation-delay: 0.1s; }
+.set-stat:nth-child(3) { animation-delay: 0.15s; }
+.set-stat:nth-child(4) { animation-delay: 0.2s; }
+.set-stat:nth-child(5) { animation-delay: 0.25s; }
+
+/* Danger zone hover */
+.set-danger-item {
+    transition: all 0.2s ease;
+    padding-left: 0;
+    border-left: 3px solid transparent;
+}
+
+.set-danger-item:hover {
+    padding-left: 8px;
+    border-left-color: #f87171;
+    background: rgba(248, 113, 113, 0.03);
+}
+
+/* Settings nav */
+.set-nav-item {
+    transition: all 0.2s ease;
+}
+
+.set-nav-item:hover {
+    padding-left: 1.1rem;
+}
+
+/* ═══════════════════
+   SCHEDULER JOB ROWS
+═══════════════════ */
+.sch-job {
+    transition: all 0.2s ease;
+}
+
+.sch-job:hover {
+    transform: translateX(3px);
+}
+
+/* Toggle switch bounce */
+.sch-job-toggle.on::after {
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* ═══════════════════
+   COLLECTION BULK SELECT
+═══════════════════ */
+.bulk-toolbar.visible {
+    animation: mcDropIn 0.25s ease;
+}
+
+.card-checkbox {
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card-checkbox.checked {
+    animation: mcCheckPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.collection-card.selected {
+    animation: mcCardSelect 0.25s ease;
+}
+
+/* ═══════════════════
+   EMPTY STATE
+═══════════════════ */
+.empty-state,
+.pm-empty,
+.sch-empty {
+    animation: mcFadeUp 0.5s ease;
+}
+
+.empty-state .empty-icon,
+.pm-empty .pm-empty-icon,
+.sch-empty .sch-empty-icon {
+    animation: mcLogoFloat 3s ease-in-out infinite;
+}
+
+/* ═══════════════════
+   SCROLLBAR STYLING
+═══════════════════ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(193, 205, 125, 0.15);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(193, 205, 125, 0.3);
+}
+
+/* ═══════════════════
+   SEASONAL DROPDOWN
+═══════════════════ */
+.pm-seasonal-dd {
+    animation: mcDropIn 0.15s ease;
+}
+
+.pm-seasonal-opt {
+    transition: all 0.15s ease;
+}
+
+.pm-seasonal-opt:hover {
+    padding-left: 20px;
+}
+
+/* ═══════════════════
+   TABS ANIMATION
+═══════════════════ */
+.pm-tab,
+.sch-tab,
+.pm-mode-btn {
+    transition: all 0.2s ease;
+}
+
+.pm-tab:active,
+.sch-tab:active,
+.pm-mode-btn:active {
+    transform: scale(0.95);
+}
+
+/* ═══════════════════
+   USER CARD HOVER
+═══════════════════ */
+.user-card {
+    transition: all 0.2s ease;
+}
+
+.user-card:hover .user-avatar {
+    animation: mcIconBounce 0.4s ease;
+}
+
+/* ═══════════════════
+   ACCOUNT ROW HOVER
+═══════════════════ */
+.pm-card-body div[style*="savedAccountsItems"] > div,
+#savedAccountsItems > div {
+    transition: all 0.15s ease;
+}
+
+#savedAccountsItems > div:hover {
+    transform: translateX(2px);
+}
+
+/* ═══════════════════
+   SELECTION/FOCUS RING
+═══════════════════ */
+::selection {
+    background: rgba(193, 205, 125, 0.3);
+    color: #e5e3d9;
+}
+
+/* ═══════════════════
+   REDUCED MOTION
+═══════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

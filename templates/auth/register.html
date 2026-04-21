@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Create Account — Mr.Creative{% endblock %}
+
+{% block auth_content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="logo-icon">✦</div>
+            <h1>Mr.Creative</h1>
+            <p>Start creating with AI</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}" style="margin-bottom: 1rem; min-width: auto;" onclick="this.remove()">
+            {% if category == 'error' %}✕{% else %}ℹ{% endif %}
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('auth.register') }}">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" class="form-input" placeholder="johndoe" required autofocus minlength="3">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="Min 6 characters" required minlength="6">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-input" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top: 0.5rem;">
+                Create Account →
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <span style="color: var(--text-muted); font-size: 0.85rem;">Already have an account?</span>
+            <a href="{{ url_for('auth.login') }}" style="font-weight: 600; font-size: 0.85rem; margin-left: 0.25rem;">Sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

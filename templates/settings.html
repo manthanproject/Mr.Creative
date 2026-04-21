@@ -1,0 +1,703 @@
+{% extends "base.html" %}
+{% block title %}Settings — Mr.Creative{% endblock %}
+
+{% block content %}
+<style>
+    /* ═══════════════════
+       SETTINGS PAGE
+    ═══════════════════ */
+    .set-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .set-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #e5e3d9;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .set-header p {
+        font-size: 0.82rem;
+        color: #919282;
+        margin-top: 0.2rem;
+    }
+
+    /* ═══════════════════
+       LAYOUT
+    ═══════════════════ */
+    .set-grid {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    @media (max-width: 900px) {
+        .set-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ═══════════════════
+       SIDEBAR NAV
+    ═══════════════════ */
+    .set-nav {
+        position: sticky;
+        top: 16px;
+    }
+
+    .set-nav-item {
+        display: block;
+        padding: 0.55rem 0.85rem;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        color: #c7c8b6;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: none;
+        background: none;
+        text-align: left;
+        width: 100%;
+        font-family: inherit;
+        margin-bottom: 2px;
+    }
+
+    .set-nav-item:hover {
+        background: #282a2c;
+        color: #e5e3d9;
+    }
+
+    .set-nav-item.active {
+        background: rgba(193, 205, 125, 0.1);
+        color: #c1cd7d;
+        font-weight: 600;
+    }
+
+    .set-nav-item.danger {
+        color: #919282;
+    }
+
+    .set-nav-item.danger:hover {
+        color: #f87171;
+        background: rgba(248, 113, 113, 0.06);
+    }
+
+    /* ═══════════════════
+       SECTIONS
+    ═══════════════════ */
+    .set-section {
+        background: #1e1f20;
+        border: 1px solid #282a2c;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .set-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #e5e3d9;
+        margin-bottom: 0.15rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .set-section-desc {
+        font-size: 0.78rem;
+        color: #919282;
+        margin-bottom: 1rem;
+    }
+
+    /* ═══════════════════
+       FORM ELEMENTS
+    ═══════════════════ */
+    .set-form-group {
+        margin-bottom: 0.85rem;
+    }
+
+    .set-label {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: #c7c8b6;
+        margin-bottom: 0.3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .set-input {
+        width: 100%;
+        padding: 0.6rem 0.85rem;
+        background: #282a2c;
+        border: 1px solid #333537;
+        border-radius: 12px;
+        color: #e5e3d9;
+        font-size: 0.85rem;
+        font-family: inherit;
+        transition: border-color 0.2s;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .set-input:focus {
+        border-color: #c1cd7d;
+        box-shadow: 0 0 0 2px rgba(193, 205, 125, 0.15);
+    }
+
+    .set-input:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .set-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.85rem;
+    }
+
+    @media (max-width: 600px) {
+        .set-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .set-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0.55rem 1.1rem;
+        border-radius: 9999px;
+        border: none;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s;
+    }
+
+    .set-btn-primary {
+        background: #c1cd7d;
+        color: #2c3400;
+    }
+
+    .set-btn-primary:hover {
+        background: #cdd98a;
+        box-shadow: 0 4px 12px rgba(193, 205, 125, 0.2);
+    }
+
+    .set-btn-primary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .set-btn-ghost {
+        background: #282a2c;
+        color: #c7c8b6;
+        border: 1px solid #333537;
+    }
+
+    .set-btn-ghost:hover {
+        background: #333537;
+        color: #e5e3d9;
+    }
+
+    .set-btn-danger {
+        background: rgba(248, 113, 113, 0.12);
+        color: #f87171;
+        border: 1px solid rgba(248, 113, 113, 0.25);
+    }
+
+    .set-btn-danger:hover {
+        background: rgba(248, 113, 113, 0.2);
+    }
+
+    /* ═══════════════════
+       AVATAR PREVIEW
+    ═══════════════════ */
+    .set-avatar-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .set-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: white;
+        flex-shrink: 0;
+    }
+
+    .set-avatar-info {
+        flex: 1;
+    }
+
+    .set-avatar-name {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #e5e3d9;
+    }
+
+    .set-avatar-email {
+        font-size: 0.78rem;
+        color: #919282;
+    }
+
+    .set-color-swatches {
+        display: flex;
+        gap: 6px;
+        margin-top: 0.5rem;
+    }
+
+    .set-swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.15s;
+    }
+
+    .set-swatch:hover {
+        transform: scale(1.15);
+    }
+
+    .set-swatch.active {
+        border-color: #e5e3d9;
+        box-shadow: 0 0 0 2px rgba(229, 227, 217, 0.3);
+    }
+
+    /* ═══════════════════
+       STATS ROW
+    ═══════════════════ */
+    .set-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .set-stat {
+        text-align: center;
+        padding: 0.75rem 0.5rem;
+        background: #282a2c;
+        border-radius: 12px;
+        border: 1px solid #333537;
+    }
+
+    .set-stat-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #c1cd7d;
+    }
+
+    .set-stat-label {
+        font-size: 0.68rem;
+        color: #919282;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-top: 2px;
+    }
+
+    /* ═══════════════════
+       DANGER ZONE
+    ═══════════════════ */
+    .set-danger-zone {
+        border-color: rgba(248, 113, 113, 0.2);
+    }
+
+    .set-danger-zone .set-section-title {
+        color: #f87171;
+    }
+
+    .set-danger-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #282a2c;
+    }
+
+    .set-danger-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .set-danger-info h4 {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #e5e3d9;
+    }
+
+    .set-danger-info p {
+        font-size: 0.72rem;
+        color: #919282;
+        margin-top: 2px;
+    }
+
+    /* ═══════════════════
+       HINT TEXT
+    ═══════════════════ */
+    .set-hint {
+        font-size: 0.72rem;
+        color: #919282;
+        margin-top: 0.2rem;
+    }
+
+    .set-success-msg {
+        font-size: 0.78rem;
+        color: #4ade80;
+        margin-top: 0.4rem;
+        display: none;
+    }
+</style>
+
+<div class="set-header">
+    <h1>⚙ Settings</h1>
+    <p>Manage your profile, security, and app preferences</p>
+</div>
+
+<div class="set-grid">
+
+    <!-- ════════════════════════════════
+         LEFT: NAV
+    ════════════════════════════════ -->
+    <nav class="set-nav">
+        <button class="set-nav-item active" onclick="scrollToSection('profile', this)">👤 Profile</button>
+        <button class="set-nav-item" onclick="scrollToSection('password', this)">🔒 Password</button>
+        <button class="set-nav-item" onclick="scrollToSection('data', this)">📊 Data & Storage</button>
+        <button class="set-nav-item danger" onclick="scrollToSection('danger', this)">⚠ Danger Zone</button>
+    </nav>
+
+    <!-- ════════════════════════════════
+         RIGHT: SECTIONS
+    ════════════════════════════════ -->
+    <div>
+        <!-- ──── PROFILE ──── -->
+        <div class="set-section" id="sectionProfile">
+            <div class="set-section-title">👤 Profile</div>
+            <div class="set-section-desc">Your account identity across Mr.Creative</div>
+
+            <div class="set-avatar-row">
+                <div class="set-avatar" id="avatarPreview" style="background-color: {{ current_user.avatar_color }};">
+                    {{ current_user.initials }}
+                </div>
+                <div class="set-avatar-info">
+                    <div class="set-avatar-name" id="displayName">{{ current_user.username }}</div>
+                    <div class="set-avatar-email" id="displayEmail">{{ current_user.email }}</div>
+                    <div class="set-color-swatches">
+                        {% set colors = ['#6C5CE7', '#c1cd7d', '#00B894', '#E17055', '#0984E3', '#D63031', '#FDCB6E', '#A29BFE', '#E84393', '#00CEC9'] %}
+                        {% for color in colors %}
+                        <div class="set-swatch {% if current_user.avatar_color == color %}active{% endif %}"
+                             style="background: {{ color }};"
+                             onclick="selectAvatarColor('{{ color }}', this)"
+                             data-color="{{ color }}"></div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="set-row">
+                <div class="set-form-group">
+                    <label class="set-label">Username</label>
+                    <input type="text" id="setUsername" class="set-input" value="{{ current_user.username }}">
+                </div>
+                <div class="set-form-group">
+                    <label class="set-label">Email</label>
+                    <input type="email" id="setEmail" class="set-input" value="{{ current_user.email }}">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="set-btn set-btn-primary" onclick="saveProfile()">Save Changes</button>
+                <span class="set-success-msg" id="profileSuccess">✓ Saved!</span>
+            </div>
+        </div>
+
+        <!-- ──── PASSWORD ──── -->
+        <div class="set-section" id="sectionPassword">
+            <div class="set-section-title">🔒 Password</div>
+            <div class="set-section-desc">Update your login password</div>
+
+            <div class="set-form-group">
+                <label class="set-label">Current Password</label>
+                <input type="password" id="setCurPw" class="set-input" placeholder="••••••••">
+            </div>
+
+            <div class="set-row">
+                <div class="set-form-group">
+                    <label class="set-label">New Password</label>
+                    <input type="password" id="setNewPw" class="set-input" placeholder="At least 6 characters">
+                </div>
+                <div class="set-form-group">
+                    <label class="set-label">Confirm New Password</label>
+                    <input type="password" id="setConfirmPw" class="set-input" placeholder="••••••••">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="set-btn set-btn-primary" onclick="changePassword()">Update Password</button>
+                <span class="set-success-msg" id="passwordSuccess">✓ Updated!</span>
+            </div>
+        </div>
+
+        <!-- ──── DATA & STORAGE ──── -->
+        <div class="set-section" id="sectionData">
+            <div class="set-section-title">📊 Data & Storage</div>
+            <div class="set-section-desc">Your account usage overview</div>
+
+            <div class="set-stats">
+                <div class="set-stat">
+                    <div class="set-stat-value">{{ stats.generations }}</div>
+                    <div class="set-stat-label">Generations</div>
+                </div>
+                <div class="set-stat">
+                    <div class="set-stat-value">{{ stats.collections }}</div>
+                    <div class="set-stat-label">Collections</div>
+                </div>
+                <div class="set-stat">
+                    <div class="set-stat-value">{{ stats.prompts }}</div>
+                    <div class="set-stat-label">Prompts</div>
+                </div>
+                <div class="set-stat">
+                    <div class="set-stat-value">{{ stats.jobs }}</div>
+                    <div class="set-stat-label">Jobs Run</div>
+                </div>
+                <div class="set-stat">
+                    <div class="set-stat-value">{{ stats.storage_display }}</div>
+                    <div class="set-stat-label">Storage</div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="set-btn set-btn-ghost" onclick="clearData('generations')">🗑 Clear Generations</button>
+                <button class="set-btn set-btn-ghost" onclick="clearData('jobs')">🗑 Clear Job History</button>
+            </div>
+            <p class="set-hint" style="margin-top: 0.5rem;">Clearing generations removes records only — collection files are preserved.</p>
+        </div>
+
+        <!-- ──── DANGER ZONE ──── -->
+        <div class="set-section set-danger-zone" id="sectionDanger">
+            <div class="set-section-title">⚠ Danger Zone</div>
+            <div class="set-section-desc">Irreversible actions — proceed with caution</div>
+
+            <div class="set-danger-item">
+                <div class="set-danger-info">
+                    <h4>Clear All Data</h4>
+                    <p>Delete all generations, jobs, and scheduled tasks. Keeps your account and collections.</p>
+                </div>
+                <button class="set-btn set-btn-danger" onclick="clearData('all')">Clear All</button>
+            </div>
+
+            <div class="set-danger-item">
+                <div class="set-danger-info">
+                    <h4>Delete Account</h4>
+                    <p>Permanently delete your account and all associated data. This cannot be undone.</p>
+                </div>
+                <button class="set-btn set-btn-danger" onclick="deleteAccount()">Delete Account</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var selectedAvatarColor = '{{ current_user.avatar_color }}';
+
+    // ════════════════════
+    // SECTION NAVIGATION
+    // ════════════════════
+    function scrollToSection(id, btn) {
+        var sectionMap = {
+            profile: 'sectionProfile',
+            password: 'sectionPassword',
+            data: 'sectionData',
+            danger: 'sectionDanger',
+        };
+        var el = document.getElementById(sectionMap[id]);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        document.querySelectorAll('.set-nav-item').forEach(function(n) { n.classList.remove('active'); });
+        btn.classList.add('active');
+    }
+
+    // ════════════════════
+    // AVATAR COLOR
+    // ════════════════════
+    function selectAvatarColor(color, swatch) {
+        selectedAvatarColor = color;
+        document.querySelectorAll('.set-swatch').forEach(function(s) { s.classList.remove('active'); });
+        swatch.classList.add('active');
+        document.getElementById('avatarPreview').style.backgroundColor = color;
+    }
+
+    // ════════════════════
+    // SAVE PROFILE
+    // ════════════════════
+    async function saveProfile() {
+        var username = document.getElementById('setUsername').value.trim();
+        var email = document.getElementById('setEmail').value.trim();
+
+        if (!username) { showToast('Username is required.', 'error'); return; }
+        if (!email) { showToast('Email is required.', 'error'); return; }
+
+        try {
+            var res = await fetch('/settings/update-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    avatar_color: selectedAvatarColor,
+                })
+            });
+            var data = await res.json();
+
+            if (data.success) {
+                document.getElementById('displayName').textContent = data.username;
+                document.getElementById('displayEmail').textContent = data.email;
+                document.getElementById('avatarPreview').textContent = data.initials;
+
+                // Update sidebar too
+                var sidebarName = document.querySelector('.user-name');
+                var sidebarEmail = document.querySelector('.user-email');
+                var sidebarAvatar = document.querySelector('.user-avatar');
+                if (sidebarName) sidebarName.textContent = data.username;
+                if (sidebarEmail) sidebarEmail.textContent = data.email;
+                if (sidebarAvatar) {
+                    sidebarAvatar.textContent = data.initials;
+                    sidebarAvatar.style.backgroundColor = data.avatar_color;
+                }
+
+                flashSuccess('profileSuccess');
+                showToast('Profile updated!', 'success');
+            } else {
+                showToast(data.error || 'Failed to save.', 'error');
+            }
+        } catch (err) {
+            showToast('Error saving profile.', 'error');
+        }
+    }
+
+    // ════════════════════
+    // CHANGE PASSWORD
+    // ════════════════════
+    async function changePassword() {
+        var curPw = document.getElementById('setCurPw').value;
+        var newPw = document.getElementById('setNewPw').value;
+        var confirmPw = document.getElementById('setConfirmPw').value;
+
+        if (!curPw) { showToast('Enter your current password.', 'error'); return; }
+        if (!newPw || newPw.length < 6) { showToast('New password must be 6+ characters.', 'error'); return; }
+        if (newPw !== confirmPw) { showToast('Passwords don\'t match.', 'error'); return; }
+
+        try {
+            var res = await fetch('/settings/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_password: curPw,
+                    new_password: newPw,
+                    confirm_password: confirmPw,
+                })
+            });
+            var data = await res.json();
+
+            if (data.success) {
+                document.getElementById('setCurPw').value = '';
+                document.getElementById('setNewPw').value = '';
+                document.getElementById('setConfirmPw').value = '';
+                flashSuccess('passwordSuccess');
+                showToast('Password updated!', 'success');
+            } else {
+                showToast(data.error || 'Failed to update.', 'error');
+            }
+        } catch (err) {
+            showToast('Error changing password.', 'error');
+        }
+    }
+
+    // ════════════════════
+    // CLEAR DATA
+    // ════════════════════
+    async function clearData(what) {
+        var labels = {
+            generations: 'all generation records',
+            jobs: 'all job history and scheduled tasks',
+            all: 'ALL data (generations, jobs, scheduled tasks)',
+        };
+        var msg = 'Clear ' + (labels[what] || what) + '? This cannot be undone.';
+        if (!await showConfirm(msg)) return;
+
+        try {
+            var res = await fetch('/settings/clear-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ what: what })
+            });
+            var data = await res.json();
+            if (data.success) {
+                showToast(data.message || 'Data cleared!', 'success');
+                setTimeout(function() { location.reload(); }, 1000);
+            } else {
+                showToast(data.error || 'Failed.', 'error');
+            }
+        } catch (err) {
+            showToast('Error clearing data.', 'error');
+        }
+    }
+
+    // ════════════════════
+    // DELETE ACCOUNT
+    // ════════════════════
+    async function deleteAccount() {
+        if (!await showConfirm('Permanently delete your account and ALL data? This absolutely cannot be undone.')) return;
+
+        // Double confirm with password
+        var password = prompt('Enter your password to confirm:');
+        if (!password) return;
+
+        try {
+            var res = await fetch('/settings/delete-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            });
+            var data = await res.json();
+            if (data.success) {
+                showToast('Account deleted. Redirecting...', 'info');
+                setTimeout(function() {
+                    window.location.href = data.redirect || '/auth/login';
+                }, 1500);
+            } else {
+                showToast(data.error || 'Failed to delete.', 'error');
+            }
+        } catch (err) {
+            showToast('Error deleting account.', 'error');
+        }
+    }
+
+    // ════════════════════
+    // UTILITY
+    // ════════════════════
+    function flashSuccess(id) {
+        var el = document.getElementById(id);
+        el.style.display = 'inline';
+        setTimeout(function() { el.style.display = 'none'; }, 3000);
+    }
+</script>
+{% endblock %}

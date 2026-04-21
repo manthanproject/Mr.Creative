@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Mr.Creative{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <a href="{{ url_for('projects.index') }}" style="font-size: 0.85rem; color: var(--text-muted);">← Projects</a>
+            <h1 style="margin-top: 0.25rem;">{{ project.name }}</h1>
+            <p>{{ project.description or 'No description' }}
+                {% if project.website_url %} · <a href="{{ project.website_url }}" target="_blank" style="font-size: 0.9rem;">🌐 {{ project.website_url[:40] }}</a>{% endif %}
+            </p>
+        </div>
+        <div class="header-btns">
+            <a href="{{ url_for('prompts.index') }}" class="btn btn-primary">✦ New Prompt</a>
+            <button class="btn btn-danger-outline" onclick="deleteProject('{{ project.id }}')">✕ Delete</button>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <!-- Project Prompts -->
+    <div class="card animate-fade-up delay-1">
+        <div class="card-header">
+            <h3>Prompts</h3>
+            <span class="text-muted text-sm">{{ project.prompts.count() }} total</span>
+        </div>
+        <div class="card-body">
+            {% set project_prompts = project.prompts.order_by(None).all() %}
+            {% if project_prompts %}
+            <div class="prompt-list">
+                {% for prompt in project_prompts[:10] %}
+                <div class="prompt-card" style="border: none; box-shadow: none; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light);">
+                    <div style="flex: 1;">
+                        <div class="prompt-text" style="font-size: 0.85rem;">{{ prompt.text[:100] }}{% if prompt.text|length > 100 %}...{% endif %}</div>
+                        <div class="prompt-meta">
+                            <span class="badge badge-{{ prompt.status }}">{{ prompt.status }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 2rem;">
+                <p>No prompts in this project yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Project Generations -->
+    <div class="card animate-fade-up delay-2">
+        <div class="card-header">
+            <h3>Generations</h3>
+            <span class="text-muted text-sm">{{ project.generations.count() }} total</span>
+        </div>
+        <div class="card-body">
+            {% set project_gens = project.generations.order_by(None).all() %}
+            {% if project_gens %}
+            <div class="gallery-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
+                {% for gen in project_gens[:8] %}
+                <div class="gallery-item">
+                    <div class="gallery-thumb" style="aspect-ratio: 1;">
+                        {% if gen.thumbnail_path %}
+                        <img src="{{ url_for('static', filename=gen.thumbnail_path) }}" alt="Generation">
+                        {% else %}
+                        <span style="font-size: 1.5rem; color: var(--text-muted);">◫</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 2rem;">
+                <p>No generations in this project yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteProject(id) {
+    if (!await showConfirm('Delete this project and all its data?')) return;
+    const res = await fetch(`/projects/${id}/delete`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) window.location = '{{ url_for("projects.index") }}';
+}
+</script>
+{% endblock %}

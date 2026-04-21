@@ -1,0 +1,930 @@
+{% extends "base.html" %}
+{% block title %}Scheduler — Mr.Creative{% endblock %}
+
+{% block content %}
+<style>
+    /* ═══════════════════
+       SCHEDULER PAGE
+    ═══════════════════ */
+    .sch-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+    }
+
+    .sch-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-primary, #e5e3d9);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sch-header h1 small {
+        font-size: 0.78rem;
+        font-weight: 400;
+        color: var(--text-muted, #919282);
+    }
+
+    .sch-header-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    /* ═══════════════════
+       LAYOUT: TWO COLUMNS
+    ═══════════════════ */
+    .sch-grid {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 1.25rem;
+        align-items: start;
+    }
+
+    @media (max-width: 1100px) {
+        .sch-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ═══════════════════
+       CARD
+    ═══════════════════ */
+    .sch-card {
+        background: #1e1f20;
+        border: 1px solid #282a2c;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .sch-card-header {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #282a2c;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .sch-card-header h3 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #e5e3d9;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sch-card-body {
+        padding: 0.85rem;
+    }
+
+    /* ═══════════════════
+       SECTION TABS
+    ═══════════════════ */
+    .sch-tabs {
+        display: flex;
+        gap: 2px;
+        background: #1e1f20;
+        border-radius: 9999px;
+        padding: 4px;
+        border: 1px solid #282a2c;
+        width: fit-content;
+        margin-bottom: 1rem;
+    }
+
+    .sch-tab {
+        padding: 0.5rem 1.1rem;
+        border-radius: 9999px;
+        border: none;
+        background: transparent;
+        color: #c7c8b6;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: inherit;
+    }
+
+    .sch-tab:hover {
+        color: #e5e3d9;
+        background: #333537;
+    }
+
+    .sch-tab.active {
+        background: #c1cd7d;
+        color: #2c3400;
+        font-weight: 600;
+    }
+
+    .sch-tab .tab-count {
+        display: inline-block;
+        background: rgba(193, 205, 125, 0.2);
+        color: #c1cd7d;
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 8px;
+        margin-left: 4px;
+    }
+
+    .sch-tab.active .tab-count {
+        background: rgba(44, 52, 0, 0.25);
+        color: #2c3400;
+    }
+
+    /* ═══════════════════
+       JOB ROW
+    ═══════════════════ */
+    .sch-job {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.85rem 1rem;
+        background: #1e1f20;
+        border: 1px solid #282a2c;
+        border-radius: 14px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+    .sch-job:hover {
+        border-color: #333537;
+        background: #232425;
+    }
+
+    .sch-job.inactive {
+        opacity: 0.5;
+    }
+
+    .sch-job-toggle {
+        width: 36px;
+        height: 20px;
+        background: #333537;
+        border-radius: 10px;
+        position: relative;
+        flex-shrink: 0;
+        cursor: pointer;
+        transition: background 0.2s;
+        border: none;
+        padding: 0;
+    }
+
+    .sch-job-toggle::after {
+        content: '';
+        width: 16px;
+        height: 16px;
+        background: #919282;
+        border-radius: 50%;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: all 0.2s;
+    }
+
+    .sch-job-toggle.on {
+        background: #c1cd7d;
+    }
+
+    .sch-job-toggle.on::after {
+        left: 18px;
+        background: #2c3400;
+    }
+
+    .sch-job-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sch-job-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #e5e3d9;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sch-job-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 3px;
+        flex-wrap: wrap;
+    }
+
+    .sch-job-meta span {
+        font-size: 0.72rem;
+        color: #919282;
+    }
+
+    .sch-job-meta .sch-badge {
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .sch-badge-once { background: rgba(193, 205, 125, 0.12); color: #c1cd7d; }
+    .sch-badge-daily { background: rgba(125, 172, 240, 0.12); color: #7dacf0; }
+    .sch-badge-weekly { background: rgba(200, 140, 240, 0.12); color: #c88cf0; }
+    .sch-badge-campaign { background: rgba(193, 205, 125, 0.12); color: #c1cd7d; }
+    .sch-badge-photoshoot { background: rgba(125, 172, 240, 0.12); color: #7dacf0; }
+
+    .sch-job-prompt {
+        font-size: 0.72rem;
+        color: #919282;
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 350px;
+    }
+
+    .sch-job-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .sch-action-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #333537;
+        background: #282a2c;
+        color: #c7c8b6;
+        font-size: 0.82rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+        font-family: inherit;
+    }
+
+    .sch-action-btn:hover {
+        background: #333537;
+        color: #e5e3d9;
+    }
+
+    .sch-action-btn.run:hover {
+        background: rgba(193, 205, 125, 0.15);
+        color: #c1cd7d;
+        border-color: rgba(193, 205, 125, 0.3);
+    }
+
+    .sch-action-btn.delete:hover {
+        background: rgba(248, 113, 113, 0.12);
+        color: #f87171;
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    /* ═══════════════════
+       CREATE FORM
+    ═══════════════════ */
+    .sch-form-group {
+        margin-bottom: 0.65rem;
+    }
+
+    .sch-form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .sch-label {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: #c7c8b6;
+        margin-bottom: 0.3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .sch-input,
+    .sch-select,
+    .sch-textarea {
+        width: 100%;
+        padding: 0.6rem 0.85rem;
+        background: #282a2c;
+        border: 1px solid #333537;
+        border-radius: 12px;
+        color: #e5e3d9;
+        font-size: 0.85rem;
+        font-family: inherit;
+        transition: border-color 0.2s;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .sch-input:focus,
+    .sch-select:focus,
+    .sch-textarea:focus {
+        border-color: #c1cd7d;
+        box-shadow: 0 0 0 2px rgba(193, 205, 125, 0.15);
+    }
+
+    .sch-textarea {
+        resize: vertical;
+        min-height: 70px;
+    }
+
+    .sch-select option {
+        background: #1e1f20;
+        color: #e5e3d9;
+    }
+
+    .sch-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.65rem;
+    }
+
+    .sch-btn-create {
+        width: 100%;
+        padding: 0.65rem;
+        border-radius: 9999px;
+        border: none;
+        background: #c1cd7d;
+        color: #2c3400;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+        margin-top: 0.5rem;
+    }
+
+    .sch-btn-create:hover {
+        background: #cdd98a;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(193, 205, 125, 0.25);
+    }
+
+    .sch-btn-create:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* ═══════════════════
+       NEXT RUN HIGHLIGHT
+    ═══════════════════ */
+    .sch-next-run {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.72rem;
+        color: #c1cd7d;
+        font-weight: 600;
+    }
+
+    .sch-next-run .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #c1cd7d;
+        animation: schPulse 2s ease infinite;
+    }
+
+    @keyframes schPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    /* ═══════════════════
+       EMPTY
+    ═══════════════════ */
+    .sch-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: #919282;
+    }
+
+    .sch-empty-icon {
+        font-size: 2rem;
+        margin-bottom: 0.4rem;
+        opacity: 0.4;
+    }
+
+    .sch-empty h4 {
+        font-size: 0.88rem;
+        color: #c7c8b6;
+        margin-bottom: 0.25rem;
+    }
+
+    .sch-empty p {
+        font-size: 0.78rem;
+    }
+
+    /* ═══════════════════
+       INFO BANNER
+    ═══════════════════ */
+    .sch-info {
+        padding: 0.7rem 0.85rem;
+        background: rgba(193, 205, 125, 0.06);
+        border: 1px solid rgba(193, 205, 125, 0.12);
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: #c7c8b6;
+        line-height: 1.5;
+        margin-top: 0.75rem;
+    }
+
+    .sch-info strong {
+        color: #c1cd7d;
+    }
+
+    /* Template chips */
+    .sch-tmpl {
+        padding: 6px 8px;
+        background: #282a2c;
+        border: 2px solid #333537;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #c7c8b6;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.15s;
+        user-select: none;
+    }
+
+    .sch-tmpl:hover {
+        border-color: #444746;
+        color: #e5e3d9;
+    }
+
+    .sch-tmpl.selected {
+        border-color: #c1cd7d;
+        background: rgba(193, 205, 125, 0.1);
+        color: #c1cd7d;
+    }
+
+    .sch-tmpl.disabled {
+        opacity: 0.3;
+        pointer-events: none;
+    }
+
+    /* Upload button */
+    .sch-btn-upload {
+        padding: 0.5rem 0.85rem;
+        background: #282a2c;
+        border: 1px solid #333537;
+        border-radius: 10px;
+        color: #c7c8b6;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sch-btn-upload:hover {
+        background: #333537;
+        color: #e5e3d9;
+        border-color: #444746;
+    }
+
+    .sch-btn-upload.has-file {
+        border-color: #c1cd7d;
+        color: #c1cd7d;
+    }
+</style>
+
+<div class="sch-header">
+    <h1>⏱ Scheduler <small>Automate your Pomelli runs</small></h1>
+    <div class="sch-header-actions">
+        {% if scheduler_status and scheduler_status.running %}
+        <div style="display:flex;align-items:center;gap:6px;padding:0.4rem 0.85rem;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:9999px;font-size:0.75rem;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;animation:schPulse 2s ease infinite;"></span>
+            <span style="color:#4ade80;font-weight:600;">Auto-run active</span>
+            <span style="color:#919282;">· checks every 60s</span>
+        </div>
+        {% else %}
+        <div style="display:flex;align-items:center;gap:6px;padding:0.4rem 0.85rem;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:9999px;font-size:0.75rem;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#f87171;"></span>
+            <span style="color:#f87171;font-weight:600;">Auto-run inactive</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="sch-grid">
+
+    <!-- ════════════════════════════════
+         LEFT: JOB LIST
+    ════════════════════════════════ -->
+    <div>
+        <div class="sch-tabs">
+            <button class="sch-tab active" onclick="filterJobs('all', this)">
+                All <span class="tab-count">{{ jobs|length }}</span>
+            </button>
+            <button class="sch-tab" onclick="filterJobs('upcoming', this)">
+                ⏳ Upcoming <span class="tab-count">{{ upcoming|length }}</span>
+            </button>
+            <button class="sch-tab" onclick="filterJobs('past', this)">
+                ✓ Past <span class="tab-count">{{ past|length }}</span>
+            </button>
+        </div>
+
+        <div id="jobList">
+            {% if jobs %}
+                {% for job in jobs %}
+                <div class="sch-job {% if not job.is_active %}inactive{% endif %}"
+                     id="schJob-{{ job.id }}"
+                     data-status="{% if job.is_active and (job.next_run or job.scheduled_time) >= now %}upcoming{% else %}past{% endif %}">
+                    <button class="sch-job-toggle {% if job.is_active %}on{% endif %}"
+                            onclick="toggleJob('{{ job.id }}')"
+                            title="{% if job.is_active %}Pause{% else %}Activate{% endif %}">
+                    </button>
+                    <div class="sch-job-info">
+                        <div class="sch-job-name">{{ job.name }}</div>
+                        <div class="sch-job-meta">
+                            <span class="sch-badge sch-badge-{{ job.schedule_type }}">{{ job.schedule_type }}</span>
+                            <span class="sch-badge sch-badge-{{ job.pomelli_feature }}">{{ job.pomelli_feature }}</span>
+                            {% if job.is_active and job.next_run %}
+                            <span class="sch-next-run">
+                                <span class="dot"></span>
+                                Next: {{ job.next_run.strftime('%b %d, %H:%M') }}
+                            </span>
+                            {% elif job.last_run %}
+                            <span>Last ran: {{ job.last_run.strftime('%b %d, %H:%M') }}</span>
+                            {% else %}
+                            <span>{{ job.scheduled_time.strftime('%b %d, %H:%M') }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="sch-job-prompt" title="{{ job.prompt_text }}">{{ job.prompt_text[:80] }}{% if job.prompt_text|length > 80 %}...{% endif %}</div>
+                    </div>
+                    <div class="sch-job-actions">
+                        <button class="sch-action-btn run" onclick="runJobNow('{{ job.id }}', '{{ job.name }}')" title="Run now">▶</button>
+                        <button class="sch-action-btn delete" onclick="deleteJob('{{ job.id }}', '{{ job.name }}')" title="Delete">✕</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="sch-empty" id="emptyState">
+                    <div class="sch-empty-icon">⏱</div>
+                    <h4>No scheduled jobs</h4>
+                    <p>Create a schedule to automate your Pomelli runs</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════
+         RIGHT: CREATE FORM
+    ════════════════════════════════ -->
+    <div>
+        <div class="sch-card">
+            <div class="sch-card-header">
+                <h3>➕ New Scheduled Job</h3>
+            </div>
+            <div class="sch-card-body">
+                <div class="sch-form-group">
+                    <label class="sch-label">Job Name</label>
+                    <input type="text" id="schName" class="sch-input" placeholder="e.g. Morning Campaign Run">
+                </div>
+
+                <div class="sch-row">
+                    <div class="sch-form-group">
+                        <label class="sch-label">Feature</label>
+                        <select id="schFeature" class="sch-select" onchange="onFeatureChange(this.value)">
+                            <option value="campaign">📝 Campaign</option>
+                            <option value="photoshoot">📸 Photoshoot</option>
+                            <option value="generate">🎨 Generate / Edit</option>
+                        </select>
+                    </div>
+                    <div class="sch-form-group">
+                        <label class="sch-label">Repeat</label>
+                        <select id="schRepeat" class="sch-select">
+                            <option value="once">Once</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Prompt (campaign + generate) -->
+                <div class="sch-form-group" id="schPromptGroup">
+                    <label class="sch-label">Prompt</label>
+                    {% if prompts %}
+                    <select id="schPromptSelect" class="sch-select" onchange="onSchPromptSelect(this.value)" style="margin-bottom: 6px;">
+                        <option value="">— Pick approved prompt —</option>
+                        {% for p in prompts %}
+                        <option value="{{ p.id }}" data-text="{{ p.text }}">{{ p.text[:60] }}{% if p.text|length > 60 %}...{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                    <textarea id="schPrompt" class="sch-textarea" rows="3" placeholder="Enter your campaign prompt..."></textarea>
+                </div>
+
+                <!-- Product URL (campaign only) -->
+                <div class="sch-form-group" id="schProductUrlGroup">
+                    <label class="sch-label">Product URL (optional)</label>
+                    <input type="url" id="schProductUrl" class="sch-input" placeholder="https://yourbrand.com/products/serum" style="font-size: 0.8rem;">
+                </div>
+
+                <!-- Image Upload (all modes — required for photoshoot, optional for campaign + generate) -->
+                <div class="sch-form-group" id="schImageGroup">
+                    <label class="sch-label" id="schImageLabel">Image (optional)</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" class="sch-btn-upload" onclick="document.getElementById('schImageInput').click()">
+                            📷 <span id="schImageName">Choose Image</span>
+                        </button>
+                        <button type="button" id="schImageClear" style="display:none;background:none;border:none;color:#f87171;cursor:pointer;font-size:0.85rem;" onclick="clearSchImage()">✕</button>
+                        <input type="file" id="schImageInput" accept="image/*" style="display:none;" onchange="handleSchImageSelect(this)">
+                    </div>
+                </div>
+
+                <!-- Aspect Ratio (all modes) -->
+                <div class="sch-form-group" id="schAspectGroup">
+                    <label class="sch-label">Aspect Ratio</label>
+                    <select id="schAspect" class="sch-select">
+                        <option value="story">Story (9:16)</option>
+                        <option value="square">Square (1:1)</option>
+                        <option value="feed">Feed (4:5)</option>
+                    </select>
+                </div>
+
+                <!-- Template Picker (photoshoot only) -->
+                <div class="sch-form-group" id="schTemplateGroup" style="display: none;">
+                    <label class="sch-label">Templates <span id="schTmplCount" style="color:#c1cd7d;">(0/4)</span></label>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'Studio')">Studio</div>
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'Floating')">Floating</div>
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'Ingredient')">Ingredient</div>
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'In Use')">In Use</div>
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'Contextual')">Contextual</div>
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'Flatlay')">Flatlay</div>
+                        <div class="sch-tmpl" onclick="toggleSchTemplate(this, 'Model Try On')">Model Try On</div>
+                    </div>
+                </div>
+
+                <div class="sch-form-group">
+                    <label class="sch-label">Date & Time</label>
+                    <input type="datetime-local" id="schDateTime" class="sch-input">
+                </div>
+
+                <button class="sch-btn-create" id="schCreateBtn" onclick="createJob()">
+                    ⏱ Schedule Job
+                </button>
+
+                <div class="sch-info">
+                    <strong>How it works:</strong> Jobs run automatically at the scheduled time using your active Google account.
+                    The scheduler checks every 60 seconds for due jobs. Daily/weekly jobs repeat automatically.
+                    You can also hit ▶ to run any job immediately.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set default datetime to now + 1 hour (local time)
+    (function() {
+        var now = new Date();
+        now.setHours(now.getHours() + 1);
+        now.setMinutes(0, 0, 0);
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var d = String(now.getDate()).padStart(2, '0');
+        var h = String(now.getHours()).padStart(2, '0');
+        var min = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('schDateTime').value = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+    })();
+
+    var schSelectedTemplates = [];
+    var schImageFile = null;
+
+    // ════════════════════
+    // FEATURE MODE SWITCHING
+    // ════════════════════
+    function onFeatureChange(feature) {
+        var promptGroup = document.getElementById('schPromptGroup');
+        var productUrlGroup = document.getElementById('schProductUrlGroup');
+        var imageGroup = document.getElementById('schImageGroup');
+        var templateGroup = document.getElementById('schTemplateGroup');
+        var aspectGroup = document.getElementById('schAspectGroup');
+        var imageLabel = document.getElementById('schImageLabel');
+
+        if (feature === 'campaign') {
+            promptGroup.style.display = '';
+            productUrlGroup.style.display = '';
+            imageGroup.style.display = '';
+            templateGroup.style.display = 'none';
+            aspectGroup.style.display = '';
+            imageLabel.textContent = 'Image (optional)';
+            document.getElementById('schPrompt').placeholder = 'Enter your campaign prompt...';
+        } else if (feature === 'photoshoot') {
+            promptGroup.style.display = 'none';
+            productUrlGroup.style.display = 'none';
+            imageGroup.style.display = '';
+            templateGroup.style.display = '';
+            aspectGroup.style.display = 'none';
+            imageLabel.textContent = 'Product Image (required)';
+        } else if (feature === 'generate') {
+            promptGroup.style.display = '';
+            productUrlGroup.style.display = 'none';
+            imageGroup.style.display = '';
+            templateGroup.style.display = 'none';
+            aspectGroup.style.display = '';
+            imageLabel.textContent = 'Reference Image (optional)';
+            document.getElementById('schPrompt').placeholder = 'Describe the image to generate or edit...';
+        }
+    }
+
+    // ════════════════════
+    // IMAGE UPLOAD
+    // ════════════════════
+    function handleSchImageSelect(input) {
+        if (input.files && input.files[0]) {
+            schImageFile = input.files[0];
+            var name = schImageFile.name;
+            if (name.length > 20) name = name.substring(0, 17) + '...';
+            document.getElementById('schImageName').textContent = name;
+            document.getElementById('schImageClear').style.display = '';
+            document.querySelector('.sch-btn-upload').classList.add('has-file');
+        }
+    }
+
+    function clearSchImage() {
+        schImageFile = null;
+        document.getElementById('schImageInput').value = '';
+        document.getElementById('schImageName').textContent = 'Choose Image';
+        document.getElementById('schImageClear').style.display = 'none';
+        document.querySelector('.sch-btn-upload').classList.remove('has-file');
+    }
+
+    // ════════════════════
+    // TEMPLATE SELECTION
+    // ════════════════════
+    function toggleSchTemplate(el, name) {
+        if (el.classList.contains('selected')) {
+            el.classList.remove('selected');
+            schSelectedTemplates = schSelectedTemplates.filter(function(t) { return t !== name; });
+        } else {
+            if (schSelectedTemplates.length >= 4) {
+                showToast('Max 4 templates.', 'error');
+                return;
+            }
+            el.classList.add('selected');
+            schSelectedTemplates.push(name);
+        }
+        document.getElementById('schTmplCount').textContent = '(' + schSelectedTemplates.length + '/4)';
+        document.querySelectorAll('.sch-tmpl').forEach(function(t) {
+            if (schSelectedTemplates.length >= 4 && !t.classList.contains('selected')) {
+                t.classList.add('disabled');
+            } else {
+                t.classList.remove('disabled');
+            }
+        });
+    }
+
+    // ════════════════════
+    // PROMPT QUICK-PICK
+    // ════════════════════
+    function onSchPromptSelect(id) {
+        if (id) {
+            var opt = document.querySelector('#schPromptSelect option[value="' + id + '"]');
+            if (opt && opt.dataset.text) {
+                document.getElementById('schPrompt').value = opt.dataset.text;
+            }
+        }
+    }
+
+    // ════════════════════
+    // FILTER TABS
+    // ════════════════════
+    function filterJobs(filter, btn) {
+        document.querySelectorAll('.sch-tab').forEach(function(t) { t.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelectorAll('.sch-job').forEach(function(job) {
+            if (filter === 'all') {
+                job.style.display = '';
+            } else {
+                job.style.display = job.dataset.status === filter ? '' : 'none';
+            }
+        });
+    }
+
+    // ════════════════════
+    // CREATE JOB
+    // ════════════════════
+    async function createJob() {
+        var name = document.getElementById('schName').value.trim();
+        var prompt = document.getElementById('schPrompt').value.trim();
+        var feature = document.getElementById('schFeature').value;
+        var repeat = document.getElementById('schRepeat').value;
+        var dt = document.getElementById('schDateTime').value;
+        var productUrl = document.getElementById('schProductUrl').value.trim();
+        var aspectRatio = document.getElementById('schAspect').value;
+
+        if (!name) { showToast('Enter a job name.', 'error'); return; }
+        if (!dt) { showToast('Pick a date & time.', 'error'); return; }
+
+        if (feature === 'campaign' && !prompt) {
+            showToast('Enter a prompt for campaign.', 'error'); return;
+        }
+        if (feature === 'generate' && !prompt && !schImageFile) {
+            showToast('Enter a prompt or upload an image.', 'error'); return;
+        }
+        if (feature === 'photoshoot' && !schImageFile) {
+            showToast('Upload a product image for photoshoot.', 'error'); return;
+        }
+        if (feature === 'photoshoot' && schSelectedTemplates.length === 0) {
+            showToast('Select at least 1 template.', 'error'); return;
+        }
+
+        var btn = document.getElementById('schCreateBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Creating...';
+
+        try {
+            var res;
+            if (schImageFile) {
+                var formData = new FormData();
+                formData.append('name', name);
+                formData.append('prompt_text', prompt);
+                formData.append('pomelli_feature', feature);
+                formData.append('schedule_type', repeat);
+                formData.append('scheduled_time', dt);
+                formData.append('image', schImageFile);
+                formData.append('templates', JSON.stringify(schSelectedTemplates));
+                formData.append('aspect_ratio', aspectRatio);
+                formData.append('product_url', productUrl);
+                res = await fetch('/scheduler/create', { method: 'POST', body: formData });
+            } else {
+                res = await fetch('/scheduler/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name, prompt_text: prompt, pomelli_feature: feature,
+                        schedule_type: repeat, scheduled_time: dt, templates: schSelectedTemplates,
+                        aspect_ratio: aspectRatio, product_url: productUrl,
+                    })
+                });
+            }
+            var data = await res.json();
+            if (data.success) {
+                showToast(data.message || 'Job scheduled!', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.error || 'Failed to create.', 'error');
+            }
+        } catch (err) {
+            showToast('Error creating job.', 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = '⏱ Schedule Job';
+    }
+
+    // ════════════════════
+    // TOGGLE / RUN / DELETE
+    // ════════════════════
+    async function toggleJob(id) {
+        try {
+            var res = await fetch('/scheduler/' + id + '/toggle', { method: 'POST' });
+            var data = await res.json();
+            if (data.success) {
+                var row = document.getElementById('schJob-' + id);
+                var toggle = row.querySelector('.sch-job-toggle');
+                if (data.is_active) { row.classList.remove('inactive'); toggle.classList.add('on'); showToast('Job activated', 'success'); }
+                else { row.classList.add('inactive'); toggle.classList.remove('on'); showToast('Job paused', 'info'); }
+            }
+        } catch (err) { showToast('Error toggling job.', 'error'); }
+    }
+
+    async function runJobNow(id, name) {
+        if (!await showConfirm('Run "' + name + '" now?')) return;
+        try {
+            var res = await fetch('/scheduler/' + id + '/run-now', { method: 'POST' });
+            var data = await res.json();
+            if (data.success) { showToast(data.message || 'Job started!', 'success'); setTimeout(function() { window.location.href = '/generate/'; }, 1500); }
+            else { showToast(data.error || 'Failed to run.', 'error'); }
+        } catch (err) { showToast('Error running job.', 'error'); }
+    }
+
+    async function deleteJob(id, name) {
+        if (!await showConfirm('Delete schedule "' + name + '"?')) return;
+        try {
+            var res = await fetch('/scheduler/' + id + '/delete', { method: 'POST' });
+            var data = await res.json();
+            if (data.success) {
+                var row = document.getElementById('schJob-' + id);
+                if (row) { row.style.transition = 'all 0.35s ease'; row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; setTimeout(function() { row.remove(); }, 350); }
+                showToast('Schedule deleted.', 'success');
+            }
+        } catch (err) { showToast('Error deleting.', 'error'); }
+    }
+</script>
+{% endblock %}

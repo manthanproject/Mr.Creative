@@ -1,0 +1,56 @@
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ─── Editors / OS ───
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ─── Flask / SQLite ───
+instance/
+database.db
+*.sqlite
+*.sqlite3
+
+# ─── Chrome profiles (huge, contain cookies/creds) ───
+chrome_debug/
+chrome_session/
+chrome_pomelli_profile/
+chrome_flow_profile/
+
+# ─── Runtime data (users will regenerate) ───
+static/uploads/
+static/outputs/
+static/downloads/
+static/exports/
+
+# ─── Sensitive files ───
+saved_accounts.json
+.env
+.env.local
+*.pem
+*.key
+
+# ─── Root-level test/debug artifacts ───
+download_result.png
+final_result.png
+final_test.png
+generation_result.png
+pomelli_page.png
+scan_result.png
+
+# ─── Stray/accidental folder from shell glob ───
+{modules,static/
+
+# ─── Logs / temp ───
+*.log
+*.tmp
+*.bak
