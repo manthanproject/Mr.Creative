@@ -139,7 +139,19 @@ RULES:
 
 Return ONLY {count} prompts, numbered 1-{count}, one per line. No introductions or explanations."""
 
-        text = self._call_api(prompt, temperature=1.0)
+        # Load recent prompts from DB to avoid repetition
+        avoid_block = ''
+        try:
+            from flask import current_app
+            from models import Prompt
+            recent = Prompt.query.order_by(Prompt.created_at.desc()).limit(20).all()
+            if recent:
+                recent_texts = [p.text[:80] for p in recent if p.text]
+                avoid_block = "\n\nDO NOT repeat or closely resemble any of these recent prompts:\n" + "\n".join(f"- {t}" for t in recent_texts)
+        except Exception:
+            pass
+
+        text = self._call_api(prompt + avoid_block, temperature=1.0)
         results = self._parse_numbered_list(text)[:count]
 
         if len(results) < count // 2:
