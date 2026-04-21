@@ -153,6 +153,8 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
                     filename = os.path.basename(filepath)
                     dest = os.path.join(output_dir, filename)
                     shutil.move(filepath, dest)
+                    if not os.path.exists(dest):
+                        continue
                     file_size = os.path.getsize(dest)
 
                     gen = Generation(
