@@ -39,6 +39,10 @@ saved_accounts.json
 *.pem
 *.key
 
+# ─── Binaries (version-specific, should auto-download) ───
+chromedriver.exe
+chromedriver
+
 # ─── Root-level test/debug artifacts ───
 download_result.png
 final_result.png
