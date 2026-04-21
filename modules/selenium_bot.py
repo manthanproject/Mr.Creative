@@ -596,7 +596,17 @@ class PomelliBot:
             except Exception as e:
                 print(f"[PomelliBot] Aspect ratio selection failed (continuing): {e}")
             self._update_status(PomelliBotStatus.GENERATING, 'Clicking Generate Ideas...')
-            WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(text(), "Generate Ideas")] or contains(text(), "Generate Ideas")]'))).click()
+            try:
+                gen_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[aria-label="Generate Ideas"]')))
+                self.driver.execute_script("arguments[0].click();", gen_btn)
+                print("[PomelliBot] Clicked Generate Ideas via aria-label + JS click")
+            except Exception as e1:
+                print(f"[PomelliBot] aria-label click failed: {e1}")
+                btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
+                    EC.element_to_be_clickable((By.XPATH, '//button[contains(., "Generate Ideas")]')))
+                self.driver.execute_script("arguments[0].click();", btn)
+                print("[PomelliBot] Clicked Generate Ideas via XPATH fallback")
             time.sleep(3)
             self._update_status(PomelliBotStatus.GENERATING, 'Waiting for ideas...')
             self._wait_for_idea_cards(old_count)
