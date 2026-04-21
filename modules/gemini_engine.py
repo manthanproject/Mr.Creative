@@ -1,51 +1,33 @@
 """
-Mr.Creative — AI Prompt Engine (Groq)
-Generates unique, non-repeating creative prompts every time.
+Mr.Creative — AI Prompt Engine (Google Gemini)
+Generates unique, non-repeating creative prompts using Gemini Flash.
 """
 
 import re
 import random
 import time
-import requests
-import json
+from google import genai
 
 
 class GeminiEngine:
-    """AI-powered prompt engine using Groq (Llama 3)."""
+    """AI-powered prompt engine using Google Gemini."""
 
     def __init__(self, api_key):
         self.api_key = api_key
-        self.api_url = 'https://api.groq.com/openai/v1/chat/completions'
-        self.model = 'llama-3.3-70b-versatile'
+        self.client = genai.Client(api_key=api_key)
+        self.model = 'gemini-2.0-flash'
 
     def _call_api(self, prompt, temperature=1.0, max_tokens=2000):
-        """Call Groq API and return text response."""
-        headers = {
-            'Authorization': f'Bearer {self.api_key}',
-            'Content-Type': 'application/json',
-        }
-        data = {
-            'model': self.model,
-            'messages': [
-                {
-                    'role': 'system',
-                    'content': (
-                        'You are a world-class creative director who always produces '
-                        'fresh, original, and surprising ideas. You never repeat yourself. '
-                        'Every response must be completely different from anything you have '
-                        'written before. Be bold, specific, and vivid.'
-                    ),
-                },
-                {'role': 'user', 'content': prompt},
-            ],
-            'max_tokens': max_tokens,
-            'temperature': temperature,
-            'top_p': 0.95,
-        }
-        response = requests.post(self.api_url, headers=headers, json=data, timeout=45)
-        response.raise_for_status()
-        result = response.json()
-        return result['choices'][0]['message']['content'].strip()
+        """Call Gemini API and return text response."""
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+            ),
+        )
+        return response.text.strip()
 
     def _parse_numbered_list(self, text):
         """Parse a numbered list response into clean strings."""
@@ -62,10 +44,9 @@ class GeminiEngine:
         return prompts
 
     def _random_seed_block(self):
-        """Generate a unique seed block to bust LLM caching and force fresh output."""
+        """Generate a unique seed block to force fresh output."""
         ts = int(time.time() * 1000)
         rand_id = random.randint(100000, 999999)
-        # Random style direction
         styles = [
             'minimalist Scandinavian', 'bold maximalist', 'retro 70s warmth',
             'moody film noir', 'bright pop art', 'soft watercolor pastels',
@@ -77,7 +58,6 @@ class GeminiEngine:
             'Japanese wabi-sabi', 'Mediterranean sun-drenched',
             'cyberpunk dystopia', 'French provincial charm',
         ]
-        # Random industries to push diversity
         industries = [
             'artisanal coffee', 'sustainable fashion', 'luxury skincare',
             'organic baby food', 'smart home tech', 'indie perfume',
@@ -88,7 +68,6 @@ class GeminiEngine:
             'natural hair care', 'meditation app', 'street sneakers',
             'artisan cheese', 'travel backpacks', 'home fragrance candles',
         ]
-        # Random tones
         tones = [
             'playful and energetic', 'sophisticated and calm',
             'bold and rebellious', 'warm and inviting',
@@ -117,7 +96,7 @@ class GeminiEngine:
         if base_text:
             prompt = f"""[{seed}]
 
-You are a top-tier creative marketing director generating prompts for Pomelli (Google's AI marketing tool).
+You are a world-class creative marketing director generating prompts for Pomelli (Google's AI marketing tool).
 
 TASK: Generate exactly {count} UNIQUE creative prompts based on this idea:
 "{base_text}"
@@ -139,7 +118,7 @@ Return ONLY {count} prompts, numbered 1-{count}, one per line. No introductions 
         else:
             prompt = f"""[{seed}]
 
-You are a top-tier creative marketing director generating prompts for Pomelli (Google's AI marketing tool).
+You are a world-class creative marketing director generating prompts for Pomelli (Google's AI marketing tool).
 
 TASK: Generate exactly {count} WILDLY DIVERSE creative marketing prompts.
 
@@ -163,7 +142,6 @@ Return ONLY {count} prompts, numbered 1-{count}, one per line. No introductions 
         text = self._call_api(prompt, temperature=1.0)
         results = self._parse_numbered_list(text)[:count]
 
-        # Fallback: if parsing failed or too few results, retry once with simpler prompt
         if len(results) < count // 2:
             fallback = f"""[{seed}-RETRY]
 Generate {count} creative marketing prompts for AI product photography and campaigns.
@@ -191,7 +169,6 @@ Rewrite the prompt incorporating the feedback. Make it MORE specific, MORE vivid
 Return ONLY the refined prompt as a single paragraph. No quotes, no explanations."""
 
         result = self._call_api(prompt, temperature=0.9)
-        # Clean up any numbering or quotes
         result = re.sub(r'^[\d]+[\.\)\:]\s*', '', result.strip())
         result = result.strip('"\'')
         return result
@@ -222,7 +199,6 @@ Return ONLY the enhanced prompt as a single paragraph (3-5 sentences). No quotes
         result = self._call_api(prompt, temperature=1.0)
         result = re.sub(r'^[\d]+[\.\)\:]\s*', '', result.strip())
         result = result.strip('"\'')
-        # Remove any "Enhanced prompt:" or similar prefixes
         result = re.sub(r'^(Enhanced|Refined|Updated|Here\'s the|The enhanced)\s*(prompt|version|brief)?[\:\-]?\s*', '', result, flags=re.IGNORECASE)
         return result.strip()
 

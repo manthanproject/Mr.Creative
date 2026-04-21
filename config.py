@@ -15,7 +15,7 @@ class Config:
 
     # Gemini API (add your key here or set env variable)
     GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')
-    GEMINI_API_KEY = 'AIzaSyDjxd3esxIbfHsH-acqrvedXBaFsAqnS50'
+    GEMINI_API_KEY = 'AIzaSyDwcn9acI_78ufTdeKROrx8OX7O1INkNpE'
     HF_API_KEY = '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'
 
     # Pomelli settings

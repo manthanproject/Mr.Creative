@@ -6,11 +6,9 @@ api_bp = Blueprint('api', __name__)
 
 
 def get_gemini_engine():
-    """Initialize and return AI engine (Groq)."""
+    """Initialize and return AI engine (Gemini)."""
     from modules.gemini_engine import GeminiEngine
-    api_key = current_app.config.get('GROQ_API_KEY', '')
-    if not api_key:
-        api_key = current_app.config.get('GEMINI_API_KEY', '')
+    api_key = current_app.config.get('GEMINI_API_KEY', '')
     if not api_key:
         return None
     return GeminiEngine(api_key)
