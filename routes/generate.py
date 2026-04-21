@@ -99,7 +99,10 @@ def _get_or_create_bot(config):
             # Same account — check if Chrome is still alive
             try:
                 _ = _persistent_bot.driver.title
+                print("[BotManager] Forcing fresh Chrome session with new chromedriver")
                 print(f"[BotManager] Reusing existing Chrome session ({_persistent_bot_email})")
+                _persistent_bot = None
+                need_new = True
             except Exception:
                 print(f"[BotManager] Chrome session dead, creating new one")
                 _persistent_bot = None

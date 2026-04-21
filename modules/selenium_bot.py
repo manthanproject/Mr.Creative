@@ -51,7 +51,7 @@ WAIT_MEDIUM = 15
 WAIT_LONG = 60
 WAIT_CREATIVES = 600
 WAIT_ANIMATE = 600
-DOWNLOAD_WAIT = 15
+DOWNLOAD_WAIT = 8
 
 
 class PomelliBotStatus:
@@ -155,7 +155,12 @@ class PomelliBot:
         last_error = None
         for attempt in range(3):
             try:
-                if ChromeDriverManager:
+                # Try local chromedriver first (instant, no download)
+                local_driver = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'chromedriver.exe')
+                if os.path.exists(local_driver):
+                    service = Service(local_driver)
+                    self.driver = webdriver.Chrome(service=service, options=options)
+                elif ChromeDriverManager:
                     service = Service(ChromeDriverManager().install())
                     self.driver = webdriver.Chrome(service=service, options=options)
                 else:
@@ -168,7 +173,7 @@ class PomelliBot:
                     self._update_status(PomelliBotStatus.NAVIGATING,
                         f'Chrome start failed (attempt {attempt+1}), retrying...')
                     self._kill_orphaned_chrome()
-                    time.sleep(3)
+                    time.sleep(2)
         if last_error:
             raise RuntimeError(f"Failed to start Chrome after 3 attempts: {last_error}")
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -318,7 +323,7 @@ class PomelliBot:
     # ============================================
     # GOOGLE LOGIN
     # ============================================
-    def _type_slowly(self, element, text, delay=0.04):
+    def _type_slowly(self, element, text, delay=0.015):
         for char in text:
             element.send_keys(char)
             time.sleep(delay)
@@ -539,7 +544,7 @@ class PomelliBot:
         try:
             self._update_status(PomelliBotStatus.NAVIGATING, 'Going to Pomelli home...')
             self.driver.get(POMELLI_HOME)
-            time.sleep(5)
+            time.sleep(3)
             # Check if redirected to Google login
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
@@ -551,7 +556,7 @@ class PomelliBot:
             textarea = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'textarea[placeholder*="Describe"]')))
             textarea.clear()
             self._type_slowly(textarea, prompt_text, delay=0.03)
-            time.sleep(2)
+            time.sleep(1)
 
             # ── Campaign options (each step is independent — if one fails, others still run) ──
             if product_url:
@@ -570,18 +575,26 @@ class PomelliBot:
                     self._update_status(PomelliBotStatus.ENTERING_PROMPT,
                         f'Image selection skipped: {str(e)[:50]}')
 
-            if aspect_ratio and aspect_ratio != 'story':
-                self._check_pause()
-                try:
-                    self._campaign_set_aspect_ratio(aspect_ratio)
-                except Exception as e:
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                        f'Aspect ratio skipped: {str(e)[:50]}')
-
             old_count = len(self.driver.find_elements(By.CSS_SELECTOR, 'button[aria-label="Delete idea"]'))
             self._check_pause()
             # Dismiss any lingering overlays from product/image dialogs
             self._dismiss_all_overlays()
+            # Select aspect ratio if specified
+            try:
+                ar = aspect_ratio or 'story'
+                ar_map = {'story': 'Story (9:16)', 'square': 'Square (1:1)', 'feed': 'Feed (4:5)'}
+                ar_label = ar_map.get(ar, 'Story (9:16)')
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Setting aspect ratio: {ar_label}')
+                ar_btn = self.driver.find_element(By.XPATH, '//button[contains(., "Aspect Ratio")]')
+                ar_btn.click()
+                time.sleep(1)
+                option = WebDriverWait(self.driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, f'//button[contains(., "{ar_label}")]')))
+                option.click()
+                time.sleep(0.5)
+                print(f"[PomelliBot] Aspect ratio set to: {ar_label}")
+            except Exception as e:
+                print(f"[PomelliBot] Aspect ratio selection failed (continuing): {e}")
             self._update_status(PomelliBotStatus.GENERATING, 'Clicking Generate Ideas...')
             WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(text(), "Generate Ideas")] or contains(text(), "Generate Ideas")]'))).click()
             time.sleep(3)
@@ -824,11 +837,28 @@ class PomelliBot:
         start = time.time()
         while time.time() - start < 180:
             time.sleep(4)
-            if len(self.driver.find_elements(By.CSS_SELECTOR, 'button[aria-label="Delete idea"]')) - old_count >= 3:
-                time.sleep(2)
-                return
-            if '/campaigns/' in self.driver.current_url:
-                return
+            try:
+                url = self.driver.current_url
+                if '/campaigns/' in url:
+                    print("[PomelliBot] Campaign URL detected — ideas loaded")
+                    return
+                delete_btns = self.driver.find_elements(By.CSS_SELECTOR, 'button[aria-label="Delete idea"]')
+                idea_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div.campaign-idea-card')
+                print(f"[PomelliBot] Waiting... delete_btns={len(delete_btns)} idea_cards={len(idea_cards)}")
+                if len(delete_btns) - old_count >= 3 or len(idea_cards) >= 3:
+                    time.sleep(2)
+                    return
+            except Exception as e:
+                err_type = type(e).__name__
+                err_msg = str(e).split('\n')[0][:100]
+                print(f"[PomelliBot] Wait error: {err_type}: {err_msg}")
+                # If Chrome disconnected, try to recover
+                try:
+                    _ = self.driver.title
+                except Exception:
+                    print("[PomelliBot] Chrome disconnected during wait!")
+                    raise
+                time.sleep(3)
 
     def _click_first_idea(self):
         time.sleep(2)
@@ -1242,7 +1272,7 @@ class PomelliBot:
         existing = set(os.listdir(download_dir))
         self.driver.execute_cdp_cmd('Page.setDownloadBehavior', {'behavior': 'allow', 'downloadPath': download_dir})
         try:
-            time.sleep(3)
+            time.sleep(1)
             self._update_status(PomelliBotStatus.DOWNLOADING, 'Downloading images individually...')
             self._ps_download_by_hover(download_dir)
             time.sleep(DOWNLOAD_WAIT)
