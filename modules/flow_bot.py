@@ -27,7 +27,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
 
 FLOW_URL = 'https://labs.google/fx/tools/flow'
-DOWNLOAD_WAIT = 10
+DOWNLOAD_WAIT = 25
 
 ASPECT_RATIO_MAP = {
     'landscape': 'crop_16_916:9',
@@ -109,6 +109,23 @@ class FlowBot:
             else:
                 break
 
+        # Step 1.5: Consent dialog — "Experience and shape AI tools"
+        for _ in range(5):
+            has_consent = self.driver.execute_script("""
+                return document.body.innerText.includes('Experience and shape AI tools');
+            """)
+            if has_consent:
+                self._update_status('navigating', 'Dismissing consent dialog...')
+                self.driver.execute_script("""
+                    var btns = document.querySelectorAll('button');
+                    for (var b of btns) {
+                        if (b.offsetParent && b.textContent.trim() === 'Next') { b.click(); return; }
+                    }
+                """)
+                time.sleep(3)
+            else:
+                break
+
         # Step 2: Google login redirect
         if 'accounts.google.com' in self.driver.current_url:
             self._update_status('navigating', 'Handling Google login...')
@@ -123,28 +140,55 @@ class FlowBot:
                     break
 
         # Step 3: Dashboard → click "+ New project"
-        for _ in range(10):
+        for attempt in range(15):
             if '/project/' in self.driver.current_url:
+                self._update_status('navigating', 'Project page loaded!')
                 break
-            is_dashboard = self.driver.execute_script(
-                "return document.body.innerText.includes('New project') && !document.body.innerText.includes('What do you want to create');")
-            if is_dashboard:
-                self._update_status('navigating', 'Clicking New Project...')
-                self.driver.execute_script("""
-                    var els = document.querySelectorAll('*');
-                    for (var el of els) {
-                        if (el.offsetParent && el.textContent.trim() === 'New project'
-                            && el.getBoundingClientRect().width < 300) {
-                            el.click(); break;
+            self._update_status('navigating', f'Clicking New Project (attempt {attempt+1})...')
+            clicked = self.driver.execute_script("""
+                // Close any banner overlay first
+                var closeBtn = document.querySelector('button[aria-label="Close"]');
+                if (closeBtn) closeBtn.click();
+
+                // Scroll to bottom
+                window.scrollTo(0, document.body.scrollHeight);
+
+                // Try 1: Find by text (includes check for shadow DOM host)
+                var all = document.querySelectorAll('*');
+                for (var el of all) {
+                    if (!el.offsetParent) continue;
+                    var r = el.getBoundingClientRect();
+                    // Check innerText (catches more than textContent)
+                    try {
+                        if (el.innerText && el.innerText.includes('New project') && r.width < 400 && r.height > 20) {
+                            el.scrollIntoView({block: 'center'});
+                            el.click();
+                            return 'clicked_text';
                         }
-                    }
-                """)
+                    } catch(e) {}
+                }
+
+                // Try 2: Click the bottom-center card by position
+                var vpW = window.innerWidth;
+                var vpH = window.innerHeight;
+                var el = document.elementFromPoint(vpW / 2, vpH - 150);
+                if (el) {
+                    el.click();
+                    return 'clicked_position_' + el.tagName;
+                }
+
+                return 'not_found';
+            """)
+            print(f"[FlowBot] New Project click result: {clicked}")
+            if clicked and clicked.startswith('clicked'):
                 time.sleep(5)
-                break
-            time.sleep(2)
+                if '/project/' in self.driver.current_url:
+                    break
+            else:
+                time.sleep(2)
 
         # Step 4: Wait for prompt bar
-        for _ in range(15):
+        for _ in range(20):
             has_prompt = self.driver.execute_script("""
                 var divs = document.querySelectorAll('div[contenteditable="true"]');
                 for (var d of divs) { if (d.getBoundingClientRect().width > 200) return true; }
@@ -198,13 +242,26 @@ class FlowBot:
         self._update_status('settings', 'Settings applied!')
 
     def _click_flow_tab(self, target_text):
-        self.driver.execute_script("""
+        result = self.driver.execute_script("""
             var target = arguments[0];
             var btns = document.querySelectorAll('button.flow_tab_slider_trigger');
             for (var b of btns) {
-                if (b.offsetParent && b.textContent.trim() === target) { b.click(); return; }
+                if (b.offsetParent && b.textContent.trim() === target) {
+                    b.scrollIntoView({block: 'center'});
+                    return b;
+                }
             }
+            return null;
         """, target_text)
+        if result:
+            try:
+                ActionChains(self.driver).move_to_element(result).pause(0.2).click().perform()
+                print(f"[FlowBot] Tab click: clicked_{target_text} (ActionChains)")
+            except Exception:
+                self.driver.execute_script("arguments[0].click();", result)
+                print(f"[FlowBot] Tab click: clicked_{target_text} (JS fallback)")
+        else:
+            print(f"[FlowBot] Tab click: not_found_{target_text}")
 
     # ══════════════════════════════════════
     # PROMPT + CREATE
@@ -259,6 +316,8 @@ class FlowBot:
     def wait_for_images(self, count_before, expected=4, timeout=300):
         self._update_status('generating', 'Waiting for images...')
         start = time.time()
+        last_count = 0
+        last_change_time = time.time()
         while time.time() - start < timeout:
             time.sleep(4)
             current = self.count_images()
@@ -267,6 +326,13 @@ class FlowBot:
             self._update_status('generating', f'{new_count}/{expected} images generated ({elapsed}s)')
             if new_count >= expected:
                 time.sleep(3)
+                return True
+            if new_count > last_count:
+                last_count = new_count
+                last_change_time = time.time()
+            elif new_count > 0 and time.time() - last_change_time > 30:
+                self._update_status('generating', f'No new images for 30s — proceeding with {new_count} images')
+                time.sleep(2)
                 return True
         return True
 
@@ -295,7 +361,7 @@ class FlowBot:
         time.sleep(4)
 
         # Wait for Download button
-        for _ in range(10):
+        for _ in range(15):
             has_dl = self.driver.execute_script("""
                 var btns = document.querySelectorAll('button');
                 for (var b of btns) { if (b.offsetParent && b.textContent.includes('Download')) return true; }
@@ -314,14 +380,36 @@ class FlowBot:
         """)
         time.sleep(2)
 
-        # Click 2K Upscaled
-        self._js_click("""
+        # Try 2K Upscaled first, fall back to regular download
+        clicked_2k = self._js_click("""
             var btns = document.querySelectorAll('button');
             for (var b of btns) { if (b.offsetParent && b.textContent.includes('2K') && b.textContent.includes('Upscaled')) return b; }
             return null;
         """)
-        self._update_status('downloading', 'Downloading 2K image...')
-        time.sleep(DOWNLOAD_WAIT)
+        if clicked_2k:
+            self._update_status('downloading', 'Downloading 2K image...')
+        else:
+            self._update_status('downloading', 'Downloading standard image...')
+
+        # Wait for download — detect "Upscaling complete" toast or timeout
+        for _ in range(DOWNLOAD_WAIT):
+            done = self.driver.execute_script("""
+                return document.body.innerText.includes('Upscaling complete')
+                    || document.body.innerText.includes('image has been downloaded')
+                    || document.body.innerText.includes('Download complete');
+            """)
+            if done:
+                self._update_status('downloading', 'Download complete!')
+                # Dismiss the toast
+                self.driver.execute_script("""
+                    var els = document.querySelectorAll('*');
+                    for (var el of els) {
+                        if (el.offsetParent && el.textContent.trim() === 'Dismiss') { el.click(); break; }
+                    }
+                """)
+                time.sleep(1)
+                break
+            time.sleep(1)
 
     def download_all_new_images(self, edit_urls, project_url):
         """Download each new image in 2K, then return to project."""
@@ -332,6 +420,14 @@ class FlowBot:
             self._update_status('downloading', f'Downloading image {i+1}/{len(edit_urls)} in 2K...')
             self.download_single_image_2k(url)
 
+        # Wait for any pending .crdownload files to finish
+        for _ in range(15):
+            pending = [f for f in os.listdir(self.download_dir) if f.endswith('.crdownload')]
+            if not pending:
+                break
+            print(f"[FlowBot] Waiting for {len(pending)} downloads to finish...")
+            time.sleep(2)
+
         # Go back to project
         self.driver.get(project_url)
         time.sleep(3)
@@ -339,8 +435,10 @@ class FlowBot:
         # Collect new files
         downloaded_after = set(os.listdir(self.download_dir))
         new_files = downloaded_after - downloaded_before
-        return [os.path.join(self.download_dir, f) for f in new_files
+        files = [os.path.join(self.download_dir, f) for f in new_files
                 if not f.endswith(('.crdownload', '.tmp'))]
+        print(f"[FlowBot] Total new files: {len(files)}")
+        return files
 
     # ══════════════════════════════════════
     # FULL WORKFLOW

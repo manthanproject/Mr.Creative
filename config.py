@@ -16,12 +16,16 @@ class Config:
     # Gemini API (add your key here or set env variable)
     GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')
     GEMINI_API_KEY = 'AIzaSyDwcn9acI_78ufTdeKROrx8OX7O1INkNpE'
-    HF_API_KEY = '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'
+    HF_API_KEY = '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'
 
     # Pomelli settings
     POMELLI_URL = 'https://labs.google.com/pomelli'
     GOOGLE_EMAIL = os.environ.get('GOOGLE_EMAIL', 'dropsyshops45@gmail.com')
     GOOGLE_PASSWORD = os.environ.get('GOOGLE_PASSWORD', 'Matrix@404')
+
+    # Flow account (Pro subscription)
+    FLOW_GOOGLE_EMAIL = 'bueauty1996@gmail.com'
+    FLOW_GOOGLE_PASSWORD = 'Dn3k2F2@365'
 
     # Selenium settings
     CHROME_DRIVER_PATH = os.environ.get('CHROME_DRIVER_PATH', '')
