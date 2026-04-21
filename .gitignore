@@ -33,6 +33,7 @@ static/downloads/
 static/exports/
 
 # ─── Sensitive files ───
+config.py
 saved_accounts.json
 .env
 .env.local
