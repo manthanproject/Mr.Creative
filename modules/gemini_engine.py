@@ -1,33 +1,30 @@
 """
-Mr.Creative — AI Prompt Engine (Google Gemini)
-Generates unique, non-repeating creative prompts using Gemini Flash.
+Mr.Creative — AI Prompt Engine (Groq (Llama 3.3 70B))
+Generates unique, non-repeating creative prompts using Llama 3.3 70B.
 """
 
 import re
 import random
 import time
-from google import genai
+from groq import Groq
 
 
 class GeminiEngine:
-    """AI-powered prompt engine using Google Gemini."""
+    """AI-powered prompt engine using Groq (Llama 3.3 70B)."""
 
     def __init__(self, api_key):
         self.api_key = api_key
-        self.client = genai.Client(api_key=api_key)
-        self.model = 'gemini-2.0-flash'
+        self.client = Groq(api_key=api_key)
+        self.model = 'llama-3.3-70b-versatile'
 
     def _call_api(self, prompt, temperature=1.0, max_tokens=2000):
-        """Call Gemini API and return text response."""
-        response = self.client.models.generate_content(
+        response = self.client.chat.completions.create(
             model=self.model,
-            contents=prompt,
-            config=genai.types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-            ),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
-        return response.text.strip()
+        return response.choices[0].message.content.strip()
 
     def _parse_numbered_list(self, text):
         """Parse a numbered list response into clean strings."""

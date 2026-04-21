@@ -6,9 +6,9 @@ api_bp = Blueprint('api', __name__)
 
 
 def get_gemini_engine():
-    """Initialize and return AI engine (Gemini)."""
+    """Initialize and return AI engine (Groq)."""
     from modules.gemini_engine import GeminiEngine
-    api_key = current_app.config.get('GEMINI_API_KEY', '')
+    api_key = current_app.config.get('GROQ_API_KEY', '')
     if not api_key:
         return None
     return GeminiEngine(api_key)
@@ -29,7 +29,7 @@ def generate_prompts():
 
     engine = get_gemini_engine()
     if not engine:
-        return jsonify({'error': 'Gemini API key not configured. Add it in config.py', 'prompts': []}), 400
+        return jsonify({'error': 'Groq API key not configured. Add GROQ_API_KEY in config.py', 'prompts': []}), 400
 
     try:
         prompts = engine.generate_prompts(
@@ -46,11 +46,11 @@ def generate_prompts():
         error_msg = str(e)
         # Provide user-friendly error messages
         if 'API_KEY_INVALID' in error_msg or 'PERMISSION_DENIED' in error_msg:
-            error_msg = 'Invalid Gemini API key. Please check your key in config.py'
+            error_msg = 'Invalid Groq API key. Please check GROQ_API_KEY in config.py'
         elif 'quota' in error_msg.lower():
-            error_msg = 'Gemini API quota exceeded. Please try again later.'
+            error_msg = 'Groq API quota exceeded. Please try again later.'
         elif 'network' in error_msg.lower() or 'connection' in error_msg.lower():
-            error_msg = 'Network error connecting to Gemini. Check your internet connection.'
+            error_msg = 'Network error connecting to Groq. Check your internet connection.'
 
         return jsonify({'error': error_msg, 'prompts': []}), 500
 
@@ -70,7 +70,7 @@ def refine_prompt():
 
     engine = get_gemini_engine()
     if not engine:
-        return jsonify({'error': 'Gemini API key not configured'}), 400
+        return jsonify({'error': 'Groq API key not configured'}), 400
 
     try:
         refined = engine.refine_prompt(original, instruction)
@@ -91,7 +91,7 @@ def enhance_prompt():
 
     engine = get_gemini_engine()
     if not engine:
-        return jsonify({'error': 'Gemini API key not configured'}), 400
+        return jsonify({'error': 'Groq API key not configured'}), 400
 
     try:
         enhanced = engine.enhance_prompt(prompt_text)
@@ -113,7 +113,7 @@ def prompt_variations():
 
     engine = get_gemini_engine()
     if not engine:
-        return jsonify({'error': 'Gemini API key not configured'}), 400
+        return jsonify({'error': 'Groq API key not configured'}), 400
 
     try:
         variations = engine.generate_variations(prompt_text, count=count)
@@ -134,7 +134,7 @@ def suggest_categories():
 
     engine = get_gemini_engine()
     if not engine:
-        return jsonify({'error': 'Gemini API key not configured'}), 400
+        return jsonify({'error': 'Groq API key not configured'}), 400
 
     try:
         categories = engine.suggest_categories(description)

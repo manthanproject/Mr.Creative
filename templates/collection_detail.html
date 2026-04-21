@@ -57,7 +57,7 @@
 <!-- Stats Bar -->
 <div class="flex-between" style="margin-bottom: 10px;">
     <div class="flex gap-1">
-        <span class="badge badge-completed">{{ (generations|length) + (folder_files|length) }} items</span>
+        <span class="badge badge-completed">{% if folder_files %}{{ folder_files|length }}{% else %}{{ generations|length }}{% endif %} items</span>
         {% if collection.is_public %}<span class="badge badge-approved">Shared</span>{% endif %}
     </div>
     <div class="flex gap-1">

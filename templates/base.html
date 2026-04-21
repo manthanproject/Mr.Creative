@@ -63,12 +63,12 @@
                 <div class="nav-section-label">Tools</div>
                 <a href="{{ url_for('generate.index') }}" class="nav-link {% if request.endpoint and 'generate' in request.endpoint %}active{% endif %}" id="navGenerate">
                     <span class="nav-icon">⚡</span>
-                    Generate
+                    Pomelli
                     <span class="nav-badge" id="queueBadge" style="display:none;">0</span>
                 </a>
                 <a href="/banners" class="nav-link {% if request.path.startswith('/banners') %}active{% endif %}">
                     <span class="nav-icon">🎨</span>
-                    Banners
+                    Flow
                 </a>
                 <a href="{{ url_for('scheduler.index') }}" class="nav-link {% if request.endpoint and 'scheduler' in request.endpoint %}active{% endif %}" id="navSchedule">
                     <span class="nav-icon">⏱</span>
