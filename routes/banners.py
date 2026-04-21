@@ -188,3 +188,10 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
         job['message'] = str(e)[:200]
         job['progress'] = 0
         job['errors'] = [str(e)]
+    finally:
+        # Quit this ChromeDriver session (not Chrome itself — it stays alive on port 9222)
+        try:
+            driver.quit()
+            print("[FlowBot] ChromeDriver session closed — Chrome stays alive for next job")
+        except Exception:
+            pass

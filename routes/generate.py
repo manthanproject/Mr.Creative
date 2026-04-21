@@ -123,7 +123,7 @@ def _get_or_create_bot(config):
 
 def _release_bot_for_reuse(bot):
     """After a job finishes, prepare bot for next job reuse.
-    Do NOT close Chrome — keep it alive."""
+    Navigate back to Pomelli home so next job starts clean."""
     global _persistent_bot_email
     # Reset per-job state but keep the driver alive
     bot._pending_ideas = []
@@ -132,6 +132,12 @@ def _release_bot_for_reuse(bot):
     bot._selected_animate_indices = None
     bot._current_job_id = None
     bot.errors = []
+    # Navigate back to Pomelli home for next job
+    try:
+        bot.driver.get('https://labs.google.com/pomelli')
+        print("[BotManager] Navigated back to Pomelli home for next job")
+    except Exception:
+        pass
     # Remember which account we're logged into
     _persistent_bot_email = bot.config.get('google_email', '')
 
