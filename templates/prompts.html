@@ -23,6 +23,14 @@
                 <input type="hidden" name="prompt_type" id="promptType" value="manual">
             </div>
 
+            <!-- Tool Selector -->
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center; margin-right: 0.3rem;">Generate for:</span>
+                <button type="button" class="tab active" data-tool="campaign" onclick="selectTool(this)">📣 Campaign</button>
+                <button type="button" class="tab" data-tool="photoshoot" onclick="selectTool(this)">📸 Photoshoot</button>
+                <button type="button" class="tab" data-tool="flow" onclick="selectTool(this)">🎨 Flow</button>
+            </div>
+
             <!-- Category Selector -->
             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem;">
                 <button type="button" class="tab active" data-cat="general" onclick="selectCategory(this)">🎨 All</button>
@@ -186,6 +194,13 @@
 {% block scripts %}
 <script>
 let selectedCategory = localStorage.getItem('ps_category') || 'general';
+    let selectedTool = 'campaign';
+
+    function selectTool(btn) {
+        document.querySelectorAll('[data-tool]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedTool = btn.getAttribute('data-tool');
+    }
 
 // ==========================================
 // RESTORE STATE ON PAGE LOAD
@@ -306,7 +321,8 @@ async function generatePrompts() {
             body: JSON.stringify({
                 base_text: baseText,
                 category: selectedCategory,
-                count: 5
+                count: 5,
+                tool: selectedTool
             })
         });
         const data = await res.json();
@@ -350,7 +366,7 @@ function renderSuggestions(prompts, category) {
             <div style="flex: 1; min-width: 0;">
                 <div class="prompt-text">${escapeHtml(prompt)}</div>
                 <div class="prompt-meta">
-                    <span class="badge" style="background: var(--accent-glow); color: var(--accent);">AI Generated</span>
+                    <span class="badge" style="background: var(--accent-glow); color: var(--accent);">${selectedTool.toUpperCase()}</span>
                     <span>${category || 'general'}</span>
                 </div>
             </div>

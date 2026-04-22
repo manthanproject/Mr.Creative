@@ -26,6 +26,7 @@ def generate_prompts():
     base_text = data.get('base_text', '').strip()
     category = data.get('category', 'general')
     count = data.get('count', 5)
+    tool = data.get('tool', 'campaign')
 
     engine = get_gemini_engine()
     if not engine:
@@ -35,7 +36,8 @@ def generate_prompts():
         prompts = engine.generate_prompts(
             base_text=base_text,
             category=category,
-            count=count
+            count=count,
+            tool=tool
         )
         if not prompts:
             return jsonify({'error': 'No prompts generated. Try a different input.', 'prompts': []}), 200

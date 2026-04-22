@@ -122,6 +122,18 @@
                 <div class="pm-group">
                     <label class="pm-label">Banner Prompt</label>
                     <textarea id="banner-prompt" class="pm-textarea" rows="4" placeholder="Describe your banner... e.g. Premium skincare product ad with gold and white theme, elegant typography, luxury feel"></textarea>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
+                        <button type="button" class="pm-btn" onclick="aiSuggestFlow()" id="flowSuggestBtn"
+                            style="background: var(--pm-bg-elevated); color: var(--pm-accent); border: 1px solid var(--pm-border); font-size: 0.75rem; padding: 0.4rem 0.75rem; border-radius: var(--pm-radius-pill);">
+                            ✦ AI Suggest
+                        </button>
+                    </div>
+                    <div id="flowSuggestions" style="display: none; margin-top: 0.5rem;">
+                        <div id="flowSugLoading" style="display: none; text-align: center; padding: 0.75rem; color: var(--pm-text-muted); font-size: 0.78rem;">
+                            ✦ Generating Flow prompts...
+                        </div>
+                        <div id="flowSugList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                    </div>
                 </div>
 
                 <div class="flow-settings-row">
@@ -260,6 +272,59 @@ function useQuickPrompt(btn) {
 }
 
 var currentJobId = null;
+
+async function aiSuggestFlow() {
+    var btn = document.getElementById('flowSuggestBtn');
+    var panel = document.getElementById('flowSuggestions');
+    var loading = document.getElementById('flowSugLoading');
+    var list = document.getElementById('flowSugList');
+    var baseText = document.getElementById('banner-prompt').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating...';
+    panel.style.display = 'block';
+    loading.style.display = 'block';
+    list.innerHTML = '';
+
+    try {
+        var res = await fetch('/api/generate-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base_text: baseText, tool: 'flow', category: 'general', count: 4 })
+        });
+        var data = await res.json();
+        loading.style.display = 'none';
+
+        if (data.error) {
+            list.innerHTML = '<div style="color: var(--pm-danger); font-size: 0.78rem; padding: 0.5rem;">' + data.error + '</div>';
+            btn.disabled = false;
+            btn.textContent = '✦ AI Suggest';
+            return;
+        }
+
+        if (data.prompts && data.prompts.length > 0) {
+            data.prompts.forEach(function(prompt) {
+                var chip = document.createElement('button');
+                chip.className = 'pm-btn';
+                chip.style.cssText = 'background: var(--pm-bg-elevated); color: var(--pm-text-secondary); border: 1px solid var(--pm-border); font-size: 0.73rem; padding: 0.45rem 0.75rem; text-align: left; border-radius: var(--pm-radius-sm); justify-content: flex-start; width: 100%; white-space: normal; line-height: 1.4; cursor: pointer;';
+                chip.textContent = prompt.length > 150 ? prompt.substring(0, 150) + '...' : prompt;
+                chip.title = prompt;
+                chip.onclick = function() {
+                    document.getElementById('banner-prompt').value = prompt;
+                    list.querySelectorAll('button').forEach(function(b) { b.style.borderColor = 'var(--pm-border)'; });
+                    chip.style.borderColor = 'var(--pm-accent)';
+                };
+                list.appendChild(chip);
+            });
+        }
+    } catch (err) {
+        loading.style.display = 'none';
+        list.innerHTML = '<div style="color: var(--pm-danger); font-size: 0.78rem; padding: 0.5rem;">Connection error</div>';
+    }
+
+    btn.disabled = false;
+    btn.textContent = '✦ AI Suggest';
+}
 
 async function generateBanners() {
     var prompt = document.getElementById('banner-prompt').value.trim();

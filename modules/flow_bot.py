@@ -139,26 +139,73 @@ class FlowBot:
                 if self._is_on_flow():
                     break
 
-        # Step 3: Dashboard → click "+ New project"
+        # Step 2.5: If stuck on old project page, go back to dashboard
+        if '/project/' in self.driver.current_url:
+            self._update_status('navigating', 'On old project — going back to dashboard...')
+            # Try clicking back arrow
+            self.driver.execute_script("""
+                var back = document.querySelector('button[aria-label="Back"], a[aria-label="Back"]');
+                if (back) { back.click(); return; }
+                var arrows = document.querySelectorAll('button, a');
+                for (var el of arrows) {
+                    if (!el.offsetParent) continue;
+                    var r = el.getBoundingClientRect();
+                    if (r.x < 80 && r.y < 120 && r.width < 60 && el.textContent.includes('arrow_back')) {
+                        el.click(); return;
+                    }
+                }
+            """)
+            time.sleep(3)
+            # If still on project page, navigate directly to dashboard
+            if '/project/' in self.driver.current_url:
+                self.driver.get(FLOW_URL)
+                time.sleep(5)
+
+        # Step 3: Close announcement banner if present
+        for _ in range(3):
+            banner_closed = self.driver.execute_script("""
+                // Try multiple close button selectors
+                var selectors = [
+                    'button[aria-label="Close"]',
+                    'button[aria-label="close"]',
+                    'button[aria-label="Dismiss"]',
+                ];
+                for (var sel of selectors) {
+                    var btn = document.querySelector(sel);
+                    if (btn && btn.offsetParent) { btn.click(); return 'closed_aria'; }
+                }
+                // Try X button in top-right area of banner
+                var btns = document.querySelectorAll('button');
+                for (var b of btns) {
+                    if (!b.offsetParent) continue;
+                    var r = b.getBoundingClientRect();
+                    if (r.x > window.innerWidth - 100 && r.y < 200 && r.width < 60 && r.height < 60) {
+                        var txt = b.textContent.trim();
+                        if (txt === '✕' || txt === 'close' || txt === '×' || txt.length <= 2) {
+                            b.click(); return 'closed_x';
+                        }
+                    }
+                }
+                return 'no_banner';
+            """)
+            if banner_closed and banner_closed.startswith('closed'):
+                self._update_status('navigating', f'Banner dismissed ({banner_closed})')
+                time.sleep(2)
+            else:
+                break
+
+        # Step 4: Dashboard → click "+ New project"
         for attempt in range(15):
             if '/project/' in self.driver.current_url:
                 self._update_status('navigating', 'Project page loaded!')
                 break
             self._update_status('navigating', f'Clicking New Project (attempt {attempt+1})...')
             clicked = self.driver.execute_script("""
-                // Close any banner overlay first
-                var closeBtn = document.querySelector('button[aria-label="Close"]');
-                if (closeBtn) closeBtn.click();
-
-                // Scroll to bottom
-                window.scrollTo(0, document.body.scrollHeight);
-
-                // Try 1: Find by text (includes check for shadow DOM host)
+                // Try 1: Find by text
                 var all = document.querySelectorAll('*');
                 for (var el of all) {
                     if (!el.offsetParent) continue;
                     var r = el.getBoundingClientRect();
-                    // Check innerText (catches more than textContent)
                     try {
                         if (el.innerText && el.innerText.includes('New project') && r.width < 400 && r.height > 20) {
                             el.scrollIntoView({block: 'center'});
@@ -168,7 +215,19 @@ class FlowBot:
                     } catch(e) {}
                 }
 
-                // Try 2: Click the bottom-center card by position
+                // Try 2: Find the + card specifically
+                var cards = document.querySelectorAll('div, button, a');
+                for (var c of cards) {
+                    if (!c.offsetParent) continue;
+                    var t = c.textContent.trim();
+                    if (t.includes('New project') && t.includes('+')) {
+                        c.scrollIntoView({block: 'center'});
+                        c.click();
+                        return 'clicked_plus_card';
+                    }
+                }
+
+                // Try 3: Click the bottom-center card by position
                 var vpW = window.innerWidth;
                 var vpH = window.innerHeight;
                 var el = document.elementFromPoint(vpW / 2, vpH - 150);
@@ -187,7 +246,7 @@ class FlowBot:
             else:
                 time.sleep(2)
 
-        # Step 4: Wait for prompt bar
+        # Step 5: Wait for prompt bar
         for _ in range(20):
             has_prompt = self.driver.execute_script("""
                 var divs = document.querySelectorAll('div[contenteditable="true"]');

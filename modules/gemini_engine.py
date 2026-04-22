@@ -77,7 +77,7 @@ class GeminiEngine:
         tone = random.choice(tones)
         return style, industry, tone, f"SEED-{ts}-{rand_id}"
 
-    def generate_prompts(self, base_text='', category='general', count=5):
+    def generate_prompts(self, base_text='', category='general', count=5, tool='campaign'):
         count = min(count, 8)
         category_context = {
             'general': 'product photography, social media campaigns, brand storytelling, and seasonal promotions',
@@ -88,12 +88,56 @@ class GeminiEngine:
             'video': 'short-form video content — animations, product reveals, behind-the-scenes',
         }
         ctx = category_context.get(category, category_context['general'])
+
+        # Tool-specific prompt engineering
+        tool_config = {
+            'campaign': {
+                'role': 'a world-class creative marketing director generating campaign briefs for Pomelli (Google\'s AI marketing tool)',
+                'format': 'Each prompt should be a marketing brief: describe the product/service, target audience, campaign goal, brand voice, visual theme, and call-to-action. Think like an ad agency creative director.',
+                'rules': [
+                    'Include target audience demographics or psychographics',
+                    'Mention a specific campaign goal (awareness, conversion, launch, seasonal)',
+                    'Suggest brand voice and visual direction (colors, mood, typography style)',
+                    'Include a call-to-action or tagline direction',
+                    'Each prompt: 2-3 sentences as a complete campaign brief',
+                ],
+                'examples_hint': 'campaign launches, seasonal promotions, product spotlights, brand storytelling',
+            },
+            'photoshoot': {
+                'role': 'an expert product photography art director creating shot briefs for AI-powered product photoshoots',
+                'format': 'Each prompt should describe the product, its physical appearance, the styled environment/setting, and lighting. Think like a commercial photographer planning a shoot.',
+                'rules': [
+                    'Describe the product physically (material, color, shape, size)',
+                    'Specify the setting/environment (marble surface, botanical garden, kitchen counter, etc.)',
+                    'Include lighting direction (soft window light, dramatic side light, golden hour, studio strobes)',
+                    'Mention props and styling elements (flowers, fabrics, ingredients, lifestyle items)',
+                    'Each prompt: 2-3 sentences as a photography shot brief',
+                ],
+                'examples_hint': 'studio product shots, lifestyle integration, flat lays, close-up detail shots, seasonal styled scenes',
+            },
+            'flow': {
+                'role': 'an expert AI image generation prompt engineer creating prompts for Google Flow (Nano Banana 2 model)',
+                'format': 'Each prompt should be an image generation prompt with visual composition, art style, colors, lighting, and quality keywords. Think like a Midjourney/DALL-E power user.',
+                'rules': [
+                    'Start with the main subject and composition',
+                    'Include specific art/photography style (editorial, cinematic, minimalist, etc.)',
+                    'Specify color palette and lighting (warm tones, cool blues, soft diffused, dramatic shadows)',
+                    'Add quality boosters at the end (8K, ultra detailed, professional photography, etc.)',
+                    'Do NOT include negative prompts or technical parameters',
+                    'Each prompt: 1-2 sentences, dense with visual keywords, comma-separated style',
+                ],
+                'examples_hint': 'product hero shots, banner designs, social media visuals, brand imagery, artistic compositions',
+            },
+        }
+
+        tc = tool_config.get(tool, tool_config['campaign'])
+
         style, industry_hint, tone, seed = self._random_seed_block()
 
         if base_text:
             prompt = f"""[{seed}]
 
-You are a world-class creative marketing director generating prompts for Pomelli (Google's AI marketing tool).
+You are {tc['role']}.
 
 TASK: Generate exactly {count} UNIQUE creative prompts based on this idea:
 "{base_text}"
@@ -103,10 +147,11 @@ CREATIVE DIRECTION FOR THIS BATCH:
 - Tone: {tone}
 - Focus area: {ctx}
 
+FORMAT: {tc['format']}
+
 RULES:
 - Each prompt MUST be completely different in concept, angle, and approach
-- Each prompt: 2-3 sentences, vivid imagery, specific details (colors, textures, lighting, setting)
-- Include specific creative directions like camera angles, color palettes, props, moods
+{''.join(f'{chr(10)}- {r}' for r in tc['rules'])}
 - Do NOT write generic marketing copy — write detailed creative briefs
 - Do NOT repeat words or phrases across prompts
 - Surprise me — take unexpected creative angles on the idea
@@ -115,20 +160,22 @@ Return ONLY {count} prompts, numbered 1-{count}, one per line. No introductions 
         else:
             prompt = f"""[{seed}]
 
-You are a world-class creative marketing director generating prompts for Pomelli (Google's AI marketing tool).
+You are {tc['role']}.
 
-TASK: Generate exactly {count} WILDLY DIVERSE creative marketing prompts.
+TASK: Generate exactly {count} WILDLY DIVERSE creative prompts.
 
 CREATIVE DIRECTION FOR THIS BATCH:
 - Visual style inspiration: {style}
 - Tone: {tone}
 - Include at least one prompt inspired by: {industry_hint}
 - Focus area: {ctx}
+- Prompt types to cover: {tc['examples_hint']}
+
+FORMAT: {tc['format']}
 
 RULES:
 - Each prompt MUST target a DIFFERENT industry/product type
-- Each prompt: 2-3 sentences, vivid imagery, specific details (colors, textures, lighting, setting)
-- Include specific creative directions like camera angles, color palettes, props, moods
+{''.join(f'{chr(10)}- {r}' for r in tc['rules'])}
 - Do NOT write generic marketing copy — write detailed creative briefs
 - Do NOT repeat words or phrases across prompts
 - Cover a MIX of: food & beverage, beauty, fashion, tech, home, wellness, lifestyle
@@ -153,8 +200,10 @@ Return ONLY {count} prompts, numbered 1-{count}, one per line. No introductions 
 
         if len(results) < count // 2:
             fallback = f"""[{seed}-RETRY]
-Generate {count} creative marketing prompts for AI product photography and campaigns.
+You are {tc['role']}.
+Generate {count} creative prompts for {tc['examples_hint']}.
 Style: {style}. Tone: {tone}.
+{tc['format']}
 Numbered 1-{count}, one per line. Be specific and vivid."""
             text = self._call_api(fallback, temperature=1.0)
             results = self._parse_numbered_list(text)[:count]
