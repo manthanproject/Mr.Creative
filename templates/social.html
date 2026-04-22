@@ -1,0 +1,462 @@
+{% extends "base.html" %}
+{% block title %}Social Post — Mr.Creative{% endblock %}
+
+{% block content %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@1,400;1,500;1,600;1,700&display=swap');
+    :root {
+        --pm-bg: #1b1b1b; --pm-bg-card: #1e1f20; --pm-bg-elevated: #282a2c; --pm-bg-hover: #333537;
+        --pm-border: #333537; --pm-border-light: #282a2c;
+        --pm-accent: #c1cd7d; --pm-accent-muted: #c5caa3; --pm-accent-dim: rgba(193,205,125,0.15);
+        --pm-accent-text: #2c3400; --pm-text: #e5e3d9; --pm-text-secondary: #c7c8b6; --pm-text-muted: #919282;
+        --pm-success: #4ade80; --pm-danger: #f87171; --pm-warning: #fbbf24;
+        --pm-radius: 16px; --pm-radius-sm: 12px; --pm-radius-pill: 9999px;
+    }
+    .page-header, .page-header-actions { display: none !important; }
+
+    .sp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .sp-header h1 { font-family: 'DM Sans', system-ui; font-style: italic; font-size: 1.5rem; font-weight: 500; color: var(--pm-text); }
+    .sp-header h1 span { color: var(--pm-accent); }
+
+    .sp-grid { display: grid; grid-template-columns: 1fr 360px; gap: 1.25rem; align-items: start; }
+    @media (max-width: 1100px) { .sp-grid { grid-template-columns: 1fr; } }
+
+    .sp-card { background: var(--pm-bg-card); border: 1px solid var(--pm-border-light); border-radius: var(--pm-radius); overflow: hidden; }
+    .sp-card-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--pm-border-light); display: flex; align-items: center; justify-content: space-between; }
+    .sp-card-header h3 { font-size: 0.9rem; font-weight: 600; color: var(--pm-text); }
+    .sp-card-body { padding: 0.85rem; }
+
+    .sp-label { display: block; font-size: 0.72rem; font-weight: 500; color: var(--pm-text-secondary); margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sp-input, .sp-select, .sp-textarea { width: 100%; padding: 0.6rem 0.85rem; background: var(--pm-bg-elevated); border: 1px solid var(--pm-border); border-radius: var(--pm-radius-sm); color: var(--pm-text); font-size: 0.82rem; font-family: inherit; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
+    .sp-input:focus, .sp-select:focus, .sp-textarea:focus { border-color: var(--pm-accent); box-shadow: 0 0 0 2px var(--pm-accent-dim); }
+    .sp-textarea { resize: vertical; min-height: 70px; }
+    .sp-select option { background: var(--pm-bg-card); color: var(--pm-text); }
+    .sp-group { margin-bottom: 0.6rem; }
+
+    .sp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border: none; border-radius: var(--pm-radius-pill); font-family: inherit; cursor: pointer; transition: all 0.2s; font-size: 0.8rem; padding: 0.5rem 1rem; }
+    .sp-btn-primary { background: var(--pm-accent); color: var(--pm-accent-text); font-weight: 600; }
+    .sp-btn-primary:hover { background: #cdd98a; }
+    .sp-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sp-btn-ghost { background: var(--pm-bg-elevated); color: var(--pm-text-secondary); border: 1px solid var(--pm-border); }
+    .sp-btn-ghost:hover { background: var(--pm-bg-hover); color: var(--pm-text); }
+    .sp-btn-danger { background: transparent; color: var(--pm-danger); border: 1px solid var(--pm-danger); }
+    .sp-btn-sm { font-size: 0.72rem; padding: 0.35rem 0.7rem; }
+
+    /* Image picker */
+    .sp-image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; margin-top: 0.5rem; }
+    .sp-image-thumb { aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; position: relative; }
+    .sp-image-thumb:hover { border-color: var(--pm-accent-muted); }
+    .sp-image-thumb.selected { border-color: var(--pm-accent); box-shadow: 0 0 0 2px var(--pm-accent-dim); }
+    .sp-image-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .sp-image-thumb .check { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--pm-accent); color: var(--pm-accent-text); font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: 700; }
+    .sp-image-thumb.selected .check { display: flex; }
+
+    /* Preview */
+    .sp-preview { border-radius: var(--pm-radius-sm); overflow: hidden; background: var(--pm-bg-elevated); }
+    .sp-preview img { width: 100%; display: block; max-height: 300px; object-fit: contain; background: #000; }
+    .sp-preview-info { padding: 0.6rem 0.75rem; }
+    .sp-preview-title { font-size: 0.85rem; font-weight: 600; color: var(--pm-text); margin-bottom: 0.2rem; }
+    .sp-preview-caption { font-size: 0.75rem; color: var(--pm-text-secondary); line-height: 1.4; }
+    .sp-preview-tags { font-size: 0.7rem; color: var(--pm-accent); margin-top: 0.3rem; }
+
+    /* Queue */
+    .sp-queue-item { display: flex; gap: 0.75rem; padding: 0.6rem; border-radius: var(--pm-radius-sm); background: var(--pm-bg-elevated); border: 1px solid var(--pm-border-light); margin-bottom: 0.5rem; transition: all 0.2s; }
+    .sp-queue-item:hover { border-color: var(--pm-border); }
+    .sp-queue-thumb { width: 60px; height: 60px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+    .sp-queue-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .sp-queue-info { flex: 1; min-width: 0; }
+    .sp-queue-title { font-size: 0.78rem; font-weight: 600; color: var(--pm-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sp-queue-meta { font-size: 0.68rem; color: var(--pm-text-muted); margin-top: 0.15rem; }
+    .sp-queue-actions { display: flex; gap: 4px; margin-top: 0.3rem; }
+
+    .sp-badge { display: inline-block; font-size: 0.62rem; font-weight: 600; padding: 2px 8px; border-radius: var(--pm-radius-pill); text-transform: uppercase; }
+    .sp-badge-draft { background: var(--pm-bg-hover); color: var(--pm-text-muted); }
+    .sp-badge-scheduled { background: var(--pm-accent-dim); color: var(--pm-accent); }
+    .sp-badge-posting { background: rgba(251,191,36,0.15); color: var(--pm-warning); }
+    .sp-badge-posted { background: rgba(74,222,128,0.15); color: var(--pm-success); }
+    .sp-badge-failed { background: rgba(248,113,113,0.15); color: var(--pm-danger); }
+
+    .sp-empty { text-align: center; padding: 2rem 1rem; color: var(--pm-text-muted); font-size: 0.82rem; }
+</style>
+
+<div class="sp-header">
+    <h1><span>📌</span> Social Post</h1>
+    <div style="display: flex; gap: 0.5rem;">
+        <button class="sp-btn sp-btn-ghost sp-btn-sm" onclick="testConnection()">🔌 Test Pinterest</button>
+    </div>
+</div>
+
+<div class="sp-grid">
+    <!-- LEFT: Create Post -->
+    <div>
+        <div class="sp-card">
+            <div class="sp-card-header">
+                <h3>📝 Create Pin</h3>
+                <span id="connectionStatus" style="font-size: 0.68rem; color: var(--pm-text-muted);"></span>
+            </div>
+            <div class="sp-card-body">
+                <!-- Step 1: Pick Collection -->
+                <div class="sp-group">
+                    <label class="sp-label">Select Collection</label>
+                    <select id="collectionSelect" class="sp-select" onchange="loadCollectionImages(this.value)">
+                        <option value="">— Pick a collection —</option>
+                        {% for col in collections %}
+                        <option value="{{ col.id }}">{{ col.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Step 2: Pick Image -->
+                <div id="imagePickerPanel" style="display: none;">
+                    <label class="sp-label">Select Image</label>
+                    <div id="imageGrid" class="sp-image-grid"></div>
+                </div>
+
+                <!-- Step 3: Caption & Details -->
+                <div id="detailsPanel" style="display: none; margin-top: 0.75rem; border-top: 1px solid var(--pm-border-light); padding-top: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-bottom: 0.6rem;">
+                        <div class="sp-group" style="flex: 1; margin-bottom: 0;">
+                            <label class="sp-label">Describe for AI caption</label>
+                            <input type="text" id="captionPrompt" class="sp-input" placeholder="e.g. Premium hair care serum for damaged hair">
+                        </div>
+                        <button class="sp-btn sp-btn-ghost sp-btn-sm" onclick="generateCaption()" id="aiCaptionBtn" style="white-space: nowrap;">✦ AI Caption</button>
+                    </div>
+
+                    <div class="sp-group">
+                        <label class="sp-label">Title</label>
+                        <input type="text" id="pinTitle" class="sp-input" placeholder="Catchy pin title (max 100 chars)" maxlength="100">
+                    </div>
+
+                    <div class="sp-group">
+                        <label class="sp-label">Caption</label>
+                        <textarea id="pinCaption" class="sp-textarea" rows="3" placeholder="Pin description..."></textarea>
+                    </div>
+
+                    <div class="sp-group">
+                        <label class="sp-label">Hashtags</label>
+                        <input type="text" id="pinHashtags" class="sp-input" placeholder="#skincare #beauty #haircare">
+                    </div>
+
+                    <div style="display: flex; gap: 0.75rem;">
+                        <div class="sp-group" style="flex: 1;">
+                            <label class="sp-label">Product Link</label>
+                            <input type="url" id="pinLink" class="sp-input" placeholder="https://dropy.in/products/...">
+                        </div>
+                        <div class="sp-group" style="width: 180px;">
+                            <label class="sp-label">Board</label>
+                            <select id="boardSelect" class="sp-select">
+                                <option value="">Loading boards...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sp-group">
+                        <label class="sp-label">Schedule (optional — leave empty to save as draft)</label>
+                        <input type="datetime-local" id="scheduleTime" class="sp-input">
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <button class="sp-btn sp-btn-primary" onclick="createPost('schedule')" style="flex: 1;">📅 Schedule Post</button>
+                        <button class="sp-btn sp-btn-ghost" onclick="createPost('draft')">Save Draft</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post Queue -->
+        <div class="sp-card" style="margin-top: 1rem;">
+            <div class="sp-card-header">
+                <h3>📋 Post Queue</h3>
+                <span style="font-size: 0.68rem; color: var(--pm-text-muted);">{{ posts|length }} posts</span>
+            </div>
+            <div class="sp-card-body">
+                {% if posts %}
+                {% for post in posts %}
+                <div class="sp-queue-item" id="post-{{ post.id }}">
+                    <div class="sp-queue-thumb">
+                        <img src="{{ url_for('static', filename=post.image_path) }}" alt="Pin" loading="lazy">
+                    </div>
+                    <div class="sp-queue-info">
+                        <div class="sp-queue-title">{{ post.title or 'Untitled' }}</div>
+                        <div class="sp-queue-meta">
+                            <span class="sp-badge sp-badge-{{ post.status }}">{{ post.status }}</span>
+                            {% if post.board_name %}· {{ post.board_name }}{% endif %}
+                            {% if post.scheduled_at %}· 📅 {{ post.scheduled_at.strftime('%b %d, %I:%M %p') }}{% endif %}
+                            {% if post.posted_at %}· ✓ Posted {{ post.posted_at.strftime('%b %d, %I:%M %p') }}{% endif %}
+                        </div>
+                        {% if post.error_message %}
+                        <div style="font-size: 0.65rem; color: var(--pm-danger); margin-top: 0.15rem;">{{ post.error_message[:80] }}</div>
+                        {% endif %}
+                        <div class="sp-queue-actions">
+                            {% if post.status != 'posted' %}
+                            <button class="sp-btn sp-btn-primary sp-btn-sm" onclick="postNow('{{ post.id }}')">📌 Post Now</button>
+                            <button class="sp-btn sp-btn-danger sp-btn-sm" onclick="deletePost('{{ post.id }}')">✕</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="sp-empty">No posts yet. Select a collection and create your first pin!</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Preview -->
+    <div>
+        <div class="sp-card">
+            <div class="sp-card-header">
+                <h3>👁 Pin Preview</h3>
+            </div>
+            <div class="sp-card-body">
+                <div id="previewEmpty" class="sp-empty" style="padding: 1.5rem;">
+                    Select an image to preview
+                </div>
+                <div id="previewCard" style="display: none;">
+                    <div class="sp-preview">
+                        <img id="previewImg" src="" alt="Preview">
+                        <div class="sp-preview-info">
+                            <div class="sp-preview-title" id="previewTitle">Pin title</div>
+                            <div class="sp-preview-caption" id="previewCaption">Caption will appear here...</div>
+                            <div class="sp-preview-tags" id="previewTags"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sp-card" style="margin-top: 1rem;">
+            <div class="sp-card-header">
+                <h3>💡 Tips</h3>
+            </div>
+            <div class="sp-card-body" style="font-size: 0.75rem; color: var(--pm-text-secondary); line-height: 1.6;">
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--pm-accent);">Title:</strong> Keep it under 100 chars, include keywords.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--pm-accent);">Caption:</strong> 2-3 sentences, keyword-rich for Pinterest SEO.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--pm-accent);">Hashtags:</strong> 2-5 targeted hashtags on Pinterest (not 30 like Instagram).</p>
+                <p style="margin: 0;"><strong style="color: var(--pm-accent);">Link:</strong> Always add your product URL for traffic.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var selectedImagePath = '';
+var selectedCollectionId = '';
+var boardsLoaded = false;
+
+// ═══ LOAD BOARDS ═══
+async function loadBoards() {
+    try {
+        var res = await fetch('/social/boards');
+        var data = await res.json();
+        var sel = document.getElementById('boardSelect');
+        sel.innerHTML = '<option value="">— Select board —</option>';
+        if (data.boards) {
+            data.boards.forEach(function(b) {
+                var opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = b.name + ' (' + b.pin_count + ')';
+                opt.setAttribute('data-name', b.name);
+                sel.appendChild(opt);
+            });
+        }
+        boardsLoaded = true;
+    } catch (e) {
+        document.getElementById('boardSelect').innerHTML = '<option value="">Failed to load boards</option>';
+    }
+}
+
+// ═══ TEST CONNECTION ═══
+async function testConnection() {
+    var el = document.getElementById('connectionStatus');
+    el.textContent = '⏳ Testing...';
+    el.style.color = 'var(--pm-text-muted)';
+    try {
+        var res = await fetch('/social/test-connection');
+        var data = await res.json();
+        if (data.success) {
+            el.textContent = '✓ Connected: @' + data.username;
+            el.style.color = 'var(--pm-success)';
+        } else {
+            el.textContent = '✗ ' + (data.error || 'Failed');
+            el.style.color = 'var(--pm-danger)';
+        }
+    } catch (e) {
+        el.textContent = '✗ Connection error';
+        el.style.color = 'var(--pm-danger)';
+    }
+}
+
+// ═══ LOAD COLLECTION IMAGES ═══
+async function loadCollectionImages(collectionId) {
+    if (!collectionId) {
+        document.getElementById('imagePickerPanel').style.display = 'none';
+        document.getElementById('detailsPanel').style.display = 'none';
+        return;
+    }
+    selectedCollectionId = collectionId;
+    try {
+        var res = await fetch('/social/collection-images/' + collectionId);
+        var data = await res.json();
+        var grid = document.getElementById('imageGrid');
+        grid.innerHTML = '';
+        if (data.images && data.images.length > 0) {
+            data.images.forEach(function(img) {
+                var div = document.createElement('div');
+                div.className = 'sp-image-thumb';
+                div.setAttribute('data-path', img.path);
+                div.innerHTML = '<img src="/static/' + img.path + '" alt="' + img.filename + '" loading="lazy"><div class="check">✓</div>';
+                div.onclick = function() { selectImage(div, img.path); };
+                grid.appendChild(div);
+            });
+            document.getElementById('imagePickerPanel').style.display = 'block';
+        } else {
+            grid.innerHTML = '<div class="sp-empty" style="grid-column: 1/-1;">No images in this collection</div>';
+            document.getElementById('imagePickerPanel').style.display = 'block';
+        }
+    } catch (e) {}
+}
+
+// ═══ SELECT IMAGE ═══
+function selectImage(el, path) {
+    document.querySelectorAll('.sp-image-thumb').forEach(function(t) { t.classList.remove('selected'); });
+    el.classList.add('selected');
+    selectedImagePath = path;
+
+    // Show details panel
+    document.getElementById('detailsPanel').style.display = 'block';
+
+    // Update preview
+    document.getElementById('previewEmpty').style.display = 'none';
+    document.getElementById('previewCard').style.display = 'block';
+    document.getElementById('previewImg').src = '/static/' + path;
+
+    // Load boards if not loaded
+    if (!boardsLoaded) loadBoards();
+}
+
+// ═══ GENERATE CAPTION ═══
+async function generateCaption() {
+    var btn = document.getElementById('aiCaptionBtn');
+    var prompt = document.getElementById('captionPrompt').value.trim();
+    if (!prompt) { alert('Enter a description for AI caption'); return; }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating...';
+
+    try {
+        var res = await fetch('/social/generate-caption', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt_text: prompt,
+                platform: 'pinterest',
+                product_url: document.getElementById('pinLink').value.trim(),
+            })
+        });
+        var data = await res.json();
+        if (data.title) document.getElementById('pinTitle').value = data.title;
+        if (data.caption) document.getElementById('pinCaption').value = data.caption;
+        if (data.hashtags) document.getElementById('pinHashtags').value = data.hashtags;
+        updatePreview();
+    } catch (e) {}
+
+    btn.disabled = false;
+    btn.textContent = '✦ AI Caption';
+}
+
+// ═══ UPDATE PREVIEW ═══
+function updatePreview() {
+    document.getElementById('previewTitle').textContent = document.getElementById('pinTitle').value || 'Pin title';
+    document.getElementById('previewCaption').textContent = document.getElementById('pinCaption').value || 'Caption...';
+    document.getElementById('previewTags').textContent = document.getElementById('pinHashtags').value || '';
+}
+
+// Live preview updates
+['pinTitle', 'pinCaption', 'pinHashtags'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', updatePreview);
+});
+
+// ═══ CREATE POST ═══
+async function createPost(mode) {
+    if (!selectedImagePath) { alert('Select an image first'); return; }
+
+    var boardSel = document.getElementById('boardSelect');
+    var boardId = boardSel.value;
+    var boardName = boardId ? boardSel.options[boardSel.selectedIndex].getAttribute('data-name') : '';
+    var scheduledAt = document.getElementById('scheduleTime').value;
+
+    if (mode === 'schedule' && !scheduledAt && !boardId) {
+        alert('Select a board and schedule time, or save as draft');
+        return;
+    }
+
+    try {
+        var res = await fetch('/social/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                collection_id: selectedCollectionId,
+                platform: 'pinterest',
+                image_path: selectedImagePath,
+                title: document.getElementById('pinTitle').value.trim(),
+                caption: document.getElementById('pinCaption').value.trim(),
+                hashtags: document.getElementById('pinHashtags').value.trim(),
+                pin_link: document.getElementById('pinLink').value.trim(),
+                board_id: boardId,
+                board_name: boardName,
+                scheduled_at: scheduledAt,
+            })
+        });
+        var data = await res.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to create post');
+        }
+    } catch (e) { alert('Connection error'); }
+}
+
+// ═══ POST NOW ═══
+async function postNow(postId) {
+    if (!confirm('Post this pin to Pinterest now?')) return;
+    var el = document.getElementById('post-' + postId);
+    try {
+        var res = await fetch('/social/post-now/' + postId, { method: 'POST' });
+        var data = await res.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to post');
+        }
+    } catch (e) { alert('Connection error'); }
+}
+
+// ═══ DELETE POST ═══
+async function deletePost(postId) {
+    if (!confirm('Delete this post?')) return;
+    try {
+        var res = await fetch('/social/delete/' + postId, { method: 'POST' });
+        var data = await res.json();
+        if (data.success) {
+            document.getElementById('post-' + postId).remove();
+        }
+    } catch (e) {}
+}
+
+// Load boards on page load
+loadBoards();
+
+// Auto-select collection if coming from collection page
+var urlParams = new URLSearchParams(window.location.search);
+var preselect = urlParams.get('collection');
+if (preselect) {
+    var sel = document.getElementById('collectionSelect');
+    sel.value = preselect;
+    if (sel.value === preselect) {
+        loadCollectionImages(preselect);
+    }
+}
+</script>
+{% endblock %}

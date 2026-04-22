@@ -55,6 +55,12 @@ def _check_due_jobs(app):
         if active_count > 0:
             print(f"[AutoScheduler] Checking... now={now.strftime('%H:%M:%S')}, {active_count} active job(s)")
 
+        # ── Check due social posts ──
+        try:
+            _post_due_social(app)
+        except Exception as e:
+            print(f"[AutoScheduler] Social post error: {e}")
+
         due_jobs = ScheduledJob.query.filter(
             ScheduledJob.is_active == True,
             ScheduledJob.next_run != None,
@@ -173,3 +179,73 @@ def get_scheduler_status():
             'next_check': str(jobs[0].next_run_time) if jobs else None,
         }
     return {'running': False}
+
+
+def _post_due_social(app):
+    """Post any social posts that are due."""
+    with app.app_context():
+        from models import SocialPost, db
+        from datetime import datetime
+
+        due_posts = SocialPost.query.filter(
+            SocialPost.status == 'scheduled',
+            SocialPost.scheduled_at <= datetime.now()
+        ).all()
+
+        if not due_posts:
+            return
+
+        token = app.config.get('PINTEREST_ACCESS_TOKEN', '')
+        if not token:
+            print("[AutoScheduler] No Pinterest token — skipping social posts")
+            return
+
+        from modules.pinterest_api import PinterestAPI
+        import os
+        api = PinterestAPI(token)
+
+        for post in due_posts:
+            try:
+                if not post.board_id:
+                    post.status = 'failed'
+                    post.error_message = 'No board selected'
+                    db.session.commit()
+                    continue
+
+                image_full_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'static', post.image_path)
+
+                description = post.caption
+                if post.hashtags:
+                    description += '\n\n' + post.hashtags
+
+                post.status = 'posting'
+                db.session.commit()
+
+                status_code, result = api.create_pin(
+                    board_id=post.board_id,
+                    title=post.title,
+                    description=description,
+                    link=post.pin_link,
+                    image_path=image_full_path,
+                )
+
+                if status_code in (200, 201):
+                    post.status = 'posted'
+                    post.posted_at = datetime.now()
+                    post.platform_post_id = result.get('id', '')
+                    post.error_message = None
+                    print(f"[AutoScheduler] Posted pin: {post.title[:30]}")
+                else:
+                    post.status = 'failed'
+                    post.error_message = result.get('message', str(result))[:200]
+                    print(f"[AutoScheduler] Pin failed: {post.error_message[:50]}")
+
+                db.session.commit()
+
+            except Exception as e:
+                post.status = 'failed'
+                post.error_message = str(e)[:200]
+                db.session.commit()
+                print(f"[AutoScheduler] Pin error: {str(e)[:50]}")

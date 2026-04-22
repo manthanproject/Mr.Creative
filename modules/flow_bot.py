@@ -598,40 +598,172 @@ class FlowBot:
             time.sleep(1)
 
     def download_all_new_images(self, edit_urls, project_url):
-        """Download each new image in 2K, then return to project."""
-        downloaded_before = set(os.listdir(self.download_dir))
+        """Download each new image in 2K, collecting files after each download."""
+        all_files = []
         self._update_status('downloading', f'Downloading {len(edit_urls)} images in 2K...')
 
         for i, url in enumerate(edit_urls):
+            # Snapshot BEFORE each individual download
+            before = {}
+            for f in os.listdir(self.download_dir):
+                fp = os.path.join(self.download_dir, f)
+                if os.path.isfile(fp):
+                    before[f] = os.path.getmtime(fp)
+
             self._update_status('downloading', f'Downloading image {i+1}/{len(edit_urls)} in 2K...')
             self.download_single_image_2k(url)
 
-        # Wait for any pending .crdownload files to finish
-        for _ in range(15):
-            pending = [f for f in os.listdir(self.download_dir) if f.endswith('.crdownload')]
-            if not pending:
-                break
-            print(f"[FlowBot] Waiting for {len(pending)} downloads to finish...")
+            # Wait for any pending .crdownload files
+            for _ in range(15):
+                pending = [f for f in os.listdir(self.download_dir) if f.endswith('.crdownload')]
+                if not pending:
+                    break
+                time.sleep(2)
             time.sleep(2)
+
+            # Collect new OR modified files from this download
+            for f in os.listdir(self.download_dir):
+                if not f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                    continue
+                if f.endswith(('.crdownload', '.tmp')):
+                    continue
+                fp = os.path.join(self.download_dir, f)
+                if not os.path.isfile(fp):
+                    continue
+                mtime = os.path.getmtime(fp)
+                # New file OR existing file that was modified (overwritten)
+                if f not in before or mtime > before[f] + 1:
+                    # Rename to unique name so next iteration doesn't confuse it
+                    import uuid
+                    ext = os.path.splitext(f)[1]
+                    unique_name = f"flow_dl_{i+1}_{uuid.uuid4().hex[:8]}{ext}"
+                    unique_path = os.path.join(self.download_dir, unique_name)
+                    os.rename(fp, unique_path)
+                    all_files.append(unique_path)
+                    print(f"[FlowBot] Captured file {i+1}: {f} → {unique_name}")
+                    break  # One file per download
 
         # Go back to project
         self.driver.get(project_url)
         time.sleep(3)
 
-        # Collect new files
-        downloaded_after = set(os.listdir(self.download_dir))
-        new_files = downloaded_after - downloaded_before
-        files = [os.path.join(self.download_dir, f) for f in new_files
-                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
-                and not f.endswith(('.crdownload', '.tmp'))]
-        print(f"[FlowBot] Total new files: {len(files)}")
-        return files
+        print(f"[FlowBot] Total new files: {len(all_files)}")
+        return all_files
+
+    def upload_reference_image(self, image_path):
+        """Upload a reference image via Flow's + button → Upload image → file explorer."""
+        if not image_path or not os.path.exists(image_path):
+            self._update_status('entering_prompt', 'No reference image to upload')
+            return False
+
+        abs_path = os.path.abspath(image_path)
+        self._update_status('entering_prompt', f'Uploading reference: {os.path.basename(abs_path)}')
+
+        try:
+            # Step 1: Click the "+" button (text contains "add_2", bottom area, small 32x32)
+            clicked = self.driver.execute_script("""
+                var btns = document.querySelectorAll('button');
+                for (var b of btns) {
+                    if (!b.offsetParent) continue;
+                    var r = b.getBoundingClientRect();
+                    var txt = b.textContent.trim();
+                    if (txt.includes('add_2') && r.y > window.innerHeight - 200 && r.width < 50) {
+                        b.click();
+                        return 'clicked';
+                    }
+                }
+                return 'not_found';
+            """)
+            self._update_status('entering_prompt', f'Plus button: {clicked}')
+            time.sleep(2)
+
+            # Step 2: Click "Upload image" option (div with class containing sc-f4d15a74)
+            clicked = self.driver.execute_script("""
+                var els = document.querySelectorAll('div[class*="sc-f4d15a74"]');
+                for (var el of els) {
+                    if (!el.offsetParent) continue;
+                    var txt = el.textContent.trim();
+                    if (txt === 'Upload image') {
+                        el.click();
+                        return 'clicked';
+                    }
+                }
+                // Fallback: any visible element with exact text
+                var all = document.querySelectorAll('div, button, span');
+                for (var el of all) {
+                    if (!el.offsetParent) continue;
+                    if (el.textContent.trim() === 'Upload image' && el.children.length === 0) {
+                        el.click();
+                        return 'clicked_fallback';
+                    }
+                }
+                return 'not_found';
+            """)
+            self._update_status('entering_prompt', f'Upload image: {clicked}')
+            time.sleep(2)
+
+            # Step 3: Handle "Notice" consent dialog — click "I agree"
+            for _ in range(3):
+                agreed = self.driver.execute_script("""
+                    var btns = document.querySelectorAll('button');
+                    for (var b of btns) {
+                        if (!b.offsetParent) continue;
+                        var txt = b.textContent.trim();
+                        if (txt === 'I agree' || txt === 'Accept' || txt === 'OK') {
+                            b.click();
+                            return 'agreed';
+                        }
+                    }
+                    return 'no_dialog';
+                """)
+                if agreed == 'agreed':
+                    self._update_status('entering_prompt', 'Accepted notice dialog')
+                    time.sleep(2)
+                    break
+                time.sleep(1)
+
+            # Step 4: File explorer opens — paste path via pyautogui
+            import pyautogui
+            import subprocess
+            time.sleep(3)
+            subprocess.run(['clip'], input=abs_path.encode(), check=True)
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.5)
+            pyautogui.press('enter')
+            self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
+            time.sleep(10)
+
+            # Step 5: Close the image picker panel if still open (click outside or press Escape)
+            self.driver.execute_script("document.body.click();")
+            time.sleep(1)
+
+            # Verify image appeared in prompt area
+            has_image = self.driver.execute_script("""
+                var imgs = document.querySelectorAll('img[src*="blob:"], img[src*="getMediaUrlRedirect"], img[src*="googleusercontent"]');
+                for (var img of imgs) {
+                    var r = img.getBoundingClientRect();
+                    if (r.width > 30 && r.height > 30 && r.y > window.innerHeight - 300) {
+                        return true;
+                    }
+                }
+                return false;
+            """)
+            if has_image:
+                self._update_status('entering_prompt', 'Reference image uploaded!')
+            else:
+                self._update_status('entering_prompt', 'Image may not have attached — proceeding')
+
+            return True
+
+        except Exception as e:
+            self._update_status('entering_prompt', f'Image upload error: {str(e)[:60]}')
+            return False
 
     # ══════════════════════════════════════
     # FULL WORKFLOW
     # ══════════════════════════════════════
 
-    def generate_banners(self, prompt, aspect_ratio='landscape', count=4, download_dir=None):
+    def generate_banners(self, prompt, aspect_ratio='landscape', count=4, download_dir=None, image_path=None):
         """Full: navigate → settings → prompt → create → wait → download 2K each.
         Returns: {'success': bool, 'downloaded_files': [...], 'errors': [...]}
         """
@@ -655,7 +787,11 @@ class FlowBot:
             # Settings
             self.set_image_settings(aspect_ratio, count)
 
-            # Count existing images
+            # Upload reference image if provided
+            if image_path:
+                self.upload_reference_image(image_path)
+
+            # Count existing images AFTER upload so reference image is included
             count_before = self.count_images()
             project_url = self.driver.current_url
 

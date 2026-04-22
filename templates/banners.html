@@ -120,6 +120,27 @@
             </div>
             <div class="pm-card-body">
                 <div class="pm-group">
+                    <label class="pm-label">Reference Image (optional)</label>
+                    <div id="flowUploadZone" style="border: 1px dashed var(--pm-border); border-radius: var(--pm-radius); padding: 0.75rem; text-align: center; cursor: pointer; transition: all 0.2s;"
+                         onclick="document.getElementById('flowImageInput').click()"
+                         ondragover="event.preventDefault(); this.style.borderColor='var(--pm-accent)';"
+                         ondragleave="this.style.borderColor='var(--pm-border)';"
+                         ondrop="event.preventDefault(); this.style.borderColor='var(--pm-border)'; handleFlowDrop(event);">
+                        <div id="flowUploadPlaceholder">
+                            <span style="font-size: 1.2rem; color: var(--pm-text-muted);">📷</span>
+                            <p style="color: var(--pm-text-muted); font-size: 0.75rem; margin-top: 0.3rem;">Drop image or click to upload</p>
+                        </div>
+                        <div id="flowUploadPreview" style="display: none;">
+                            <img id="flowPreviewImg" style="max-height: 80px; border-radius: var(--pm-radius-sm);" alt="Preview">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.3rem;">
+                                <span id="flowFileName" style="color: var(--pm-text-secondary); font-size: 0.72rem;"></span>
+                                <button type="button" onclick="event.stopPropagation(); clearFlowImage();" style="background: none; border: none; color: var(--pm-danger); cursor: pointer; font-size: 0.8rem;">✕</button>
+                            </div>
+                        </div>
+                        <input type="file" id="flowImageInput" accept="image/*" style="display: none;" onchange="handleFlowFileSelect(this)">
+                    </div>
+                </div>
+                <div class="pm-group">
                     <label class="pm-label">Banner Prompt</label>
                     <textarea id="banner-prompt" class="pm-textarea" rows="4" placeholder="Describe your banner... e.g. Premium skincare product ad with gold and white theme, elegant typography, luxury feel"></textarea>
                     <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
@@ -360,6 +381,29 @@ async function flowDeleteAccount(email) {
 // Load accounts on page load
 loadFlowAccounts();
 
+// Check for active Flow job on page load
+async function checkActiveJob() {
+    try {
+        var res = await fetch('/banners/active-job');
+        var data = await res.json();
+        if (data.active && data.job_id) {
+            // Resume polling
+            var btn = document.getElementById('generate-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Resuming job...';
+            document.getElementById('progress-panel').style.display = 'block';
+            document.getElementById('progress-bar').style.width = data.progress + '%';
+            document.getElementById('progress-icon').textContent = '⏳';
+            document.getElementById('progress-title').textContent = data.status || 'Running';
+            document.getElementById('progress-msg').textContent = data.message || 'Resuming...';
+            document.getElementById('progress-pct').textContent = data.progress + '%';
+            currentJobId = data.job_id;
+            pollJobStatus(data.job_id, data.collection_id);
+        }
+    } catch (e) {}
+}
+checkActiveJob();
+
 function selectToggle(groupId, btn) {
     document.querySelectorAll('#' + groupId + ' .flow-toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -429,6 +473,44 @@ async function aiSuggestFlow() {
     btn.textContent = '✦ AI Suggest';
 }
 
+// ═══ FLOW IMAGE UPLOAD ═══
+var flowImageFile = null;
+
+function handleFlowFileSelect(input) {
+    if (input.files && input.files[0]) {
+        flowImageFile = input.files[0];
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('flowPreviewImg').src = e.target.result;
+            document.getElementById('flowFileName').textContent = flowImageFile.name;
+            document.getElementById('flowUploadPlaceholder').style.display = 'none';
+            document.getElementById('flowUploadPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(flowImageFile);
+    }
+}
+
+function handleFlowDrop(e) {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        flowImageFile = e.dataTransfer.files[0];
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            document.getElementById('flowPreviewImg').src = ev.target.result;
+            document.getElementById('flowFileName').textContent = flowImageFile.name;
+            document.getElementById('flowUploadPlaceholder').style.display = 'none';
+            document.getElementById('flowUploadPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(flowImageFile);
+    }
+}
+
+function clearFlowImage() {
+    flowImageFile = null;
+    document.getElementById('flowImageInput').value = '';
+    document.getElementById('flowUploadPlaceholder').style.display = 'block';
+    document.getElementById('flowUploadPreview').style.display = 'none';
+}
+
 async function generateBanners() {
     var prompt = document.getElementById('banner-prompt').value.trim();
     if (!prompt) { alert('Enter a banner prompt'); return; }
@@ -455,15 +537,18 @@ async function generateBanners() {
     document.querySelectorAll('.pm-step').forEach(s => { s.classList.remove('active', 'done'); });
 
     try {
+        var formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('aspect_ratio', getToggleValue('ar-group') || 'square');
+        formData.append('count', parseInt(getToggleValue('count-group') || '4'));
+        formData.append('collection_id', document.getElementById('collection-select').value);
+        if (flowImageFile) {
+            formData.append('image', flowImageFile);
+        }
+
         var resp = await fetch('/banners/generate', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                prompt: prompt,
-                aspect_ratio: getToggleValue('ar-group') || 'square',
-                count: parseInt(getToggleValue('count-group') || '4'),
-                collection_id: document.getElementById('collection-select').value,
-            }),
+            body: formData,
         });
         var data = await resp.json();
 

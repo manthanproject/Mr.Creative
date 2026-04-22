@@ -83,6 +83,9 @@ def create_app():
     from routes.banners import banners_bp
     app.register_blueprint(banners_bp, url_prefix='/banners')
 
+    from routes.social import social_bp
+    app.register_blueprint(social_bp, url_prefix='/social')
+
     # Root route
     @app.route('/')
     def index():

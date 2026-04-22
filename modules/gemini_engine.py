@@ -305,3 +305,50 @@ Return ONLY 5 items, numbered 1-5."""
                 name, desc = cleaned.split(':', 1)
                 results.append({'name': name.strip(), 'description': desc.strip()})
         return results[:5]
+
+    def generate_social_caption(self, prompt_text, platform='pinterest', product_url=''):
+        """Generate a social media caption with hashtags for a platform."""
+        _, _, _, seed = self._random_seed_block()
+
+        platform_guides = {
+            'pinterest': 'Pinterest pin description — SEO-optimized, keyword-rich, 2-3 sentences max. Include relevant keywords naturally. No excessive hashtags — Pinterest uses 2-5 targeted hashtags at the end.',
+            'instagram': 'Instagram caption — engaging, conversational, with a hook in the first line. Use 15-25 relevant hashtags at the end, mix of popular and niche.',
+            'facebook': 'Facebook post — conversational, engaging, with a clear CTA. Use 3-5 hashtags max.',
+        }
+
+        guide = platform_guides.get(platform, platform_guides['pinterest'])
+
+        prompt = f"""[{seed}]
+
+You are a social media marketing expert.
+
+TASK: Write a {platform} caption for this content:
+"{prompt_text}"
+
+PLATFORM GUIDE: {guide}
+{f'PRODUCT LINK: {product_url}' if product_url else ''}
+
+Return your response in this EXACT format (no other text):
+TITLE: (a catchy 5-10 word title)
+CAPTION: (the main caption text, 1-3 sentences)
+HASHTAGS: (relevant hashtags separated by spaces, e.g. #skincare #beauty #luxury)"""
+
+        result = self._call_api(prompt, temperature=0.9, max_tokens=500)
+
+        title = ''
+        caption = ''
+        hashtags = ''
+        for line in result.strip().split('\n'):
+            line = line.strip()
+            if line.upper().startswith('TITLE:'):
+                title = line[6:].strip().strip('"')
+            elif line.upper().startswith('CAPTION:'):
+                caption = line[8:].strip().strip('"')
+            elif line.upper().startswith('HASHTAGS:'):
+                hashtags = line[9:].strip()
+
+        return {
+            'title': title,
+            'caption': caption,
+            'hashtags': hashtags,
+        }

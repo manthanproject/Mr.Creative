@@ -24,15 +24,31 @@ def index():
 @banners_bp.route('/generate', methods=['POST'])
 @login_required
 def generate():
-    data = request.get_json() or {}
-    prompt = data.get('prompt', '').strip()
-    aspect_ratio = data.get('aspect_ratio', '1:1')
-    count = min(int(data.get('count', 4)), 4)
-    collection_id = data.get('collection_id', '').strip()
-    model = data.get('model', 'nano_banana_2')
+    # Support both JSON and FormData
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        prompt = request.form.get('prompt', '').strip()
+        aspect_ratio = request.form.get('aspect_ratio', '1:1')
+        count = min(int(request.form.get('count', 4)), 4)
+        collection_id = request.form.get('collection_id', '').strip()
+    else:
+        data = request.get_json() or {}
+        prompt = data.get('prompt', '').strip()
+        aspect_ratio = data.get('aspect_ratio', '1:1')
+        count = min(int(data.get('count', 4)), 4)
+        collection_id = data.get('collection_id', '').strip()
 
     if not prompt:
         return jsonify({'error': 'Enter a banner prompt'}), 400
+
+    # Handle image upload
+    image_path = None
+    image_file = request.files.get('image')
+    if image_file and image_file.filename:
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        safe_name = f"flow_{uuid.uuid4().hex[:8]}_{image_file.filename}"
+        image_path = os.path.join(upload_dir, safe_name)
+        image_file.save(image_path)
 
     # Create collection
     if not collection_id:
@@ -62,6 +78,7 @@ def generate():
     thread = threading.Thread(
         target=_run_flow_bot,
         args=(job_id, prompt, aspect_ratio, count, collection_id, current_user.id, flask_app),
+        kwargs={'image_path': image_path},
         daemon=True,
     )
     thread.start()
@@ -76,7 +93,24 @@ def status(job_id):
     return jsonify(job)
 
 
-def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, flask_app):
+@banners_bp.route('/active-job')
+@login_required
+def active_job():
+    """Check if there's a running Flow job."""
+    for job_id, job in _banner_jobs.items():
+        if job.get('status') not in ('complete', 'error'):
+            return jsonify({
+                'active': True,
+                'job_id': job_id,
+                'collection_id': job.get('collection_id', ''),
+                'status': job.get('status', ''),
+                'message': job.get('message', ''),
+                'progress': job.get('progress', 0),
+            })
+    return jsonify({'active': False})
+
+
+def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, flask_app, image_path=None):
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
@@ -144,6 +178,7 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
             prompt=prompt,
             aspect_ratio=aspect_ratio,
             count=count,
+            image_path=image_path,
         )
 
         # Move downloaded files to collection output dir and save to DB

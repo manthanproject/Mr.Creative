@@ -28,6 +28,7 @@ class User(UserMixin, db.Model):
     generations = db.relationship('Generation', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     collections = db.relationship('Collection', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     scheduled_jobs = db.relationship('ScheduledJob', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
+    social_posts = db.relationship('SocialPost', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -214,3 +215,34 @@ class JobQueue(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     started_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
+
+
+class SocialPost(db.Model):
+    __tablename__ = 'social_posts'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    collection_id = db.Column(db.String(36), db.ForeignKey('collections.id'), nullable=True)
+
+    # Platform
+    platform = db.Column(db.String(20), default='pinterest')  # pinterest, instagram, facebook
+
+    # Content
+    image_path = db.Column(db.String(500), nullable=False)
+    title = db.Column(db.String(200), default='')
+    caption = db.Column(db.Text, default='')
+    hashtags = db.Column(db.Text, default='')
+    pin_link = db.Column(db.String(500), default='')
+    board_id = db.Column(db.String(100), default='')
+    board_name = db.Column(db.String(200), default='')
+
+    # Schedule
+    scheduled_at = db.Column(db.DateTime, nullable=True)
+    status = db.Column(db.String(20), default='draft')  # draft, scheduled, posting, posted, failed
+    posted_at = db.Column(db.DateTime, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    platform_post_id = db.Column(db.String(100), nullable=True)
+    platform_post_url = db.Column(db.String(500), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)

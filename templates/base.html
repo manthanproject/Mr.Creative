@@ -75,6 +75,10 @@
                     Scheduler
                     <span class="nav-badge" id="schedulerBadge" style="display:none;">0</span>
                 </a>
+                <a href="{{ url_for('social.index') }}" class="nav-link {% if request.endpoint and 'social' in request.endpoint %}active{% endif %}">
+                    <span class="nav-icon">📌</span>
+                    Social Post
+                </a>
                 <a href="{{ url_for('collections.compare') }}" class="nav-link {% if request.endpoint == 'collections.compare' %}active{% endif %}" id="navCompare">
                     <span class="nav-icon">⇄</span>
                     Compare

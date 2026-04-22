@@ -24,6 +24,9 @@ class Config:
     GEMINI_API_KEY = 'AIza...'
     HF_API_KEY = 'hf_...'
 
+    # Pinterest API
+    PINTEREST_ACCESS_TOKEN = 'your-pinterest-access-token'
+
     # Pomelli account
     POMELLI_URL = 'https://labs.google.com/pomelli'
     GOOGLE_EMAIL = os.environ.get('GOOGLE_EMAIL', 'your-pomelli-account@gmail.com')

@@ -61,6 +61,7 @@
         {% if collection.is_public %}<span class="badge badge-approved">Shared</span>{% endif %}
     </div>
     <div class="flex gap-1">
+        <a href="{{ url_for('social.index') }}?collection={{ collection.id }}" class="btn btn-ghost btn-sm" style="text-decoration: none;">📌 Post to Social</a>
         <button class="btn btn-ghost btn-sm" onclick="toggleDropZone()">📤 Drop Zone</button>
     </div>
 </div>
