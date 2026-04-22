@@ -5,12 +5,12 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@1,400;1,500;1,600;1,700&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap');
 
 :root {
-    --bg-primary: #1b1b1b;
-    --bg-white: #1e1f20;
-    --bg-glass: rgba(30, 31, 32, 0.85);
-    --bg-hover: #333537;
-    --bg-active: #3a3c3e;
-    --bg-subtle: #232425;
+    --bg-primary: #000000;
+    --bg-white: #0a0a0a;
+    --bg-glass: rgba(0, 0, 0, 0.9);
+    --bg-hover: #1a1a1a;
+    --bg-active: #222222;
+    --bg-subtle: #0d0d0d;
 
     --text-primary: #e5e3d9;
     --text-secondary: #c7c8b6;
@@ -26,9 +26,9 @@
     --gradient-warm: linear-gradient(135deg, #c1cd7d 0%, #919282 100%);
     --gradient-ocean: linear-gradient(135deg, #c1cd7d 0%, #6b8e7b 100%);
     --gradient-sunset: linear-gradient(135deg, #c1cd7d 0%, #d4de9a 100%);
-    --gradient-subtle: #1b1b1b;
-    --gradient-card: #1e1f20;
-    --gradient-sidebar: #1e1f20;
+    --gradient-subtle: #000000;
+    --gradient-card: #0a0a0a;
+    --gradient-sidebar: rgba(10, 10, 10, 0.7);
 
     --success: #4ade80;
     --success-bg: rgba(74, 222, 128, 0.15);
@@ -280,7 +280,7 @@ h5 {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #1b1b1b;
+    background: #000000;
     padding: 2rem;
     position: relative;
     overflow: hidden;
@@ -313,7 +313,7 @@ h5 {
 .auth-card {
     width: 100%;
     max-width: 460px;
-    background: #1e1f20;
+    background: #0a0a0a;
     border-radius: var(--radius-xl);
     padding: 3rem;
     box-shadow: var(--shadow-xl);
@@ -527,8 +527,15 @@ h5 {
 /* --- SIDEBAR --- */
 .sidebar {
     width: var(--sidebar-width);
-    background: var(--gradient-sidebar);
-    border-right: 1px solid var(--border-light);
+    background: linear-gradient(180deg, rgba(10, 10, 10, 0.95) 0%, rgba(5, 5, 5, 0.98) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-right: none;
+    border-radius: 0;
+    margin: 0;
+    box-shadow: 3px 0 20px rgba(193, 205, 125, 0.1), 6px 0 40px rgba(193, 205, 125, 0.06);
+    position: relative;
+    z-index: 10;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -536,7 +543,6 @@ h5 {
     left: 0;
     bottom: 0;
     z-index: 100;
-    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.15);
     transition: transform 0.3s var(--ease-out);
 }
 
