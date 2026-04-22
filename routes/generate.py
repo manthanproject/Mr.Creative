@@ -779,6 +779,7 @@ def switch_account():
 
     current_app.config['GOOGLE_EMAIL'] = match['email']
     current_app.config['GOOGLE_PASSWORD'] = match['password']
+    _save_active_account('pomelli', match['email'])
     return jsonify({'success': True, 'email': match['email']})
 
 
@@ -818,6 +819,37 @@ def _write_accounts(accounts):
     path = _accounts_file()
     with open(path, 'w') as f:
         json.dump(accounts, f, indent=2)
+
+
+def _active_accounts_file():
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'active_accounts.json')
+
+
+def _save_active_account(tool, email):
+    """Persist which account is active for each tool (pomelli/flow)."""
+    path = _active_accounts_file()
+    data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+        except Exception:
+            pass
+    data[tool] = email
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def _load_active_accounts():
+    """Load persisted active accounts for all tools."""
+    path = _active_accounts_file()
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
 
 
 def _save_account(email, password):

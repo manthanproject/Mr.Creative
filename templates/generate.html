@@ -1219,16 +1219,16 @@
                 </div>
 
                 <!-- Campaign Options Row -->
-                <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-                    <div class="pm-group" style="flex: 1;">
+                <div style="display: flex; gap: 0.75rem; align-items: flex-end; margin-bottom: 0.6rem;">
+                    <div class="pm-group" style="flex: 1; margin-bottom: 0;">
                         <label class="pm-label">Product URL (optional)</label>
                         <input type="url" id="campaignProductUrl" class="pm-input"
                             placeholder="https://yourbrand.com/products/serum"
                             style="font-size: 0.8rem; padding: 0.55rem 0.85rem;">
                     </div>
-                    <div class="pm-group" style="width: auto; flex-shrink: 0;">
+                    <div class="pm-group" style="width: auto; flex-shrink: 0; margin-bottom: 0;">
                         <label class="pm-label">Image (optional)</label>
-                        <div style="display: flex; align-items: center; gap: 6px;">
+                        <div style="display: flex; align-items: center; gap: 6px; height: 38px;">
                             <button type="button" class="pm-btn-ghost" style="white-space: nowrap;"
                                 onclick="document.getElementById('campaignImageInput').click()">
                                 📷 <span id="campaignImageLabel">Upload</span>
@@ -1239,9 +1239,9 @@
                                 onchange="handleCampaignImageSelect(this)">
                         </div>
                     </div>
-                    <div class="pm-group" style="width: 150px; flex-shrink: 0;">
+                    <div class="pm-group" style="width: 150px; flex-shrink: 0; margin-bottom: 0;">
                         <label class="pm-label">Aspect Ratio</label>
-                        <select id="campaignAspectRatio" class="pm-select" style="padding: 0.55rem 0.85rem; font-size: 0.8rem;"
+                        <select id="campaignAspectRatio" class="pm-select" style="padding: 0.55rem 0.85rem; font-size: 0.8rem; height: 38px;"
                             onchange="onCampaignAspectChange(this.value)">
                             <option value="story">Story (9:16)</option>
                             <option value="square">Square (1:1)</option>

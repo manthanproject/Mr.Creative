@@ -48,9 +48,10 @@ ASPECT_RATIOS = {
 
 class FlowBot:
 
-    def __init__(self, driver, download_dir=None):
+    def __init__(self, driver, download_dir=None, expected_email=None):
         self.driver = driver
         self.download_dir = download_dir or os.path.expanduser('~/Downloads')
+        self.expected_email = expected_email
         os.makedirs(self.download_dir, exist_ok=True)
         self.status = 'idle'
         self.status_message = ''
@@ -89,11 +90,109 @@ class FlowBot:
     # NAVIGATION
     # ══════════════════════════════════════
 
+    def _ensure_flow_account(self):
+        """Sign out and re-login if wrong Google account is active on Flow."""
+        try:
+            # Read current account email from the page
+            current_email = self.driver.execute_script("""
+                var btns = document.querySelectorAll('button, a');
+                for (var b of btns) {
+                    if (!b.offsetParent) continue;
+                    var r = b.getBoundingClientRect();
+                    if (r.x > window.innerWidth - 80 && r.y < 60 && r.width < 50) {
+                        b.click(); return 'opened';
+                    }
+                }
+                return 'no_avatar';
+            """)
+            time.sleep(2)
+
+            # Grab email from opened menu
+            logged_email = self.driver.execute_script("""
+                var els = document.querySelectorAll('*');
+                for (var el of els) {
+                    if (!el.offsetParent) continue;
+                    var t = (el.textContent || '').trim();
+                    if (t.includes('@') && t.includes('.com') && t.indexOf('@') === t.lastIndexOf('@') && t.length < 60 && !t.includes(' ')) {
+                        return t;
+                    }
+                }
+                return '';
+            """)
+            self._update_status('navigating', f'Current account: {logged_email}')
+
+            # Close menu
+            self.driver.execute_script("document.body.click();")
+            time.sleep(1)
+
+            if logged_email and self.expected_email.lower() == logged_email.lower():
+                self._update_status('navigating', 'Correct account already active!')
+                return
+
+            # Wrong account — sign out
+            self._update_status('navigating', f'Switching to {self.expected_email}...')
+
+            # Re-open avatar menu and click Sign out
+            self.driver.execute_script("""
+                var btns = document.querySelectorAll('button, a');
+                for (var b of btns) {
+                    if (!b.offsetParent) continue;
+                    var r = b.getBoundingClientRect();
+                    if (r.x > window.innerWidth - 80 && r.y < 60 && r.width < 50) {
+                        b.click(); return;
+                    }
+                }
+            """)
+            time.sleep(2)
+            self.driver.execute_script("""
+                var btns = document.querySelectorAll('button, a');
+                for (var b of btns) {
+                    if (!b.offsetParent) continue;
+                    if (b.textContent.trim() === 'Sign out') { b.click(); return; }
+                }
+            """)
+            time.sleep(3)
+
+            # Navigate back to Flow — triggers Google account picker
+            self.driver.get(FLOW_URL)
+            time.sleep(5)
+
+            # Pick correct account from chooser
+            if 'accounts.google.com' in self.driver.current_url:
+                self._update_status('navigating', f'Selecting {self.expected_email}...')
+                self.driver.execute_script("""
+                    var target = arguments[0].toLowerCase();
+                    var accs = document.querySelectorAll('div[data-email], li[data-identifier]');
+                    for (var a of accs) {
+                        var email = (a.getAttribute('data-email') || a.getAttribute('data-identifier') || '').toLowerCase();
+                        if (email === target) { a.click(); return; }
+                    }
+                """, self.expected_email.lower())
+                for _ in range(20):
+                    time.sleep(2)
+                    if self._is_on_flow():
+                        break
+                time.sleep(3)
+                self._update_status('navigating', f'Logged in as {self.expected_email}!')
+            else:
+                self._update_status('navigating', 'No account picker — proceeding...')
+
+        except Exception as e:
+            self._update_status('navigating', f'Account switch error: {str(e)[:60]}')
+            try:
+                self.driver.execute_script("document.body.click();")
+            except Exception:
+                pass
+
     def navigate_to_flow(self):
         """Go to Flow → handle landing → dashboard → New Project → prompt bar."""
         self._update_status('navigating', 'Opening Flow...')
         self.driver.get(FLOW_URL)
         time.sleep(5)
+
+        # Step 0: Log expected account
+        if self.expected_email:
+            self._update_status('navigating', f'Using account: {self.expected_email}')
 
         # Step 1: Landing page → click "Create with Flow"
         for attempt in range(3):

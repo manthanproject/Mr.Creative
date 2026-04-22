@@ -247,6 +247,27 @@
 
         <div class="pm-card" style="margin-top: 1rem;">
             <div class="pm-card-header">
+                <h3>🔑 Flow Account</h3>
+            </div>
+            <div class="pm-card-body">
+                <div id="flowActiveAccount" style="font-size: 0.78rem; color: var(--pm-text-muted); margin-bottom: 0.5rem;">
+                    Loading...
+                </div>
+                <div id="flowAccountsList" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 0.5rem;"></div>
+
+                <div style="display: flex; gap: 4px; margin-top: 0.5rem;">
+                    <input type="email" id="flowEmail" class="pm-select" placeholder="email@gmail.com"
+                        style="flex: 1; font-size: 0.72rem; padding: 0.4rem 0.6rem;">
+                </div>
+                <button class="pm-btn" onclick="flowSaveSwitch()"
+                    style="background: var(--pm-bg-elevated); color: var(--pm-text-secondary); border: 1px solid var(--pm-border); font-size: 0.72rem; padding: 0.4rem 0.75rem; border-radius: var(--pm-radius-pill); margin-top: 0.4rem; width: 100%; justify-content: center;">
+                    💾 Save & Switch
+                </button>
+            </div>
+        </div>
+
+        <div class="pm-card" style="margin-top: 1rem;">
+            <div class="pm-card-header">
                 <h3>⚠ Requirements</h3>
             </div>
             <div class="pm-card-body" style="font-size: 0.78rem; color: var(--pm-text-muted); line-height: 1.5;">
@@ -257,6 +278,88 @@
 </div>
 
 <script>
+// ═══ FLOW ACCOUNT SWITCHER ═══
+async function loadFlowAccounts() {
+    try {
+        var res = await fetch('/banners/flow-accounts');
+        var data = await res.json();
+        var activeDiv = document.getElementById('flowActiveAccount');
+        var listDiv = document.getElementById('flowAccountsList');
+
+        if (data.active) {
+            activeDiv.innerHTML = '● Active: <strong style="color: var(--pm-accent);">' + data.active + '</strong>';
+        } else {
+            activeDiv.innerHTML = '<span style="color: var(--pm-danger);">No Flow account set</span>';
+        }
+
+        listDiv.innerHTML = '';
+        if (data.accounts && data.accounts.length > 0) {
+            data.accounts.forEach(function(acc) {
+                var row = document.createElement('div');
+                row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.5rem; border-radius: 8px; font-size: 0.72rem;'
+                    + (acc.active ? 'background: var(--pm-accent-dim); border: 1px solid var(--pm-accent);' : 'background: var(--pm-bg-elevated); border: 1px solid var(--pm-border);');
+                row.innerHTML = '<span style="color: var(--pm-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;">● ' + acc.email + '</span>'
+                    + '<div style="display: flex; gap: 4px; align-items: center;">'
+                    + (acc.active
+                        ? '<span style="color: var(--pm-accent); font-weight: 600; font-size: 0.68rem;">ACTIVE</span>'
+                        : '<button onclick="flowUseAccount(\'' + acc.email + '\')" style="background: var(--pm-accent); color: var(--pm-accent-text); border: none; padding: 2px 8px; border-radius: 99px; font-size: 0.68rem; font-weight: 600; cursor: pointer;">Use</button>')
+                    + '<button onclick="flowDeleteAccount(\'' + acc.email + '\')" style="background: none; border: none; color: var(--pm-text-muted); font-size: 0.75rem; cursor: pointer; padding: 2px 4px;" title="Remove">✕</button>'
+                    + '</div>';
+                listDiv.appendChild(row);
+            });
+        }
+    } catch (e) {}
+}
+
+async function flowUseAccount(email) {
+    try {
+        var res = await fetch('/banners/flow-switch-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        var data = await res.json();
+        if (data.success) loadFlowAccounts();
+    } catch (e) {}
+}
+
+async function flowSaveSwitch() {
+    var email = document.getElementById('flowEmail').value.trim();
+    var password = 'flow-session';
+    if (!email) return;
+
+    try {
+        var res = await fetch('/banners/flow-switch-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
+        });
+        var data = await res.json();
+        if (data.success) {
+            document.getElementById('flowEmail').value = '';
+            loadFlowAccounts();
+        } else {
+            alert(data.error || 'Failed to switch');
+        }
+    } catch (e) {}
+}
+
+async function flowDeleteAccount(email) {
+    if (!confirm('Remove ' + email + '?')) return;
+    try {
+        var res = await fetch('/banners/flow-delete-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        var data = await res.json();
+        if (data.success) loadFlowAccounts();
+    } catch (e) {}
+}
+
+// Load accounts on page load
+loadFlowAccounts();
+
 function selectToggle(groupId, btn) {
     document.querySelectorAll('#' + groupId + ' .flow-toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
