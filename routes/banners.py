@@ -121,7 +121,8 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
     try:
         # Auto-launch Flow Chrome if not running
         from modules.chrome_launcher import ensure_flow_chrome
-        if not ensure_flow_chrome():
+        flow_email = flask_app.config.get('FLOW_GOOGLE_EMAIL', '')
+        if not ensure_flow_chrome(flow_email):
             _banner_jobs[job_id]['status'] = 'error'
             _banner_jobs[job_id]['message'] = 'Could not launch Chrome for Flow. Start it manually.'
             return

@@ -60,11 +60,35 @@ def launch_chrome(port, profile_dir, start_url=''):
     return False
 
 
-def ensure_pomelli_chrome():
-    """Ensure Pomelli Chrome is running on port 9222."""
-    return launch_chrome(9222, 'chrome_pomelli_profile', 'https://labs.google.com/pomelli')
+def ensure_pomelli_chrome(email=None):
+    """Ensure Pomelli Chrome is running on port 9222 with the right profile."""
+    # Map emails to profile folders
+    profile_map = {
+        'stocksmanthan@gmail.com': 'chrome_pomelli_stocksmanthan',
+        'dropsyshops45@gmail.com': 'chrome_pomelli_dropsyshops45',
+    }
+    # Default profile
+    profile = 'chrome_pomelli_profile'
+    if email and email.lower() in profile_map:
+        profile = profile_map[email.lower()]
+    elif email:
+        # Auto-generate profile name for new accounts
+        safe_name = email.split('@')[0].replace('.', '_')
+        profile = f'chrome_pomelli_{safe_name}'
+
+    return launch_chrome(9222, profile, 'https://labs.google.com/pomelli')
 
 
-def ensure_flow_chrome():
-    """Ensure Flow Chrome is running on port 9223."""
-    return launch_chrome(9223, 'chrome_flow_profile', 'https://labs.google/fx/tools/flow')
+def ensure_flow_chrome(email=None):
+    """Ensure Flow Chrome is running on port 9223 with the right profile."""
+    profile_map = {
+        'crimsonbox69@gmail.com': 'chrome_flow_crimsonbox69',
+    }
+    profile = 'chrome_flow_profile'
+    if email and email.lower() in profile_map:
+        profile = profile_map[email.lower()]
+    elif email:
+        safe_name = email.split('@')[0].replace('.', '_')
+        profile = f'chrome_flow_{safe_name}'
+
+    return launch_chrome(9223, profile, 'https://labs.google/fx/tools/flow')

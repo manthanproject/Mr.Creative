@@ -754,11 +754,14 @@ def save_credentials():
 @generate_bp.route('/saved-accounts')
 @login_required
 def saved_accounts():
-    """List all saved accounts (emails only, no passwords exposed)."""
+    """List saved accounts for Pomelli (filter out Flow-only accounts)."""
     accounts = _load_accounts()
     active = current_app.config.get('GOOGLE_EMAIL', '')
+    # Pomelli accounts — exclude known Flow-only accounts
+    flow_only = {'crimsonbox69@gmail.com'}
+    filtered = [a for a in accounts if a['email'].lower() not in flow_only]
     return jsonify({
-        'accounts': [{'email': a['email'], 'active': a['email'] == active} for a in accounts],
+        'accounts': [{'email': a['email'], 'active': a['email'] == active} for a in filtered],
         'active': active,
     })
 
@@ -774,13 +777,20 @@ def switch_account():
 
     accounts = _load_accounts()
     match = next((a for a in accounts if a['email'] == email), None)
-    if not match:
-        return jsonify({'error': 'Account not found'}), 404
 
-    current_app.config['GOOGLE_EMAIL'] = match['email']
-    current_app.config['GOOGLE_PASSWORD'] = match['password']
-    _save_active_account('pomelli', match['email'])
-    return jsonify({'success': True, 'email': match['email']})
+    if match:
+        current_app.config['GOOGLE_EMAIL'] = match['email']
+        current_app.config['GOOGLE_PASSWORD'] = match.get('password', '')
+        _save_active_account('pomelli', match['email'])
+        return jsonify({'success': True, 'email': match['email']})
+
+    # Account not in list — add it (no password needed with Chrome profiles)
+    accounts.append({'email': email, 'password': 'profile-session'})
+    _write_accounts(accounts)
+    current_app.config['GOOGLE_EMAIL'] = email
+    current_app.config['GOOGLE_PASSWORD'] = ''
+    _save_active_account('pomelli', email)
+    return jsonify({'success': True, 'email': email})
 
 
 @generate_bp.route('/delete-account', methods=['POST'])

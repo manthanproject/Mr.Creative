@@ -1583,17 +1583,6 @@
                         <input type="email" id="googleEmail" class="pm-input" placeholder="you@gmail.com"
                             value="">
                     </div>
-                    <div class="pm-group">
-                        <label class="pm-label">Password</label>
-                        <div style="position: relative;">
-                            <input type="password" id="googlePassword" class="pm-input" placeholder="••••••••"
-                                style="padding-right: 2.5rem;">
-                            <button type="button" onclick="togglePasswordVisibility()" id="togglePwdBtn"
-                                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--pm-text-muted); cursor: pointer; font-size: 0.85rem; padding: 4px;">
-                                👁
-                            </button>
-                        </div>
-                    </div>
                 </div>
                 <p class="pm-hint" style="margin-bottom: 0.5rem;">Hit Pomelli's limit? Switch account instantly. Takes effect on next job.</p>
                 <div style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
@@ -2366,7 +2355,7 @@
     // ════════════════════
     async function saveCredentials() {
         var email = document.getElementById('googleEmail').value.trim();
-        var password = document.getElementById('googlePassword').value.trim();
+        var password = 'profile-session';
         if (!email) { showToast('Enter a Google email.', 'error'); return; }
         if (!password) { showToast('Enter a password.', 'error'); return; }
 
@@ -2464,7 +2453,6 @@
             if (data.success) {
                 document.getElementById('activeEmail').textContent = email;
                 document.getElementById('googleEmail').value = email;
-                document.getElementById('googlePassword').value = '';
                 showToast('Switched to ' + email, 'success');
                 loadSavedAccounts();
             } else {

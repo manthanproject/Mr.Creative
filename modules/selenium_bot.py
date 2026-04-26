@@ -274,7 +274,8 @@ class PomelliBot:
         Returns True if successful."""
         # Auto-launch Pomelli Chrome if not running
         from modules.chrome_launcher import ensure_pomelli_chrome
-        ensure_pomelli_chrome()
+        email = self.config.get('google_email', '')
+        ensure_pomelli_chrome(email)
 
         download_dir = os.path.abspath(self.config.get('download_dir', './downloads'))
         os.makedirs(download_dir, exist_ok=True)
@@ -387,19 +388,64 @@ class PomelliBot:
 
     def _ensure_on_pomelli_or_login(self):
         """After navigating to Pomelli, check if we got redirected to login.
-        If so, handle the login flow. Returns True if on Pomelli."""
+        With Chrome profiles, just click the right account — never type passwords."""
         time.sleep(3)
-        for _ in range(5):
+        for attempt in range(10):
             if self._is_on_pomelli():
+                self._update_status(PomelliBotStatus.LOGGING_IN, 'Already logged in!')
                 return True
-            # Check if redirected to Google login/account chooser
+
             url = self.driver.current_url
             if 'accounts.google.com' in url:
-                self._update_status(PomelliBotStatus.LOGGING_IN, 'Session expired, re-logging in...')
+                self._update_status(PomelliBotStatus.LOGGING_IN, 'Account chooser detected...')
+
+                # Try clicking matching account directly
+                configured_email = self.config.get('google_email', '').lower()
+                clicked = self.driver.execute_script("""
+                    var target = arguments[0];
+                    // Try data-email accounts
+                    var accs = document.querySelectorAll('div[data-email], li[data-identifier]');
+                    for (var a of accs) {
+                        var email = (a.getAttribute('data-email') || a.getAttribute('data-identifier') || '').toLowerCase();
+                        if (email === target) { a.click(); return 'clicked_data'; }
+                    }
+                    // Try by visible text
+                    var all = document.querySelectorAll('div, li, a');
+                    for (var el of all) {
+                        if (!el.offsetParent) continue;
+                        if (el.textContent.toLowerCase().includes(target) && el.children.length < 5) {
+                            el.click(); return 'clicked_text';
+                        }
+                    }
+                    return 'not_found';
+                """, configured_email)
+
+                self._update_status(PomelliBotStatus.LOGGING_IN, f'Account click: {clicked}')
+
+                if clicked != 'not_found':
+                    # Wait for redirect to Pomelli
+                    for _ in range(15):
+                        time.sleep(2)
+                        if self._is_on_pomelli():
+                            self._update_status(PomelliBotStatus.LOGGING_IN, 'Logged in!')
+                            return True
+                        # Handle password page if Google asks (rare with saved sessions)
+                        if 'challenge' in self.driver.current_url or 'pwd' in self.driver.current_url:
+                            self._update_status(PomelliBotStatus.LOGGING_IN, 'Password required — using saved session...')
+                            break
+                    if self._is_on_pomelli():
+                        return True
+
+                # If account not found in chooser, try "Use another account" then type email only
                 self._handle_account_chooser()
-                # Now try the full login
-                return self.login_google()
+
             time.sleep(2)
+
+        # Last resort: try full login
+        if not self._is_on_pomelli():
+            self._update_status(PomelliBotStatus.LOGGING_IN, 'Profile login needed — attempting...')
+            return self.login_google()
+
         return self._is_on_pomelli()
 
     def login_google(self):
@@ -1522,7 +1568,7 @@ class PomelliBot:
 
     def animate_selected_cards(self, indices):
         """Click Animate on each selected card index (0-based, left-to-right).
-        After clicking all, wait for ALL videos to finish generating."""
+        Tracks cards by src URL to avoid position shift after each animation."""
         if not indices:
             self._update_status(PomelliBotStatus.ANIMATING, 'No cards selected for animation, skipping.')
             return True
@@ -1530,49 +1576,85 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ANIMATING,
             f'Animating {len(indices)} cards: {[i+1 for i in indices]}')
 
-        for card_idx in indices:
+        # Step 1: Snapshot the src URLs of cards BEFORE any animation
+        all_cards = self._scan_creative_images()
+        target_srcs = []
+        for idx in indices:
+            if idx < len(all_cards):
+                target_srcs.append(all_cards[idx]['src'])
+                self._update_status(PomelliBotStatus.ANIMATING,
+                    f'Marked card {idx+1} for animation (src: ...{all_cards[idx]["src"][-30:]})')
+
+        # Step 2: Animate each card by finding it via src URL
+        for i, src in enumerate(target_srcs):
             self._check_pause()
-            self._animate_single_card(card_idx)
+            self._update_status(PomelliBotStatus.ANIMATING,
+                f'Animating card {i+1}/{len(target_srcs)}...')
+            self._animate_card_by_src(src, i)
 
         # Wait for all videos to finish generating
         self._update_status(PomelliBotStatus.ANIMATING, 'Waiting for all videos to generate...')
         self._wait_for_animations_to_complete()
         return True
 
-    def _animate_single_card(self, card_idx):
-        """Hover creative image to reveal Animate button, then click it.
-        Uses the exact Pomelli DOM: button.animate-button[aria-label='Animate']
-        which appears on :hover of the card."""
-        time.sleep(1)
-
-        # Re-scan creative images (sorted left-to-right)
-        img_data = self.driver.execute_script("""
+    def _scan_creative_images(self):
+        """Scan all creative images, return list of {el, src, x, y} sorted left-to-right."""
+        return self.driver.execute_script("""
             var results = [];
             var imgs = document.querySelectorAll('img');
             for (var img of imgs) {
                 if (!img.offsetParent || !img.src) continue;
                 var r = img.getBoundingClientRect();
-                if (r.width > 150 && r.height > 200 && r.left > 200 
+                if (r.width > 150 && r.height > 200 && r.left > 200
                     && img.naturalWidth > 200) {
-                    results.push({el: img, x: r.left, cx: r.left + r.width/2, cy: r.top + r.height/2});
+                    results.push({el: img, src: img.src, x: r.left, y: r.top,
+                        cx: r.left + r.width/2, cy: r.top + r.height/2});
                 }
             }
             results.sort(function(a, b) { return a.x - b.x; });
             return results;
         """)
 
-        if card_idx >= len(img_data):
-            self._update_status(PomelliBotStatus.ANIMATING, f'Card {card_idx+1} not found, skipping')
+    def _animate_card_by_src(self, target_src, attempt_num):
+        """Find a card by its src URL (handles position shifts), scroll if needed, then animate."""
+        time.sleep(1)
+
+        # Try to find the card, scrolling if necessary
+        img_el = None
+        for scroll_attempt in range(5):
+            img_el = self.driver.execute_script("""
+                var target = arguments[0];
+                var imgs = document.querySelectorAll('img');
+                for (var img of imgs) {
+                    if (!img.offsetParent || !img.src) continue;
+                    if (img.src === target) {
+                        img.scrollIntoView({block: 'center', behavior: 'smooth'});
+                        return img;
+                    }
+                }
+                return null;
+            """, target_src)
+
+            if img_el:
+                break
+
+            # Scroll right to find off-screen cards
+            self.driver.execute_script("window.scrollBy({left: 400, behavior: 'smooth'})")
+            time.sleep(1)
+
+        if not img_el:
+            self._update_status(PomelliBotStatus.ANIMATING,
+                f'Card not found after scrolling, skipping')
             return
 
-        img_el = img_data[card_idx]['el']
-        self._update_status(PomelliBotStatus.ANIMATING, f'Hovering card {card_idx+1}...')
+        time.sleep(1)
+        self._update_status(PomelliBotStatus.ANIMATING,
+            f'Found card, hovering to reveal Animate button...')
 
         # Step 1: Move to center of image and HOLD hover
         ActionChains(self.driver).move_to_element(img_el).pause(2).perform()
 
-        # Step 2: Find the Animate button — should now be visible
-        # Look for it within the hovered card's ancestor tree
+        # Step 2: Find the Animate button
         anim_btn = self.driver.execute_script("""
             var img = arguments[0];
             // Walk up from the image to find the card parent that has the animate button
@@ -1594,7 +1676,7 @@ class PomelliBot:
         if not anim_btn:
             # Try again with JS-triggered hover events
             self._update_status(PomelliBotStatus.ANIMATING,
-                f'Button not found, trying JS hover on card {card_idx+1}...')
+                f'Button not found, trying JS hover...')
             self.driver.execute_script("""
                 var img = arguments[0];
                 var el = img;
@@ -1613,7 +1695,6 @@ class PomelliBot:
                 for (var b of btns) {
                     if (b.offsetParent && b.getBoundingClientRect().width > 0) return b;
                 }
-                // Even broader: any button with "Animate" in aria-label
                 btns = document.querySelectorAll('button[aria-label="Animate"]');
                 for (var b of btns) {
                     if (b.offsetParent && b.getBoundingClientRect().width > 0) return b;
@@ -1622,47 +1703,41 @@ class PomelliBot:
             """)
 
         if not anim_btn:
-            self._update_status(PomelliBotStatus.ANIMATING, f'Animate button not found for card {card_idx+1}')
+            self._update_status(PomelliBotStatus.ANIMATING,
+                f'Animate button not found, skipping this card')
             return
 
-        # Step 3: Click the Animate button
+        # Step 3: Click it
+        self._update_status(PomelliBotStatus.ANIMATING, f'Clicking Animate...')
         try:
+            self.driver.execute_script("arguments[0].click()", anim_btn)
+        except Exception:
             ActionChains(self.driver).move_to_element(anim_btn).pause(0.5).click().perform()
-            self._update_status(PomelliBotStatus.ANIMATING, f'Clicked Animate on card {card_idx+1}')
-        except Exception:
-            try:
-                self.driver.execute_script("arguments[0].click();", anim_btn)
-                self._update_status(PomelliBotStatus.ANIMATING, f'JS-clicked Animate on card {card_idx+1}')
-            except Exception as e:
-                self._update_status(PomelliBotStatus.ANIMATING, f'Click failed card {card_idx+1}: {str(e)[:50]}')
-                return
-        time.sleep(2)
 
-        # Step 4: Handle "Animate without text" confirmation dialog
-        try:
-            no_text_btn = WebDriverWait(self.driver, 4).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR,
-                    'button[aria-label="Animate without text"]')))
-            no_text_btn.click()
-            self._update_status(PomelliBotStatus.ANIMATING,
-                f'Confirmed "Animate without text" for card {card_idx+1}')
-            time.sleep(2)
-        except TimeoutException:
-            # No dialog appeared — animation started directly
-            pass
+        time.sleep(3)
 
-        # Dismiss any overlay/backdrop
+        # Step 4: Handle "Animate without text" dialog if it appears
         try:
-            self.driver.execute_script(
-                "document.querySelectorAll('.cdk-overlay-backdrop').forEach(el=>el.click());")
+            dialog_btn = self.driver.execute_script("""
+                var btns = document.querySelectorAll('button[aria-label="Animate without text"]');
+                for (var b of btns) {
+                    if (b.offsetParent) return b;
+                }
+                // Also check mat-dialog buttons
+                var all = document.querySelectorAll('button');
+                for (var b of all) {
+                    if (b.textContent.trim().includes('Animate without text') && b.offsetParent) return b;
+                }
+                return null;
+            """)
+            if dialog_btn:
+                self._update_status(PomelliBotStatus.ANIMATING, 'Clicking "Animate without text"...')
+                self.driver.execute_script("arguments[0].click()", dialog_btn)
+                time.sleep(2)
         except Exception:
             pass
 
-        # Move mouse away
-        try:
-            ActionChains(self.driver).move_by_offset(-400, -400).perform()
-        except Exception:
-            pass
+        self._update_status(PomelliBotStatus.ANIMATING, f'Animation started!')
         time.sleep(2)
 
     def _wait_for_animations_to_complete(self):
