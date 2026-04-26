@@ -119,6 +119,13 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
     job = _banner_jobs[job_id]
 
     try:
+        # Auto-launch Flow Chrome if not running
+        from modules.chrome_launcher import ensure_flow_chrome
+        if not ensure_flow_chrome():
+            _banner_jobs[job_id]['status'] = 'error'
+            _banner_jobs[job_id]['message'] = 'Could not launch Chrome for Flow. Start it manually.'
+            return
+
         # Connect to Chrome on port 9222
         job['status'] = 'connecting'
         job['message'] = 'Connecting to Chrome...'

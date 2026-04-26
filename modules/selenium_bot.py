@@ -272,6 +272,10 @@ class PomelliBot:
     def _try_reconnect_chrome(self):
         """Try to reconnect to a Chrome instance on our debug port.
         Returns True if successful."""
+        # Auto-launch Pomelli Chrome if not running
+        from modules.chrome_launcher import ensure_pomelli_chrome
+        ensure_pomelli_chrome()
+
         download_dir = os.path.abspath(self.config.get('download_dir', './downloads'))
         os.makedirs(download_dir, exist_ok=True)
         self._download_dir = download_dir

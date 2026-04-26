@@ -60,3 +60,4 @@ scan_result.png
 *.log
 *.tmp
 *.bak
+.claude/
