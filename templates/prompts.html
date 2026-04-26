@@ -168,10 +168,10 @@
                     ⚡ Approve
                 </button>
                 {% endif %}
-                <button class="btn btn-ghost btn-sm" onclick="openRefineModal('{{ prompt.text|e }}')" title="Refine with AI">
+                <button class="btn btn-ghost btn-sm" onclick="openRefineModal(this.dataset.text)" data-text="{{ prompt.text|e }}" title="Refine with AI">
                     ✨
                 </button>
-                <button class="btn btn-ghost btn-sm" onclick="usePrompt(`{{ prompt.text|e }}`)" title="Reuse">
+                <button class="btn btn-ghost btn-sm" onclick="usePrompt(this.dataset.text)" data-text="{{ prompt.text|e }}" title="Reuse">
                     ↺
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="deletePrompt('{{ prompt.id }}')" style="color: var(--danger);" title="Delete">
