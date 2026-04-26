@@ -25,6 +25,7 @@ chrome_debug/
 chrome_session/
 chrome_pomelli_profile/
 chrome_flow_profile/
+chrome_*/
 
 # ─── Runtime data (users will regenerate) ───
 static/uploads/
