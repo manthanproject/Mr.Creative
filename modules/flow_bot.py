@@ -488,8 +488,8 @@ class FlowBot:
             if new_count > last_count:
                 last_count = new_count
                 last_change_time = time.time()
-            elif new_count > 0 and time.time() - last_change_time > 30:
-                self._update_status('generating', f'No new images for 30s — proceeding with {new_count} images')
+            elif new_count > 0 and time.time() - last_change_time > 90:
+                self._update_status('generating', f'No new images for 90s — proceeding with {new_count} images')
                 time.sleep(2)
                 return True
         return True
