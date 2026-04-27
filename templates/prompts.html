@@ -371,9 +371,9 @@ function renderSuggestions(prompts, category) {
                 </div>
             </div>
             <div class="prompt-actions">
-                <button class="btn btn-ghost btn-sm" onclick="openRefineModal(\`${escapeForJs(prompt)}\`)" title="Refine">✨</button>
-                <button class="btn btn-secondary btn-sm" onclick="usePrompt(\`${escapeForJs(prompt)}\`)">Use</button>
-                <button class="btn btn-primary btn-sm" onclick="quickSaveApprove(\`${escapeForJs(prompt)}\`)">⚡ Approve</button>
+                <button class="btn btn-ghost btn-sm" onclick="openRefineModal(this.dataset.text)" data-text="${escapeHtml(prompt)}" title="Refine">✨</button>
+                <button class="btn btn-secondary btn-sm" onclick="usePrompt(this.dataset.text)" data-text="${escapeHtml(prompt)}">Use</button>
+                <button class="btn btn-primary btn-sm" onclick="quickSaveApprove(this.dataset.text)" data-text="${escapeHtml(prompt)}">⚡ Approve</button>
             </div>
         `;
         list.appendChild(card);
@@ -504,7 +504,6 @@ async function quickSaveApprove(text) {
         const data = await res.json();
         if (data.success) {
             showToast('Prompt approved & queued!', 'success');
-            setTimeout(() => location.reload(), 800);
         }
     } catch (err) {
         showToast('Error saving prompt.', 'error');

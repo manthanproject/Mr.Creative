@@ -92,16 +92,18 @@ class GeminiEngine:
         # Tool-specific prompt engineering
         tool_config = {
             'campaign': {
-                'role': 'a world-class creative marketing director generating campaign briefs for Pomelli (Google\'s AI marketing tool)',
-                'format': 'Each prompt should be a marketing brief: describe the product/service, target audience, campaign goal, brand voice, visual theme, and call-to-action. Think like an ad agency creative director.',
+                'role': 'a marketing strategist crafting punchy campaign ideas for Pomelli (Google\'s AI marketing tool that generates creatives from short briefs)',
+                'format': 'Each prompt is a SHORT, punchy campaign idea — 1 sentence max, ~15-25 words. Think Twitter post not essay. Format: "[Campaign theme/angle] for [product] — [hook/CTA/emotion]"',
                 'rules': [
-                    'Include target audience demographics or psychographics',
-                    'Mention a specific campaign goal (awareness, conversion, launch, seasonal)',
-                    'Suggest brand voice and visual direction (colors, mood, typography style)',
-                    'Include a call-to-action or tagline direction',
-                    'Each prompt: 2-3 sentences as a complete campaign brief',
+                    'Keep it ULTRA SHORT — Pomelli works best with brief, evocative prompts',
+                    'Lead with the campaign concept or hook, not demographics',
+                    'Include ONE strong emotion or visual cue (e.g. "cozy", "luxurious", "rebellious", "dreamy")',
+                    'Avoid percentages, numbers, target ages, or marketing jargon',
+                    'Skip phrases like "target audience", "campaign goal", "brand voice" — be natural',
+                    'Examples of good length: "Late-night study fuel campaign for Red Bull — bold neon visuals targeting Gen Z grinders"',
+                    'NO multi-sentence briefs. Each prompt = ONE punchy line.',
                 ],
-                'examples_hint': 'campaign launches, seasonal promotions, product spotlights, brand storytelling',
+                'examples_hint': 'product launches, seasonal pushes, lifestyle campaigns, viral hooks, cultural moments',
             },
             'photoshoot': {
                 'role': 'an expert product photography art director creating shot briefs for AI-powered product photoshoots',

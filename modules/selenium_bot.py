@@ -1649,90 +1649,74 @@ class PomelliBot:
 
         time.sleep(1)
         self._update_status(PomelliBotStatus.ANIMATING,
-            f'Found card, hovering to reveal Animate button...')
+            f'Found card, triggering Animate...')
 
-        # Step 1: Move to center of image and HOLD hover
-        ActionChains(self.driver).move_to_element(img_el).pause(2).perform()
-
-        # Step 2: Find the Animate button
+        # Use pure JS hover + click — no physical mouse movement to avoid triggering adjacent cards
         anim_btn = self.driver.execute_script("""
             var img = arguments[0];
-            // Walk up from the image to find the card parent that has the animate button
+            // Dispatch hover events up the tree to reveal animate button
+            var el = img;
+            var cardEl = null;
+            for (var i = 0; i < 10; i++) {
+                if (!el.parentElement) break;
+                el = el.parentElement;
+                ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'].forEach(function(evt) {
+                    el.dispatchEvent(new MouseEvent(evt, {bubbles: true, cancelable: true}));
+                });
+                // Check if animate button appeared at each level
+                var btn = el.querySelector('button[aria-label="Animate"]');
+                if (btn) cardEl = el;
+            }
+            // Wait briefly for button to render
+            return cardEl;
+        """, img_el)
+        time.sleep(2)
+
+        # Now find the animate button strictly within this card
+        clicked = self.driver.execute_script("""
+            var img = arguments[0];
+            var imgRect = img.getBoundingClientRect();
             var el = img;
             for (var i = 0; i < 10; i++) {
                 if (!el.parentElement) break;
                 el = el.parentElement;
-                var btn = el.querySelector('button.animate-button[aria-label="Animate"]');
-                if (btn) return btn;
+                var btn = el.querySelector('button[aria-label="Animate"]');
+                if (btn) {
+                    var btnRect = btn.getBoundingClientRect();
+                    // Verify button is within this card's horizontal bounds
+                    if (btnRect.left >= imgRect.left - 20 && btnRect.right <= imgRect.right + 20) {
+                        btn.click();
+                        return 'clicked';
+                    }
+                }
             }
-            // Fallback: find any visible animate button on page
-            var btns = document.querySelectorAll('button.animate-button[aria-label="Animate"]');
-            for (var b of btns) {
-                if (b.offsetParent && b.getBoundingClientRect().width > 0) return b;
-            }
-            return null;
+            return 'not_found';
         """, img_el)
 
-        if not anim_btn:
-            # Try again with JS-triggered hover events
+        if clicked != 'clicked':
             self._update_status(PomelliBotStatus.ANIMATING,
-                f'Button not found, trying JS hover...')
-            self.driver.execute_script("""
-                var img = arguments[0];
-                var el = img;
-                for (var i = 0; i < 10; i++) {
-                    if (!el.parentElement) break;
-                    el = el.parentElement;
-                    ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'].forEach(function(evt) {
-                        el.dispatchEvent(new MouseEvent(evt, {bubbles: true, cancelable: true}));
-                    });
-                }
-            """, img_el)
-            time.sleep(2)
-
-            anim_btn = self.driver.execute_script("""
-                var btns = document.querySelectorAll('button.animate-button[aria-label="Animate"]');
-                for (var b of btns) {
-                    if (b.offsetParent && b.getBoundingClientRect().width > 0) return b;
-                }
-                btns = document.querySelectorAll('button[aria-label="Animate"]');
-                for (var b of btns) {
-                    if (b.offsetParent && b.getBoundingClientRect().width > 0) return b;
-                }
-                return null;
-            """)
-
-        if not anim_btn:
-            self._update_status(PomelliBotStatus.ANIMATING,
-                f'Animate button not found, skipping this card')
+                f'Animate button not found for this card, skipping')
             return
 
-        # Step 3: Click it
-        self._update_status(PomelliBotStatus.ANIMATING, f'Clicking Animate...')
-        try:
-            self.driver.execute_script("arguments[0].click()", anim_btn)
-        except Exception:
-            ActionChains(self.driver).move_to_element(anim_btn).pause(0.5).click().perform()
-
+        self._update_status(PomelliBotStatus.ANIMATING, f'Clicked Animate!')
         time.sleep(3)
 
-        # Step 4: Handle "Animate without text" dialog if it appears
+        # Handle "Animate without text" dialog if it appears
         try:
-            dialog_btn = self.driver.execute_script("""
-                var btns = document.querySelectorAll('button[aria-label="Animate without text"]');
+            dialog_clicked = self.driver.execute_script("""
+                var btns = document.querySelectorAll('button');
                 for (var b of btns) {
-                    if (b.offsetParent) return b;
+                    var t = b.textContent.trim();
+                    if ((t === 'Animate without text' || b.getAttribute('aria-label') === 'Animate without text')
+                        && b.offsetParent) {
+                        b.click();
+                        return 'clicked';
+                    }
                 }
-                // Also check mat-dialog buttons
-                var all = document.querySelectorAll('button');
-                for (var b of all) {
-                    if (b.textContent.trim().includes('Animate without text') && b.offsetParent) return b;
-                }
-                return null;
+                return 'no_dialog';
             """)
-            if dialog_btn:
-                self._update_status(PomelliBotStatus.ANIMATING, 'Clicking "Animate without text"...')
-                self.driver.execute_script("arguments[0].click()", dialog_btn)
+            if dialog_clicked == 'clicked':
+                self._update_status(PomelliBotStatus.ANIMATING, 'Clicked "Animate without text"')
                 time.sleep(2)
         except Exception:
             pass
