@@ -86,6 +86,9 @@ def create_app():
     from routes.social import social_bp
     app.register_blueprint(social_bp, url_prefix='/social')
 
+    from routes.agent import agent_bp
+    app.register_blueprint(agent_bp, url_prefix='/agent')
+
     # Root route
     @app.route('/')
     def index():

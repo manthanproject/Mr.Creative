@@ -1,0 +1,9 @@
+python-interpreter = "C:/Users/Doker/AppData/Local/Programs/Python/Python312/python.exe"
+python-version = "3.12"
+
+[errors]
+# SQLAlchemy declarative models accept column kwargs at runtime via
+# `_declarative_constructor`, but Pyrefly sees only `object.__init__`
+# and flags every kwarg as "unexpected". Suppress those false positives.
+bad-argument-count = false
+unexpected-keyword = false

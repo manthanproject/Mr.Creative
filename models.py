@@ -29,6 +29,8 @@ class User(UserMixin, db.Model):
     collections = db.relationship('Collection', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     scheduled_jobs = db.relationship('ScheduledJob', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     social_posts = db.relationship('SocialPost', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
+    brand_kits = db.relationship('BrandKit', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
+    agent_jobs = db.relationship('AgentJob', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -246,3 +248,66 @@ class SocialPost(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class BrandKit(db.Model):
+    __tablename__ = 'brand_kits'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+
+    # Brand identity
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    logo_path = db.Column(db.String(500), nullable=True)
+
+    # Colors (stored as JSON array)
+    primary_color = db.Column(db.String(7), default='#000000')
+    secondary_color = db.Column(db.String(7), default='#FFFFFF')
+    accent_color = db.Column(db.String(7), default='#C1CD7D')
+    color_palette = db.Column(db.Text, default='[]')  # JSON array of hex colors
+
+    # Typography
+    heading_font = db.Column(db.String(100), default='Poppins')
+    body_font = db.Column(db.String(100), default='Inter')
+    font_style = db.Column(db.String(50), default='modern')  # modern, classic, playful, elegant, bold
+
+    # Brand voice
+    tone = db.Column(db.String(50), default='professional')  # professional, playful, luxury, minimal, bold
+    target_audience = db.Column(db.String(200), default='')
+    product_category = db.Column(db.String(100), default='')
+
+    # Reference images
+    product_image_path = db.Column(db.String(500), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class AgentJob(db.Model):
+    __tablename__ = 'agent_jobs'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    brand_kit_id = db.Column(db.String(36), db.ForeignKey('brand_kits.id'), nullable=False)
+    collection_id = db.Column(db.String(36), db.ForeignKey('collections.id'), nullable=True)
+
+    # Job config
+    content_types = db.Column(db.Text, default='[]')  # JSON: ["social", "banner", "a_plus"]
+    target_count = db.Column(db.Integer, default=20)
+
+    # Pipeline state
+    status = db.Column(db.String(20), default='pending')  # pending, analyzing, planning, crafting, generating, processing, reviewing, complete, failed
+    current_agent = db.Column(db.String(50), default='')
+    progress = db.Column(db.Integer, default=0)
+    message = db.Column(db.Text, default='')
+
+    # Agent outputs (JSON)
+    brand_analysis = db.Column(db.Text, default='{}')
+    content_plan = db.Column(db.Text, default='[]')
+    prompts = db.Column(db.Text, default='[]')
+    results = db.Column(db.Text, default='[]')
+
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    completed_at = db.Column(db.DateTime, nullable=True)

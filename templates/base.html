@@ -79,6 +79,10 @@
                     <span class="nav-icon">📌</span>
                     Social Post
                 </a>
+                <a href="{{ url_for('agent.index') }}" class="nav-link {% if request.endpoint and 'agent' in request.endpoint %}active{% endif %}">
+                    <span class="nav-icon">🤖</span>
+                    Agent Studio
+                </a>
                 <a href="{{ url_for('collections.compare') }}" class="nav-link {% if request.endpoint == 'collections.compare' %}active{% endif %}" id="navCompare">
                     <span class="nav-icon">⇄</span>
                     Compare

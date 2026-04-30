@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block title %}Agent Studio — Mr.Creative{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --ag-bg: #000000; --ag-card: #0a0a0a; --ag-elevated: #141414; --ag-hover: #1a1a1a;
+        --ag-border: #1e1e1e; --ag-border-light: #141414;
+        --ag-accent: #c1cd7d; --ag-accent-dim: rgba(193,205,125,0.15);
+        --ag-accent-text: #2c3400; --ag-text: #e5e3d9; --ag-text-sec: #c7c8b6; --ag-text-muted: #919282;
+        --ag-success: #4ade80; --ag-danger: #f87171; --ag-warning: #fbbf24;
+        --ag-radius: 16px; --ag-radius-sm: 12px; --ag-pill: 9999px;
+    }
+    .page-header, .page-header-actions { display: none !important; }
+
+    .ag-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .ag-header h1 { font-family: 'DM Sans', system-ui; font-style: italic; font-size: 1.5rem; font-weight: 500; color: var(--ag-text); }
+    .ag-header h1 span { color: var(--ag-accent); }
+
+    .ag-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start; }
+    @media (max-width: 1100px) { .ag-grid { grid-template-columns: 1fr; } }
+
+    .ag-card { background: var(--ag-card); border: 1px solid var(--ag-border-light); border-radius: var(--ag-radius); overflow: hidden; }
+    .ag-card-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--ag-border-light); display: flex; align-items: center; justify-content: space-between; }
+    .ag-card-header h3 { font-size: 0.9rem; font-weight: 600; color: var(--ag-text); }
+    .ag-card-body { padding: 0.85rem; }
+
+    .ag-label { display: block; font-size: 0.72rem; font-weight: 500; color: var(--ag-text-sec); margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .ag-input, .ag-select, .ag-textarea { width: 100%; padding: 0.6rem 0.85rem; background: var(--ag-elevated); border: 1px solid var(--ag-border); border-radius: var(--ag-radius-sm); color: var(--ag-text); font-size: 0.82rem; font-family: inherit; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
+    .ag-input:focus, .ag-select:focus, .ag-textarea:focus { border-color: var(--ag-accent); box-shadow: 0 0 0 2px var(--ag-accent-dim); }
+    .ag-textarea { resize: vertical; min-height: 60px; }
+    .ag-group { margin-bottom: 0.6rem; }
+
+    .ag-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border: none; border-radius: var(--ag-pill); font-family: inherit; cursor: pointer; transition: all 0.2s; font-size: 0.8rem; padding: 0.5rem 1rem; }
+    .ag-btn-primary { background: var(--ag-accent); color: var(--ag-accent-text); font-weight: 600; }
+    .ag-btn-primary:hover { background: #cdd98a; }
+    .ag-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .ag-btn-ghost { background: var(--ag-elevated); color: var(--ag-text-sec); border: 1px solid var(--ag-border); }
+    .ag-btn-ghost:hover { background: var(--ag-hover); color: var(--ag-text); }
+    .ag-btn-danger { background: transparent; color: var(--ag-danger); border: 1px solid var(--ag-danger); }
+    .ag-btn-sm { font-size: 0.72rem; padding: 0.35rem 0.7rem; }
+
+    /* Color picker row */
+    .ag-color-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .ag-color-row .ag-group { flex: 1; }
+    .ag-color-input { width: 100%; height: 38px; border: 1px solid var(--ag-border); border-radius: var(--ag-radius-sm); background: var(--ag-elevated); cursor: pointer; padding: 2px; }
+
+    /* Content type pills */
+    .ag-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.3rem; }
+    .ag-pill { padding: 0.35rem 0.75rem; border-radius: var(--ag-pill); font-size: 0.72rem; font-weight: 500; cursor: pointer; border: 1px solid var(--ag-border); background: var(--ag-elevated); color: var(--ag-text-sec); transition: all 0.2s; user-select: none; }
+    .ag-pill.active { background: var(--ag-accent-dim); border-color: var(--ag-accent); color: var(--ag-accent); }
+
+    /* Progress */
+    .ag-progress { display: none; margin-top: 1rem; }
+    .ag-progress-bar-outer { width: 100%; height: 6px; background: var(--ag-elevated); border-radius: 3px; overflow: hidden; margin-bottom: 0.75rem; }
+    .ag-progress-bar { height: 100%; background: var(--ag-accent); border-radius: 3px; transition: width 0.5s ease; width: 0%; }
+    .ag-agent-status { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: var(--ag-elevated); border-radius: var(--ag-radius-sm); border: 1px solid var(--ag-border-light); }
+    .ag-agent-icon { width: 28px; height: 28px; border-radius: 50%; background: var(--ag-accent-dim); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .ag-agent-info { flex: 1; }
+    .ag-agent-name { font-size: 0.78rem; font-weight: 600; color: var(--ag-text); }
+    .ag-agent-msg { font-size: 0.7rem; color: var(--ag-text-muted); margin-top: 1px; }
+    .ag-pct { font-size: 0.85rem; font-weight: 600; color: var(--ag-accent); }
+
+    /* Pipeline steps */
+    .ag-steps { display: flex; gap: 2px; margin-bottom: 0.75rem; }
+    .ag-step { flex: 1; padding: 0.4rem 0.25rem; text-align: center; font-size: 0.62rem; font-weight: 500; color: var(--ag-text-muted); background: var(--ag-elevated); border-radius: 4px; transition: all 0.3s; }
+    .ag-step.active { background: var(--ag-accent-dim); color: var(--ag-accent); }
+    .ag-step.done { background: rgba(74,222,128,0.1); color: var(--ag-success); }
+
+    /* Job history */
+    .ag-job-item { display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem 0.75rem; border-radius: var(--ag-radius-sm); background: var(--ag-elevated); border: 1px solid var(--ag-border-light); margin-bottom: 0.4rem; cursor: pointer; transition: all 0.2s; }
+    .ag-job-item:hover { border-color: var(--ag-border); }
+    .ag-job-info { flex: 1; min-width: 0; }
+    .ag-job-title { font-size: 0.78rem; font-weight: 600; color: var(--ag-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ag-job-meta { font-size: 0.65rem; color: var(--ag-text-muted); margin-top: 2px; }
+
+    .ag-badge { display: inline-block; font-size: 0.6rem; font-weight: 600; padding: 2px 8px; border-radius: var(--ag-pill); text-transform: uppercase; }
+    .ag-badge-complete { background: rgba(74,222,128,0.15); color: var(--ag-success); }
+    .ag-badge-failed { background: rgba(248,113,113,0.15); color: var(--ag-danger); }
+    .ag-badge-running { background: var(--ag-accent-dim); color: var(--ag-accent); }
+    .ag-badge-pending { background: var(--ag-elevated); color: var(--ag-text-muted); }
+
+    .ag-empty { text-align: center; padding: 1.5rem 1rem; color: var(--ag-text-muted); font-size: 0.82rem; }
+
+    /* Brand kit cards */
+    .ag-kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 0.5rem; }
+    .ag-kit-card { padding: 0.6rem; border-radius: var(--ag-radius-sm); background: var(--ag-elevated); border: 2px solid transparent; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .ag-kit-card:hover { border-color: var(--ag-border); }
+    .ag-kit-card.selected { border-color: var(--ag-accent); background: var(--ag-accent-dim); }
+    .ag-kit-colors { display: flex; gap: 3px; justify-content: center; margin-bottom: 0.4rem; }
+    .ag-kit-colors span { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--ag-border); }
+    .ag-kit-name { font-size: 0.75rem; font-weight: 600; color: var(--ag-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ag-kit-meta { font-size: 0.62rem; color: var(--ag-text-muted); margin-top: 2px; }
+</style>
+
+<div class="ag-header">
+    <h1><span>🤖</span> Agent Studio</h1>
+    <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="toggleNewKit()">+ New Brand Kit</button>
+</div>
+
+<div class="ag-grid">
+    <!-- LEFT -->
+    <div>
+        <!-- New Brand Kit (hidden by default) -->
+        <div class="ag-card" id="newKitPanel" style="display: none; margin-bottom: 1rem;">
+            <div class="ag-card-header">
+                <h3>🎨 Create Brand Kit</h3>
+                <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="toggleNewKit()">✕</button>
+            </div>
+            <div class="ag-card-body">
+                <div style="display: flex; gap: 0.75rem;">
+                    <div class="ag-group" style="flex: 1;">
+                        <label class="ag-label">Brand name *</label>
+                        <input type="text" id="kitName" class="ag-input" placeholder="e.g. Dropy Beauty">
+                    </div>
+                    <div class="ag-group" style="flex: 1;">
+                        <label class="ag-label">Product category</label>
+                        <input type="text" id="kitCategory" class="ag-input" placeholder="e.g. Skincare, Haircare">
+                    </div>
+                </div>
+
+                <div class="ag-group">
+                    <label class="ag-label">Brand description</label>
+                    <textarea id="kitDesc" class="ag-textarea" rows="2" placeholder="What does this brand sell? Who is it for?"></textarea>
+                </div>
+
+                <div class="ag-group">
+                    <label class="ag-label">Target audience</label>
+                    <input type="text" id="kitAudience" class="ag-input" placeholder="e.g. Women 20-35 who love premium skincare">
+                </div>
+
+                <div class="ag-color-row">
+                    <div class="ag-group">
+                        <label class="ag-label">Primary</label>
+                        <input type="color" id="kitPrimary" class="ag-color-input" value="#000000">
+                    </div>
+                    <div class="ag-group">
+                        <label class="ag-label">Secondary</label>
+                        <input type="color" id="kitSecondary" class="ag-color-input" value="#FFFFFF">
+                    </div>
+                    <div class="ag-group">
+                        <label class="ag-label">Accent</label>
+                        <input type="color" id="kitAccent" class="ag-color-input" value="#C1CD7D">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem;">
+                    <div class="ag-group" style="flex: 1;">
+                        <label class="ag-label">Tone</label>
+                        <select id="kitTone" class="ag-select">
+                            <option value="professional">Professional</option>
+                            <option value="luxury">Luxury</option>
+                            <option value="playful">Playful</option>
+                            <option value="minimal">Minimal</option>
+                            <option value="bold">Bold</option>
+                        </select>
+                    </div>
+                    <div class="ag-group" style="flex: 1;">
+                        <label class="ag-label">Font style</label>
+                        <select id="kitFontStyle" class="ag-select">
+                            <option value="modern">Modern</option>
+                            <option value="classic">Classic</option>
+                            <option value="playful">Playful</option>
+                            <option value="elegant">Elegant</option>
+                            <option value="bold">Bold</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem;">
+                    <div class="ag-group" style="flex: 1;">
+                        <label class="ag-label">Heading font</label>
+                        <input type="text" id="kitHeadingFont" class="ag-input" value="Poppins">
+                    </div>
+                    <div class="ag-group" style="flex: 1;">
+                        <label class="ag-label">Body font</label>
+                        <input type="text" id="kitBodyFont" class="ag-input" value="Inter">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    <button class="ag-btn ag-btn-primary" onclick="saveBrandKit()" style="flex: 1;">💾 Save Brand Kit</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Launch Job -->
+        <div class="ag-card">
+            <div class="ag-card-header">
+                <h3>🚀 Launch Agent</h3>
+            </div>
+            <div class="ag-card-body">
+                <div class="ag-group">
+                    <label class="ag-label">Select brand kit</label>
+                    {% if brand_kits %}
+                    <div class="ag-kit-grid" id="kitGrid">
+                        {% for kit in brand_kits %}
+                        <div class="ag-kit-card" data-id="{{ kit.id }}" onclick="selectKit(this, '{{ kit.id }}')">
+                            <div class="ag-kit-colors">
+                                <span style="background: {{ kit.primary_color }};"></span>
+                                <span style="background: {{ kit.secondary_color }};"></span>
+                                <span style="background: {{ kit.accent_color }};"></span>
+                            </div>
+                            <div class="ag-kit-name">{{ kit.name }}</div>
+                            <div class="ag-kit-meta">{{ kit.tone }} · {{ kit.product_category or 'General' }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="ag-empty">No brand kits yet. Create one above!</div>
+                    {% endif %}
+                </div>
+
+                <div class="ag-group">
+                    <label class="ag-label">Content types</label>
+                    <div class="ag-pills" id="contentPills">
+                        <div class="ag-pill active" data-type="social_post" onclick="togglePill(this)">📱 Social posts</div>
+                        <div class="ag-pill active" data-type="banner" onclick="togglePill(this)">🖼 Banners</div>
+                        <div class="ag-pill active" data-type="a_plus" onclick="togglePill(this)">📊 A+ content</div>
+                        <div class="ag-pill active" data-type="lifestyle" onclick="togglePill(this)">🌿 Lifestyle</div>
+                        <div class="ag-pill active" data-type="ad_creative" onclick="togglePill(this)">📣 Ad creatives</div>
+                    </div>
+                </div>
+
+                <div class="ag-group">
+                    <label class="ag-label">Number of images</label>
+                    <input type="range" id="targetCount" min="5" max="25" value="20" style="width: 100%;"
+                        oninput="document.getElementById('countLabel').textContent = this.value">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--ag-text-muted);">
+                        <span>5</span>
+                        <span id="countLabel" style="color: var(--ag-accent); font-weight: 600;">20</span>
+                        <span>25</span>
+                    </div>
+                </div>
+
+                <button class="ag-btn ag-btn-primary" id="launchBtn" onclick="launchAgent()" style="width: 100%; margin-top: 0.5rem; padding: 0.65rem;">
+                    🤖 Launch Agent Pipeline
+                </button>
+
+                <!-- Progress -->
+                <div class="ag-progress" id="progressPanel">
+                    <div class="ag-steps" id="stepIndicators">
+                        <div class="ag-step" data-step="analyzing">🔍 Analyze</div>
+                        <div class="ag-step" data-step="planning">📋 Plan</div>
+                        <div class="ag-step" data-step="crafting">✍️ Craft</div>
+                        <div class="ag-step" data-step="generating">🎨 Generate</div>
+                        <div class="ag-step" data-step="processing">✨ Process</div>
+                        <div class="ag-step" data-step="reviewing">✅ Review</div>
+                    </div>
+
+                    <div class="ag-progress-bar-outer">
+                        <div class="ag-progress-bar" id="progressBar"></div>
+                    </div>
+
+                    <div class="ag-agent-status">
+                        <div class="ag-agent-icon" id="agentIcon">🤖</div>
+                        <div class="ag-agent-info">
+                            <div class="ag-agent-name" id="agentName">Starting...</div>
+                            <div class="ag-agent-msg" id="agentMsg">Initializing pipeline</div>
+                        </div>
+                        <div class="ag-pct" id="agentPct">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job History -->
+        <div class="ag-card" style="margin-top: 1rem;">
+            <div class="ag-card-header">
+                <h3>📜 History</h3>
+                <span style="font-size: 0.68rem; color: var(--ag-text-muted);">{{ jobs|length }} jobs</span>
+            </div>
+            <div class="ag-card-body">
+                {% if jobs %}
+                {% for job in jobs %}
+                <div class="ag-job-item" onclick="{% if job.collection_id %}window.location='/collections/{{ job.collection_id }}'{% endif %}">
+                    <div class="ag-job-info">
+                        <div class="ag-job-title">{{ job.message or 'Agent job' }}</div>
+                        <div class="ag-job-meta">
+                            <span class="ag-badge ag-badge-{{ 'complete' if job.status == 'complete' else 'failed' if job.status == 'failed' else 'running' if job.status not in ('pending','complete','failed') else 'pending' }}">{{ job.status }}</span>
+                            · {{ job.target_count }} images
+                            · {{ job.created_at.strftime('%b %d, %I:%M %p') if job.created_at else '' }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="ag-empty">No agent jobs yet. Launch your first one!</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+        <div class="ag-card">
+            <div class="ag-card-header">
+                <h3>⚡ How it works</h3>
+            </div>
+            <div class="ag-card-body" style="font-size: 0.75rem; color: var(--ag-text-sec); line-height: 1.6;">
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">1. Brand Analyst</strong> — extracts colors, tone, audience from your brand kit.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">2. Content Strategist</strong> — plans the exact mix of content types.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">3. Prompt Crafter</strong> — writes optimized AI prompts per piece.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">4. Image Generator</strong> — creates images via Pollinations AI.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">5. Post-Processor</strong> — adds logo, text, brand elements.</p>
+                <p style="margin: 0;"><strong style="color: var(--ag-accent);">6. Quality Reviewer</strong> — scores and approves each image.</p>
+            </div>
+        </div>
+
+        <div class="ag-card" style="margin-top: 1rem;">
+            <div class="ag-card-header">
+                <h3>🎯 Tips</h3>
+            </div>
+            <div class="ag-card-body" style="font-size: 0.75rem; color: var(--ag-text-sec); line-height: 1.6;">
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">Brand kit:</strong> Better brand info = better images. Fill in all fields.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">Colors:</strong> Pick your actual brand colors — they guide every output.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">Count:</strong> Start with 10 to test, scale to 25 once satisfied.</p>
+                <p style="margin: 0;"><strong style="color: var(--ag-accent);">Types:</strong> Deselect types you don't need to focus the output.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var selectedKitId = '';
+var currentJobId = '';
+var pollInterval = null;
+
+var agentIcons = {
+    'Brand Analyst': '🔍',
+    'Content Strategist': '📋',
+    'Prompt Crafter': '✍️',
+    'Image Generator': '🎨',
+    'Post-Processor': '✨',
+    'Quality Reviewer': '✅',
+};
+
+function toggleNewKit() {
+    var panel = document.getElementById('newKitPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function selectKit(el, kitId) {
+    document.querySelectorAll('.ag-kit-card').forEach(function(c) { c.classList.remove('selected'); });
+    el.classList.add('selected');
+    selectedKitId = kitId;
+}
+
+function togglePill(el) {
+    el.classList.toggle('active');
+}
+
+async function saveBrandKit() {
+    var name = document.getElementById('kitName').value.trim();
+    if (!name) { alert('Brand name is required'); return; }
+
+    try {
+        var res = await fetch('/agent/brand-kit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                description: document.getElementById('kitDesc').value.trim(),
+                product_category: document.getElementById('kitCategory').value.trim(),
+                target_audience: document.getElementById('kitAudience').value.trim(),
+                primary_color: document.getElementById('kitPrimary').value,
+                secondary_color: document.getElementById('kitSecondary').value,
+                accent_color: document.getElementById('kitAccent').value,
+                tone: document.getElementById('kitTone').value,
+                font_style: document.getElementById('kitFontStyle').value,
+                heading_font: document.getElementById('kitHeadingFont').value.trim(),
+                body_font: document.getElementById('kitBodyFont').value.trim(),
+            })
+        });
+        var data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.error || 'Failed');
+    } catch (e) { alert('Connection error'); }
+}
+
+async function launchAgent() {
+    if (!selectedKitId) { alert('Select a brand kit first'); return; }
+
+    var types = [];
+    document.querySelectorAll('.ag-pill.active').forEach(function(p) {
+        types.push(p.getAttribute('data-type'));
+    });
+    if (types.length === 0) { alert('Select at least one content type'); return; }
+
+    var count = parseInt(document.getElementById('targetCount').value);
+    var btn = document.getElementById('launchBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Launching...';
+
+    try {
+        var res = await fetch('/agent/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                brand_kit_id: selectedKitId,
+                target_count: count,
+                content_types: types,
+            })
+        });
+        var data = await res.json();
+        if (data.success) {
+            currentJobId = data.job_id;
+            document.getElementById('progressPanel').style.display = 'block';
+            pollJobStatus();
+        } else {
+            alert(data.error || 'Failed to launch');
+            btn.disabled = false;
+            btn.textContent = '🤖 Launch Agent Pipeline';
+        }
+    } catch (e) {
+        alert('Connection error');
+        btn.disabled = false;
+        btn.textContent = '🤖 Launch Agent Pipeline';
+    }
+}
+
+function pollJobStatus() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(async function() {
+        try {
+            var res = await fetch('/agent/status/' + currentJobId);
+            var d = await res.json();
+
+            // Update progress bar
+            document.getElementById('progressBar').style.width = d.progress + '%';
+            document.getElementById('agentPct').textContent = d.progress + '%';
+
+            // Update agent info
+            document.getElementById('agentName').textContent = d.current_agent || d.status;
+            document.getElementById('agentMsg').textContent = d.message || '';
+            document.getElementById('agentIcon').textContent = agentIcons[d.current_agent] || '🤖';
+
+            // Update step indicators
+            var steps = ['analyzing', 'planning', 'crafting', 'generating', 'processing', 'reviewing'];
+            var currentIdx = steps.indexOf(d.status);
+            document.querySelectorAll('.ag-step').forEach(function(step, i) {
+                step.classList.remove('active', 'done');
+                if (i < currentIdx) step.classList.add('done');
+                else if (i === currentIdx) step.classList.add('active');
+            });
+
+            // Complete or failed
+            if (d.status === 'complete') {
+                clearInterval(pollInterval);
+                document.getElementById('agentIcon').textContent = '✅';
+                document.getElementById('agentName').textContent = 'Complete!';
+                var btn = document.getElementById('launchBtn');
+                btn.disabled = false;
+                btn.textContent = '🤖 Launch Agent Pipeline';
+
+                // Mark all steps done
+                document.querySelectorAll('.ag-step').forEach(function(s) {
+                    s.classList.remove('active');
+                    s.classList.add('done');
+                });
+
+                if (d.collection_id) {
+                    setTimeout(function() {
+                        if (confirm('Agent finished! View the generated collection?')) {
+                            window.location = '/collections/' + d.collection_id;
+                        }
+                    }, 500);
+                }
+            }
+
+            if (d.status === 'failed') {
+                clearInterval(pollInterval);
+                document.getElementById('agentIcon').textContent = '❌';
+                document.getElementById('agentName').textContent = 'Failed';
+                document.getElementById('agentMsg').textContent = d.error_message || 'Unknown error';
+                var btn = document.getElementById('launchBtn');
+                btn.disabled = false;
+                btn.textContent = '🤖 Launch Agent Pipeline';
+            }
+        } catch (e) {}
+    }, 3000);
+}
+</script>
+{% endblock %}

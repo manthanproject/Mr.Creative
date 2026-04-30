@@ -329,9 +329,21 @@ class PomelliBot:
     # GOOGLE LOGIN
     # ============================================
     def _type_slowly(self, element, text, delay=0.015):
-        for char in text:
-            element.send_keys(char)
-            time.sleep(delay)
+        """Paste text instantly via JS instead of typing char by char."""
+        try:
+            self.driver.execute_script("""
+                var el = arguments[0];
+                var text = arguments[1];
+                el.focus();
+                el.value = text;
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+            """, element, text)
+        except Exception:
+            # Fallback: clipboard paste
+            import pyperclip
+            pyperclip.copy(text)
+            element.send_keys(Keys.CONTROL, 'v')
 
     def _handle_account_chooser(self):
         """Handle Google's 'Choose an account' page.

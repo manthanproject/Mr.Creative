@@ -443,9 +443,14 @@ class FlowBot:
         prompt_el.send_keys(Keys.DELETE)
         time.sleep(0.2)
 
-        for char in prompt_text:
-            prompt_el.send_keys(char)
-            time.sleep(0.02)
+        # Paste instantly via JS instead of typing char by char
+        self.driver.execute_script("""
+            var el = arguments[0];
+            var text = arguments[1];
+            el.focus();
+            el.innerText = text;
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+        """, prompt_el, prompt_text)
         time.sleep(0.5)
         self._update_status('entering_prompt', 'Prompt entered!')
 
