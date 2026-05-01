@@ -57,13 +57,16 @@ def generate_caption():
     if not prompt_text:
         return jsonify({'error': 'Prompt text required'}), 400
 
-    from modules.gemini_engine import GeminiEngine
-    api_key = current_app.config.get('GROQ_API_KEY', '')
-    if not api_key:
+    from modules.copywriter import Copywriter
+    groq_key = current_app.config.get('GROQ_API_KEY', '')
+    if not groq_key:
         return jsonify({'error': 'Groq API key not configured'}), 400
 
-    engine = GeminiEngine(api_key)
-    result = engine.generate_social_caption(prompt_text, platform, product_url)
+    writer = Copywriter(
+        groq_api_key=groq_key,
+        cerebras_api_key=current_app.config.get('CEREBRAS_API_KEY'),
+    )
+    result = writer.generate_caption(prompt_text, platform, product_url)
     return jsonify(result)
 
 
