@@ -455,7 +455,7 @@ class FlowBot:
                 print(f"[FlowBot] ⚠️ Clipboard mismatch! Expected prompt, got: {clip[:50]}...")
         except Exception:
             pass
-        prompt_el.send_keys(Keys.CONTROL, 'v')
+        prompt_el.send_keys(Keys.CONTROL, Keys.SHIFT, 'v')
         time.sleep(0.5)
         self._update_status('entering_prompt', 'Prompt entered!')
 
