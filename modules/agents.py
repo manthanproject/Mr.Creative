@@ -19,21 +19,36 @@ class AgentEngine:
         self.model = 'llama-3.3-70b-versatile'
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7, max_tokens=2000):
-        """Call Groq LLM with a system + user prompt."""
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': user_prompt},
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"[Agent] LLM error: {e}")
-            return None
+        """Call Groq LLM with a system + user prompt. Auto-retries on 429."""
+        import re
+        for attempt in range(5):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': user_prompt},
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as e:
+                err = str(e)
+                if '429' in err or 'rate_limit' in err:
+                    # Extract wait time from error message
+                    match = re.search(r'(\d+)m(\d+)', err)
+                    if match:
+                        wait = int(match.group(1)) * 60 + int(match.group(2)) + 5
+                    else:
+                        wait = 65 * (attempt + 1)
+                    print(f"[Agent] Rate limited — waiting {wait}s (attempt {attempt+1}/5)...")
+                    time.sleep(wait)
+                    continue
+                print(f"[Agent] LLM error: {e}")
+                return None
+        print(f"[Agent] Failed after 5 retries")
+        return None
 
     def _parse_json(self, text):
         """Extract JSON from LLM response (handles ```json blocks)."""
