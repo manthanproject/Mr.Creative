@@ -161,7 +161,7 @@ Return ONLY valid JSON array (no other text). Each item:
     "priority": "high|medium|low"
 }"""
 
-        types_str = ', '.join(content_types)
+        types_str = ', '.join([t for t in content_types if t])
         user = f"""Brand analysis: {json.dumps(brand_analysis, indent=2)}
 
 Brand name: {brand_kit.name}
