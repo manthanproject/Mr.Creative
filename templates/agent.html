@@ -280,7 +280,10 @@
                             <div class="ag-agent-name" id="agentName">Starting...</div>
                             <div class="ag-agent-msg" id="agentMsg">Initializing pipeline</div>
                         </div>
-                        <div class="ag-pct" id="agentPct">0%</div>
+                        <div style="text-align: right;">
+                            <div class="ag-pct" id="agentPct">0%</div>
+                            <div id="llmBadge" style="display: none; font-size: 0.58rem; font-weight: 600; padding: 1px 6px; border-radius: 6px; margin-top: 2px;"></div>
+                        </div>
                     </div>
                     <div id="jobControls" style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
                         <button class="ag-btn ag-btn-ghost" id="pauseBtn" onclick="pauseJob()" style="flex: 1; font-size: 0.72rem;">⏸ Pause</button>
@@ -470,19 +473,27 @@ function pollJobStatus() {
             // Update agent info
             document.getElementById('agentName').textContent = d.current_agent || d.status;
             document.getElementById('agentMsg').textContent = d.message || '';
+
+            // LLM provider badge
+            if (d.llm_provider) {
+                var badge = document.getElementById('llmBadge');
+                badge.style.display = 'inline-block';
+                if (d.llm_provider === 'cerebras') {
+                    badge.textContent = '⚡ Cerebras';
+                    badge.style.background = 'rgba(245,158,11,0.15)';
+                    badge.style.color = '#f59e0b';
+                } else {
+                    badge.textContent = '🟢 Groq';
+                    badge.style.background = 'rgba(74,222,128,0.15)';
+                    badge.style.color = '#4ade80';
+                }
+            }
+
             if (d.control_action === 'pause') {
                 document.getElementById('agentMsg').textContent += ' ⏸ PAUSED';
             }
             document.getElementById('agentIcon').textContent = agentIcons[d.current_agent] || '🤖';
 
-            // Show LLM provider badge
-            if (d.message && d.message.includes('Cerebras')) {
-                document.getElementById('agentPct').title = 'Using Cerebras (Groq rate limited)';
-                document.getElementById('agentPct').style.color = '#f59e0b';
-            } else if (d.message && d.message.includes('Groq')) {
-                document.getElementById('agentPct').title = 'Using Groq';
-                document.getElementById('agentPct').style.color = '';
-            }
 
             // Update step indicators
             var steps = ['analyzing', 'planning', 'crafting', 'generating', 'processing', 'reviewing'];

@@ -298,6 +298,7 @@ class AgentJob(db.Model):
     aspect_ratio = db.Column(db.String(10), default='mixed')  # mixed, 1:1, 16:9, 9:16, 4:5, 3:4
     reference_image = db.Column(db.String(255), nullable=True)  # Path to uploaded reference image
     control_action = db.Column(db.String(10), default='')  # '', 'pause', 'stop'
+    llm_provider = db.Column(db.String(20), default='')  # 'groq' or 'cerebras'
 
     # Pipeline state
     status = db.Column(db.String(20), default='pending')  # pending, analyzing, planning, crafting, generating, processing, reviewing, complete, failed

@@ -224,6 +224,7 @@ def job_status(job_id):
         'collection_id': job.collection_id,
         'error_message': job.error_message,
         'control_action': job.control_action or '',
+        'llm_provider': job.llm_provider or '',
     })
 
 
