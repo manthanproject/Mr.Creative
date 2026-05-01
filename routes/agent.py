@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user
 from models import db, BrandKit, AgentJob, Collection
 from datetime import datetime
@@ -86,6 +86,18 @@ def delete_brand_kit(kit_id):
     db.session.delete(kit)
     db.session.commit()
     return jsonify({'success': True})
+
+
+@agent_bp.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    jobs = AgentJob.query.filter_by(user_id=current_user.id).all()
+    count = len(jobs)
+    for job in jobs:
+        db.session.delete(job)
+    db.session.commit()
+    flash(f'Cleared {count} jobs from history', 'success')
+    return redirect(url_for('agent.index'))
 
 
 @agent_bp.route('/upload-logo', methods=['POST'])

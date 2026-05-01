@@ -268,7 +268,14 @@
         <div class="ag-card" style="margin-top: 1rem;">
             <div class="ag-card-header">
                 <h3>📜 History</h3>
-                <span style="font-size: 0.68rem; color: var(--ag-text-muted);">{{ jobs|length }} jobs</span>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 0.68rem; color: var(--ag-text-muted);">{{ jobs|length }} jobs</span>
+                    {% if jobs %}
+                    <form action="{{ url_for('agent.clear_history') }}" method="POST" style="margin:0;" onsubmit="return confirm('Clear all job history?')">
+                        <button type="submit" style="background: transparent; border: 1px solid rgba(255,80,80,0.3); color: #ff6b6b; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.65rem; cursor: pointer;">🗑 Clear</button>
+                    </form>
+                    {% endif %}
+                </div>
             </div>
             <div class="ag-card-body">
                 {% if jobs %}
