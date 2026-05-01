@@ -540,12 +540,22 @@ class FlowBot:
             time.sleep(1)
 
         # Click Download button
-        self._js_click("""
+        clicked_dl = self._js_click("""
             var btns = document.querySelectorAll('button');
             for (var b of btns) { if (b.offsetParent && b.textContent.includes('downloadDownload')) return b; }
             for (var b of btns) { if (b.offsetParent && b.textContent.includes('Download')) return b; }
             return null;
         """)
+        if not clicked_dl:
+            all_btns = self.driver.execute_script("""
+                return Array.from(document.querySelectorAll('button'))
+                    .filter(b => b.offsetParent)
+                    .map(b => b.textContent.trim().substring(0, 60));
+            """)
+            print(f"[FlowBot] ⚠️ Download button NOT FOUND! Visible buttons: {all_btns}")
+            self._update_status('downloading', 'Download button not found!')
+            return
+        print(f"[FlowBot] ✓ Download button clicked")
         time.sleep(2)
 
         # Try 2K Upscaled — if not available, standard download already started
@@ -557,7 +567,28 @@ class FlowBot:
         if clicked_2k:
             self._update_status('downloading', 'Downloading 2K image...')
         else:
-            self._update_status('downloading', 'Downloading standard image...')
+            # 2K not available — must click Standard explicitly (first click only opened dropdown)
+            clicked_std = self._js_click("""
+                var btns = document.querySelectorAll('button');
+                for (var b of btns) {
+                    if (b.offsetParent && b.textContent.includes('Standard')) return b;
+                }
+                for (var b of btns) {
+                    if (b.offsetParent && b.textContent.includes('Original')) return b;
+                }
+                return null;
+            """)
+            if clicked_std:
+                self._update_status('downloading', 'Downloading standard image...')
+            else:
+                all_btns = self.driver.execute_script("""
+                    return Array.from(document.querySelectorAll('button'))
+                        .filter(b => b.offsetParent)
+                        .map(b => b.textContent.trim().substring(0, 60));
+                """)
+                print(f"[FlowBot] ⚠️ No download option found after dropdown! Buttons: {all_btns}")
+                self._update_status('downloading', 'No download option found!')
+                return
 
         # Wait for download toast or timeout
         for _ in range(DOWNLOAD_WAIT):

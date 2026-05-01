@@ -195,7 +195,7 @@ def run_agent_pipeline(app, job_id):
                         })
 
                 image_index += len(batch)
-                time.sleep(3)  # Brief pause between batches
+                time.sleep(15)  # Pause between batches to avoid Flow rate-limiting
             finally:
                 session.close()
 
