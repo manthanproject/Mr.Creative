@@ -498,10 +498,21 @@ class FlowBot:
             if new_count > last_count:
                 last_count = new_count
                 last_change_time = time.time()
-            elif new_count > 0 and time.time() - last_change_time > 90:
-                self._update_status('generating', f'No new images for 90s — proceeding with {new_count} images')
+            elif new_count > 0 and time.time() - last_change_time > 45:
+                self._update_status('generating', f'No new images for 45s — proceeding with {new_count} images')
                 time.sleep(2)
                 return True
+            # Detect failed images early
+            if new_count > 0:
+                has_failed = self.driver.execute_script("""
+                    return document.body.innerText.includes('Failed') ||
+                           document.body.innerText.includes('unusual activity') ||
+                           document.body.innerText.includes('Something went wrong');
+                """)
+                if has_failed and time.time() - last_change_time > 15:
+                    self._update_status('generating', f'Failed image detected — proceeding with {new_count} images')
+                    time.sleep(2)
+                    return True
         return True
 
     # ══════════════════════════════════════
