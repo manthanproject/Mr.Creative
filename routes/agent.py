@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user
-from models import db, BrandKit, AgentJob, Collection
+from models import db, BrandKit, AgentJob, Collection, Generation
 from datetime import datetime
 import json
 import os
@@ -294,7 +294,7 @@ def generate_mockups(job_id):
             generated.append({'type': mtype, 'path': rel})
 
             # Add to collection
-            gen = __import__('models', fromlist=['Generation']).Generation(
+            gen = Generation(
                 user_id=job.user_id,
                 collection_id=job.collection_id,
                 output_path=rel,
@@ -366,7 +366,7 @@ def generate_carousel_route(job_id):
         rel = os.path.relpath(slide_path, base_dir).replace('\\', '/')
         generated.append({'path': rel})
 
-        gen = __import__('models', fromlist=['Generation']).Generation(
+        gen = Generation(
             user_id=job.user_id,
             collection_id=job.collection_id,
             output_path=rel,
