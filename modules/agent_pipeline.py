@@ -115,9 +115,14 @@ def run_agent_pipeline(app, job_id):
                 batches.append(batch)
 
             image_index = 0
-            from modules.flow_runner import run_flow_batch
+            from modules.flow_runner import FlowSession
 
-            for batch_num, batch in enumerate(batches):
+            session = FlowSession()
+            if not session.start():
+                raise RuntimeError('Could not start Flow session')
+
+            try:
+              for batch_num, batch in enumerate(batches):
                 progress = 40 + int((batch_num / len(batches)) * 45)
                 job.progress = progress
                 job.message = f'Flow batch {batch_num+1}/{len(batches)} — generating {len(batch)} images...'
@@ -140,11 +145,12 @@ def run_agent_pipeline(app, job_id):
                 print(f"[Pipeline] Batch {batch_num+1}: '{prompt_text[:50]}...' | {ar} | x{len(batch)}")
 
                 try:
-                    files = run_flow_batch(
+                    files = session.run_batch(
                         prompt=prompt_text,
                         aspect_ratio=ar,
                         count=len(batch),
                         output_dir=output_dir,
+                        is_first=(batch_num == 0),
                     )
 
                     for j, filepath in enumerate(files):
@@ -190,6 +196,8 @@ def run_agent_pipeline(app, job_id):
 
                 image_index += len(batch)
                 time.sleep(3)  # Brief pause between batches
+            finally:
+                session.close()
 
             job.results = json.dumps(results)
             job.progress = 90

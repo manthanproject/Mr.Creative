@@ -1,6 +1,6 @@
 """
 Standalone Flow bot runner for agent pipeline.
-Connects to Flow Chrome, runs a generation, returns file paths.
+Manages a persistent session across batches.
 """
 
 import os
@@ -10,42 +10,38 @@ from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
 
 
-def run_flow_batch(prompt, aspect_ratio='1:1', count=4, output_dir=None, reference_image=None):
-    """Run a single Flow bot generation and return downloaded file paths.
+class FlowSession:
+    """Keeps driver + bot alive across multiple batches."""
 
-    Args:
-        prompt: Text prompt for image generation
-        aspect_ratio: '1:1', '16:9', '9:16', '4:3', '3:4'
-        count: Number of images (1-4)
-        output_dir: Where to save final images
-        reference_image: Optional path to reference image
+    def __init__(self):
+        self.driver = None
+        self.bot = None
 
-    Returns:
-        List of file paths to generated images
-    """
-    from modules.chrome_launcher import ensure_flow_chrome
-    from modules.flow_bot import FlowBot
+    def start(self):
+        from modules.chrome_launcher import ensure_flow_chrome
+        from modules.flow_bot import FlowBot
 
-    # Ensure Chrome is running with the right profile
-    if not ensure_flow_chrome('crimsonbox69@gmail.com'):
-        print("[FlowRunner] Could not launch Flow Chrome")
-        return []
+        if not ensure_flow_chrome('crimsonbox69@gmail.com'):
+            print("[FlowSession] Could not launch Flow Chrome")
+            return False
 
-    # Connect to Chrome
-    opts = Options()
-    opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
+        opts = Options()
+        opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
 
-    driver = None
-    try:
-        driver = webdriver.Chrome(options=opts)
-        driver.set_script_timeout(120)
+        self.driver = webdriver.Chrome(options=opts)
+        self.driver.set_script_timeout(120)
 
         download_dir = os.path.expanduser('~/Downloads')
+        self.bot = FlowBot(self.driver, download_dir=download_dir)
+        print("[FlowSession] Session started")
+        return True
 
-        # Create bot and run
-        bot = FlowBot(driver, download_dir=download_dir)
+    def run_batch(self, prompt, aspect_ratio='1:1', count=4, output_dir=None, reference_image=None, is_first=True):
+        """Run a single batch. is_first=True creates new project, False reuses current."""
+        if not self.bot:
+            print("[FlowSession] No active session")
+            return []
 
-        # Map aspect ratios to Flow format
         ar_map = {
             '1:1': 'square',
             '16:9': 'landscape',
@@ -56,11 +52,12 @@ def run_flow_batch(prompt, aspect_ratio='1:1', count=4, output_dir=None, referen
         }
         flow_ar = ar_map.get(aspect_ratio, 'square')
 
-        result = bot.generate_banners(
+        result = self.bot.generate_banners(
             prompt=prompt,
             aspect_ratio=flow_ar,
             count=min(count, 4),
-            image_path=reference_image,
+            image_path=reference_image if is_first else None,
+            reuse_project=not is_first,
         )
 
         # Move downloaded files to output_dir
@@ -77,19 +74,26 @@ def run_flow_batch(prompt, aspect_ratio='1:1', count=4, output_dir=None, referen
                     else:
                         final_files.append(src_path)
 
-        print(f"[FlowRunner] Batch done: {len(final_files)} images")
+        print(f"[FlowSession] Batch done: {len(final_files)} images")
         return final_files
 
-    except Exception as e:
-        print(f"[FlowRunner] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
-
-    finally:
-        if driver:
+    def close(self):
+        if self.driver:
             try:
-                driver.quit()
-                print("[FlowRunner] ChromeDriver session closed — Chrome stays alive")
+                self.driver.quit()
+                print("[FlowSession] ChromeDriver session closed — Chrome stays alive")
             except Exception:
                 pass
+            self.driver = None
+            self.bot = None
+
+
+# Backward-compatible wrapper for single-batch calls
+def run_flow_batch(prompt, aspect_ratio='1:1', count=4, output_dir=None, reference_image=None):
+    session = FlowSession()
+    if not session.start():
+        return []
+    try:
+        return session.run_batch(prompt, aspect_ratio, count, output_dir, reference_image, is_first=True)
+    finally:
+        session.close()

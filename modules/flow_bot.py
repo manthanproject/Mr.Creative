@@ -773,7 +773,7 @@ class FlowBot:
     # FULL WORKFLOW
     # ══════════════════════════════════════
 
-    def generate_banners(self, prompt, aspect_ratio='landscape', count=4, download_dir=None, image_path=None):
+    def generate_banners(self, prompt, aspect_ratio='landscape', count=4, download_dir=None, image_path=None, reuse_project=False):
         """Full: navigate → settings → prompt → create → wait → download 2K each.
         Returns: {'success': bool, 'downloaded_files': [...], 'errors': [...]}
         """
@@ -790,21 +790,27 @@ class FlowBot:
         result = {'success': False, 'downloaded_files': [], 'errors': []}
 
         try:
-            # Navigate
-            if not self.navigate_to_flow():
-                result['errors'].append('Could not open Flow project')
-                return result
+            if reuse_project:
+                # Already on project page from previous batch
+                self._update_status('navigating', 'Reusing current project...')
+                count_before = self.count_images()
+                project_url = self.driver.current_url
+            else:
+                # Navigate
+                if not self.navigate_to_flow():
+                    result['errors'].append('Could not open Flow project')
+                    return result
 
-            # Settings
-            self.set_image_settings(aspect_ratio, count)
+                # Settings
+                self.set_image_settings(aspect_ratio, count)
 
-            # Upload reference image if provided
-            if image_path:
-                self.upload_reference_image(image_path)
+                # Upload reference image if provided
+                if image_path:
+                    self.upload_reference_image(image_path)
 
-            # Count existing images AFTER upload so reference image is included
-            count_before = self.count_images()
-            project_url = self.driver.current_url
+                # Count existing images AFTER upload so reference image is included
+                count_before = self.count_images()
+                project_url = self.driver.current_url
 
             # Type prompt + Create
             self.type_prompt(prompt)
