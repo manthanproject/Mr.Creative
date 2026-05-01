@@ -146,8 +146,7 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
             os.path.dirname(os.path.abspath(__file__)), '..', 'static', 'outputs', f'collection_{collection_id}')
         os.makedirs(output_dir, exist_ok=True)
 
-        download_dir = flask_app.config.get('CHROME_DOWNLOAD_DIR', os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), '..', 'static', 'downloads'))
+        download_dir = flask_app.config.get('CHROME_DOWNLOAD_DIR', os.path.expanduser('~/Downloads'))
 
         expected_email = flask_app.config.get('FLOW_GOOGLE_EMAIL', '')
         bot = FlowBot(driver, download_dir=download_dir, expected_email=expected_email)

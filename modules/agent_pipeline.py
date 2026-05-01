@@ -81,10 +81,10 @@ def run_agent_pipeline(app, job_id):
             job.progress = 40
             db.session.commit()
 
-            # ── Step 4: Image Generation ──
+            # ── Step 4: Image Generation via Flow Bot ──
             job.status = 'generating'
             job.current_agent = 'Image Generator'
-            job.message = 'Generating images...'
+            job.message = 'Preparing Flow bot...'
             db.session.commit()
 
             # Create collection for this job
@@ -108,63 +108,88 @@ def run_agent_pipeline(app, job_id):
             results = []
             total = len(prompts)
 
-            for i, prompt_item in enumerate(prompts):
-                prompt_text = prompt_item.get('prompt', '') if isinstance(prompt_item, dict) else str(prompt_item)
-                eng = prompt_item.get('engine', 'pollinations') if isinstance(prompt_item, dict) else 'pollinations'
-                w = prompt_item.get('width', 1024) if isinstance(prompt_item, dict) else 1024
-                h = prompt_item.get('height', 1024) if isinstance(prompt_item, dict) else 1024
+            # Group prompts into batches of 4 (Flow generates up to 4 per run)
+            batches = []
+            for i in range(0, total, 4):
+                batch = prompts[i:i+4]
+                batches.append(batch)
 
-                progress = 40 + int((i / total) * 45)
+            image_index = 0
+            from modules.flow_runner import run_flow_batch
+
+            for batch_num, batch in enumerate(batches):
+                progress = 40 + int((batch_num / len(batches)) * 45)
                 job.progress = progress
-                job.message = f'Generating image {i+1}/{total} via {eng}...'
+                job.message = f'Flow batch {batch_num+1}/{len(batches)} — generating {len(batch)} images...'
                 db.session.commit()
 
-                # For now, all go through Pollinations (Flow/Pomelli need bot automation)
-                if eng in ('pollinations', 'flow', 'pomelli'):
-                    filename = f"agent_{i+1:02d}_{uuid.uuid4().hex[:6]}.png"
-                    save_path = os.path.join(output_dir, filename)
+                # Use first prompt in batch (Flow creates variations)
+                prompt_item = batch[0]
+                prompt_text = prompt_item.get('prompt', '') if isinstance(prompt_item, dict) else str(prompt_item)
+                width = prompt_item.get('width', 1024) if isinstance(prompt_item, dict) else 1024
+                height = prompt_item.get('height', 1024) if isinstance(prompt_item, dict) else 1024
 
-                    result = pollinations.generate_image(
+                # Determine aspect ratio from dimensions
+                if width > height:
+                    ar = '16:9'
+                elif height > width:
+                    ar = '9:16'
+                else:
+                    ar = '1:1'
+
+                print(f"[Pipeline] Batch {batch_num+1}: '{prompt_text[:50]}...' | {ar} | x{len(batch)}")
+
+                try:
+                    files = run_flow_batch(
                         prompt=prompt_text,
-                        width=w,
-                        height=h,
-                        enhance=True,
-                        save_path=save_path,
+                        aspect_ratio=ar,
+                        count=len(batch),
+                        output_dir=output_dir,
                     )
 
-                    if result:
-                        # Get content plan info for this piece
-                        plan_item = content_plan[i] if i < len(content_plan) else {}
+                    for j, filepath in enumerate(files):
+                        plan_idx = image_index + j
+                        plan_item = content_plan[plan_idx] if plan_idx < len(content_plan) else {}
 
-                        rel_path = f"outputs/collection_{collection.id}/{filename}"
+                        rel_path = os.path.relpath(filepath,
+                            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+                        ).replace('\\', '/')
+
                         gen = Generation(
                             user_id=job.user_id,
                             collection_id=collection.id,
                             output_path=rel_path,
                             pomelli_feature='agent',
                             status='completed',
-                            tags=prompt_text[:200],
+                            tags=(plan_item.get('title', '') + ' | ' + prompt_text[:100]),
                         )
                         db.session.add(gen)
                         db.session.commit()
 
                         results.append({
-                            'id': i + 1,
-                            'filename': filename,
+                            'id': plan_idx + 1,
+                            'filename': os.path.basename(filepath),
                             'path': rel_path,
-                            'engine': eng,
-                            'title': plan_item.get('title', f'Image {i+1}'),
+                            'engine': 'flow',
+                            'title': plan_item.get('title', f'Image {plan_idx+1}'),
                             'type': plan_item.get('type', 'unknown'),
                         })
-                    else:
+
+                    print(f"[Pipeline] Batch {batch_num+1} done: {len(files)} images")
+
+                except Exception as e:
+                    print(f"[Pipeline] Batch {batch_num+1} failed: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    for j in range(len(batch)):
                         results.append({
-                            'id': i + 1,
-                            'error': 'Generation failed',
-                            'engine': eng,
+                            'id': image_index + j + 1,
+                            'error': str(e)[:100],
+                            'engine': 'flow',
                         })
 
-                    # Rate limit between generations
-                    time.sleep(2)
+                image_index += len(batch)
+                time.sleep(3)  # Brief pause between batches
 
             job.results = json.dumps(results)
             job.progress = 90

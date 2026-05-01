@@ -56,12 +56,14 @@ class FlowBot:
         self.status = 'idle'
         self.status_message = ''
         self.errors = []
-        # Set download path via CDP
+        # Set download path via CDP (Browser-level, not Page-level)
         try:
-            self.driver.execute_cdp_cmd('Page.setDownloadBehavior', {
-                'behavior': 'allow', 'downloadPath': self.download_dir})
-        except Exception:
-            pass
+            abs_path = os.path.abspath(self.download_dir)
+            self.driver.execute_cdp_cmd('Browser.setDownloadBehavior', {
+                'behavior': 'allow', 'downloadPath': abs_path})
+            print(f"[FlowBot] CDP download path set to: {abs_path}")
+        except Exception as e:
+            print(f"[FlowBot] ⚠️ CDP setDownloadBehavior failed: {e}")
 
     def _update_status(self, status, message=''):
         self.status = status
@@ -443,14 +445,10 @@ class FlowBot:
         prompt_el.send_keys(Keys.DELETE)
         time.sleep(0.2)
 
-        # Paste instantly via JS instead of typing char by char
-        self.driver.execute_script("""
-            var el = arguments[0];
-            var text = arguments[1];
-            el.focus();
-            el.innerText = text;
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-        """, prompt_el, prompt_text)
+        # Paste via clipboard — fastest method that triggers contenteditable events
+        import pyperclip
+        pyperclip.copy(prompt_text)
+        prompt_el.send_keys(Keys.CONTROL, 'v')
         time.sleep(0.5)
         self._update_status('entering_prompt', 'Prompt entered!')
 
@@ -776,10 +774,11 @@ class FlowBot:
             self.download_dir = download_dir
             os.makedirs(self.download_dir, exist_ok=True)
             try:
-                self.driver.execute_cdp_cmd('Page.setDownloadBehavior', {
-                    'behavior': 'allow', 'downloadPath': self.download_dir})
-            except Exception:
-                pass
+                abs_path = os.path.abspath(self.download_dir)
+                self.driver.execute_cdp_cmd('Browser.setDownloadBehavior', {
+                    'behavior': 'allow', 'downloadPath': abs_path})
+            except Exception as e:
+                print(f"[FlowBot] ⚠️ CDP setDownloadBehavior failed: {e}")
 
         result = {'success': False, 'downloaded_files': [], 'errors': []}
 
