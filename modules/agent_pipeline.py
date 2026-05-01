@@ -286,6 +286,29 @@ def run_agent_pipeline(app, job_id):
             processor = PostProcessor(brand_kit)
             results = processor.process_batch(results, content_plan, output_dir)
 
+            if not _check_job_control(job, db):
+                return
+
+            # ── Step 5b: AI Copywriting (captions + hashtags) ──
+            job.current_agent = 'Copywriter'
+            job.progress = 94
+            job.message = 'Generating captions and hashtags...'
+            db.session.commit()
+
+            try:
+                from modules.copywriter import Copywriter
+                writer = Copywriter(
+                    groq_api_key=groq_key,
+                    cerebras_api_key=app.config.get('CEREBRAS_API_KEY'),
+                )
+                results = writer.generate_batch_captions(
+                    results, content_plan,
+                    brand_name=brand_kit.name,
+                    tone=brand_kit.tone or 'professional',
+                )
+            except Exception as e:
+                print(f"[Pipeline] Copywriting skipped: {e}")
+
             # ── Step 6: Quality Review ──
             job.status = 'reviewing'
             job.current_agent = 'Quality Reviewer'
