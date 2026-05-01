@@ -387,6 +387,39 @@ var selectedAR = 'mixed';
 var refImagePath = null;
 var completedCollectionId = '';
 
+// Auto-restore post-actions for latest completed job on page load
+(async function restoreLastJob() {
+    try {
+        var res = await fetch('/agent/jobs');
+        var data = await res.json();
+        if (data.jobs && data.jobs.length > 0) {
+            var last = data.jobs[0];
+            if (last.status === 'complete' && last.collection_id) {
+                currentJobId = last.id;
+                completedCollectionId = last.collection_id;
+                document.getElementById('progressPanel').style.display = 'block';
+                document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('agentPct').textContent = '100%';
+                document.getElementById('agentIcon').textContent = '✅';
+                document.getElementById('agentName').textContent = 'Complete!';
+                document.getElementById('agentMsg').textContent = last.message || 'Done';
+                document.getElementById('jobControls').style.display = 'none';
+                document.getElementById('postActions').style.display = 'block';
+                document.querySelectorAll('.ag-step').forEach(function(s) {
+                    s.classList.add('done');
+                });
+            } else if (last.status !== 'complete' && last.status !== 'failed' && last.status !== 'pending') {
+                // Job still running — resume polling
+                currentJobId = last.id;
+                document.getElementById('progressPanel').style.display = 'block';
+                document.getElementById('launchBtn').disabled = true;
+                document.getElementById('launchBtn').textContent = '⏳ Running...';
+                pollJobStatus();
+            }
+        }
+    } catch(e) {}
+})();
+
 var agentIcons = {
     'Brand Analyst': '🔍',
     'Content Strategist': '📋',
