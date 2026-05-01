@@ -100,6 +100,54 @@ def clear_history():
     return redirect(url_for('agent.index'))
 
 
+@agent_bp.route('/job/<job_id>/pause', methods=['POST'])
+@login_required
+def pause_job(job_id):
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job or job.status in ('complete', 'failed'):
+        return jsonify({'error': 'Cannot pause this job'}), 400
+    if job.control_action == 'pause':
+        job.control_action = ''  # Toggle: unpause
+    else:
+        job.control_action = 'pause'
+    db.session.commit()
+    return jsonify({'success': True, 'action': job.control_action})
+
+
+@agent_bp.route('/job/<job_id>/stop', methods=['POST'])
+@login_required
+def stop_job(job_id):
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job or job.status in ('complete', 'failed'):
+        return jsonify({'error': 'Cannot stop this job'}), 400
+    job.control_action = 'stop'
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@agent_bp.route('/upload-reference', methods=['POST'])
+@login_required
+def upload_reference():
+    if 'image' not in request.files:
+        return jsonify({'error': 'No file'}), 400
+    f = request.files['image']
+    if not f.filename:
+        return jsonify({'error': 'No file selected'}), 400
+
+    upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              'static', 'uploads', 'references')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    import uuid as _uuid
+    ext = os.path.splitext(f.filename)[1] or '.png'
+    filename = f"ref_{_uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    f.save(filepath)
+
+    rel_path = f"uploads/references/{filename}"
+    return jsonify({'success': True, 'path': rel_path})
+
+
 @agent_bp.route('/upload-logo', methods=['POST'])
 @login_required
 def upload_logo():
@@ -137,12 +185,16 @@ def launch_job():
 
     target_count = data.get('target_count', 20)
     content_types = data.get('content_types', ['social_post', 'banner', 'a_plus', 'lifestyle', 'ad_creative'])
+    aspect_ratio = data.get('aspect_ratio', 'mixed')
+    reference_image = data.get('reference_image', None)
 
     job = AgentJob(
         user_id=current_user.id,
         brand_kit_id=kit_id,
         target_count=min(target_count, 25),
         content_types=json.dumps(content_types),
+        aspect_ratio=aspect_ratio,
+        reference_image=reference_image,
         status='pending',
     )
     db.session.add(job)
@@ -171,6 +223,7 @@ def job_status(job_id):
         'message': job.message,
         'collection_id': job.collection_id,
         'error_message': job.error_message,
+        'control_action': job.control_action or '',
     })
 
 

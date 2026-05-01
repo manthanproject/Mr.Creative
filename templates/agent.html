@@ -223,6 +223,28 @@
                 </div>
 
                 <div class="ag-group">
+                    <label class="ag-label">Aspect ratio</label>
+                    <div class="ag-pills" id="aspectPills">
+                        <div class="ag-pill active" data-ar="mixed" onclick="selectAR(this)">🔀 Mixed</div>
+                        <div class="ag-pill" data-ar="1:1" onclick="selectAR(this)">⬜ 1:1</div>
+                        <div class="ag-pill" data-ar="16:9" onclick="selectAR(this)">🖥 16:9</div>
+                        <div class="ag-pill" data-ar="9:16" onclick="selectAR(this)">📱 9:16</div>
+                        <div class="ag-pill" data-ar="4:5" onclick="selectAR(this)">📌 4:5</div>
+                    </div>
+                </div>
+
+                <div class="ag-group">
+                    <label class="ag-label">Reference image (product photo)</label>
+                    <div id="refImageArea" style="border: 2px dashed var(--ag-border); border-radius: var(--ag-radius-sm); padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s;" onclick="document.getElementById('refImageInput').click()">
+                        <div id="refImagePreview" style="display: none; margin-bottom: 0.5rem;">
+                            <img id="refImageThumb" style="max-height: 80px; border-radius: 8px;" />
+                        </div>
+                        <div id="refImagePlaceholder" style="color: var(--ag-text-muted); font-size: 0.75rem;">📷 Click to upload product/brand image</div>
+                        <input type="file" id="refImageInput" accept="image/*" style="display: none;" onchange="uploadRefImage(this)">
+                    </div>
+                </div>
+
+                <div class="ag-group">
                     <label class="ag-label">Number of images</label>
                     <input type="range" id="targetCount" min="5" max="25" value="20" style="width: 100%;"
                         oninput="document.getElementById('countLabel').textContent = this.value">
@@ -259,6 +281,10 @@
                             <div class="ag-agent-msg" id="agentMsg">Initializing pipeline</div>
                         </div>
                         <div class="ag-pct" id="agentPct">0%</div>
+                    </div>
+                    <div id="jobControls" style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
+                        <button class="ag-btn ag-btn-ghost" id="pauseBtn" onclick="pauseJob()" style="flex: 1; font-size: 0.72rem;">⏸ Pause</button>
+                        <button class="ag-btn ag-btn-danger" id="stopBtn" onclick="stopJob()" style="flex: 1; font-size: 0.72rem; border: 1px solid var(--ag-danger);">⏹ Stop</button>
                     </div>
                 </div>
             </div>
@@ -332,6 +358,8 @@
 var selectedKitId = '';
 var currentJobId = '';
 var pollInterval = null;
+var selectedAR = 'mixed';
+var refImagePath = null;
 
 var agentIcons = {
     'Brand Analyst': '🔍',
@@ -407,6 +435,8 @@ async function launchAgent() {
                 brand_kit_id: selectedKitId,
                 target_count: count,
                 content_types: types,
+                aspect_ratio: selectedAR,
+                reference_image: refImagePath,
             })
         });
         var data = await res.json();
@@ -440,6 +470,9 @@ function pollJobStatus() {
             // Update agent info
             document.getElementById('agentName').textContent = d.current_agent || d.status;
             document.getElementById('agentMsg').textContent = d.message || '';
+            if (d.control_action === 'pause') {
+                document.getElementById('agentMsg').textContent += ' ⏸ PAUSED';
+            }
             document.getElementById('agentIcon').textContent = agentIcons[d.current_agent] || '🤖';
 
             // Update step indicators
@@ -459,6 +492,7 @@ function pollJobStatus() {
                 var btn = document.getElementById('launchBtn');
                 btn.disabled = false;
                 btn.textContent = '🤖 Launch Agent Pipeline';
+                document.getElementById('jobControls').style.display = 'none';
 
                 // Mark all steps done
                 document.querySelectorAll('.ag-step').forEach(function(s) {
@@ -483,9 +517,58 @@ function pollJobStatus() {
                 var btn = document.getElementById('launchBtn');
                 btn.disabled = false;
                 btn.textContent = '🤖 Launch Agent Pipeline';
+                document.getElementById('jobControls').style.display = 'none';
             }
         } catch (e) {}
     }, 3000);
+}
+
+function selectAR(el) {
+    document.querySelectorAll('#aspectPills .ag-pill').forEach(function(p) { p.classList.remove('active'); });
+    el.classList.add('active');
+    selectedAR = el.getAttribute('data-ar');
+}
+
+async function uploadRefImage(input) {
+    if (!input.files || !input.files[0]) return;
+    var formData = new FormData();
+    formData.append('image', input.files[0]);
+    try {
+        var res = await fetch('/agent/upload-reference', { method: 'POST', body: formData });
+        var data = await res.json();
+        if (data.success) {
+            refImagePath = data.path;
+            document.getElementById('refImageThumb').src = '/static/' + data.path;
+            document.getElementById('refImagePreview').style.display = 'block';
+            document.getElementById('refImagePlaceholder').textContent = '✅ ' + input.files[0].name;
+            document.getElementById('refImageArea').style.borderColor = 'var(--ag-accent)';
+        } else { alert(data.error || 'Upload failed'); }
+    } catch (e) { alert('Upload error'); }
+}
+
+async function pauseJob() {
+    if (!currentJobId) return;
+    var res = await fetch('/agent/job/' + currentJobId + '/pause', { method: 'POST' });
+    var data = await res.json();
+    if (!data.success) return;
+    var btn = document.getElementById('pauseBtn');
+    if (data.action === 'pause') {
+        btn.textContent = '▶️ Resume';
+        btn.style.borderColor = 'var(--ag-accent)';
+        btn.style.color = 'var(--ag-accent)';
+    } else {
+        btn.textContent = '⏸ Pause';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+    }
+}
+
+async function stopJob() {
+    if (!currentJobId) return;
+    if (!confirm('Stop this job? Images generated so far will be kept.')) return;
+    await fetch('/agent/job/' + currentJobId + '/stop', { method: 'POST' });
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('stopBtn').textContent = '⏹ Stopping...';
 }
 </script>
 {% endblock %}

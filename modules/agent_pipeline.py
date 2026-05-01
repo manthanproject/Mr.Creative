@@ -10,6 +10,24 @@ import uuid
 from datetime import datetime
 
 
+def _check_job_control(job, db):
+    """Check pause/stop flags. Returns True to continue, False to stop."""
+    while True:
+        db.session.refresh(job)
+        if job.control_action == 'stop':
+            job.status = 'complete'
+            job.message = f'Stopped by user at {job.progress}%'
+            job.completed_at = datetime.now()
+            db.session.commit()
+            return False
+        if job.control_action == 'pause':
+            job.message = 'Paused — waiting to resume...'
+            db.session.commit()
+            time.sleep(3)
+            continue
+        return True
+
+
 def run_agent_pipeline(app, job_id):
     """Run the full agent pipeline for a job. Called in a background thread."""
     with app.app_context():
@@ -52,6 +70,9 @@ def run_agent_pipeline(app, job_id):
             job.progress = 15
             db.session.commit()
 
+            if not _check_job_control(job, db):
+                return
+
             # ── Step 2: Content Planning ──
             job.status = 'planning'
             job.current_agent = 'Content Strategist'
@@ -69,6 +90,9 @@ def run_agent_pipeline(app, job_id):
             job.progress = 30
             db.session.commit()
 
+            if not _check_job_control(job, db):
+                return
+
             # ── Step 3: Prompt Crafting ──
             job.status = 'crafting'
             job.current_agent = 'Prompt Crafter'
@@ -80,6 +104,9 @@ def run_agent_pipeline(app, job_id):
             job.prompts = json.dumps(prompts)
             job.progress = 40
             db.session.commit()
+
+            if not _check_job_control(job, db):
+                return
 
             # ── Step 4: Image Generation via Flow Bot ──
             job.status = 'generating'
@@ -134,8 +161,10 @@ def run_agent_pipeline(app, job_id):
                 width = prompt_item.get('width', 1024) if isinstance(prompt_item, dict) else 1024
                 height = prompt_item.get('height', 1024) if isinstance(prompt_item, dict) else 1024
 
-                # Determine aspect ratio from dimensions
-                if width > height:
+                # Aspect ratio: user override or from content plan
+                if hasattr(job, 'aspect_ratio') and job.aspect_ratio and job.aspect_ratio != 'mixed':
+                    ar = job.aspect_ratio
+                elif width > height:
                     ar = '16:9'
                 elif height > width:
                     ar = '9:16'
@@ -145,11 +174,22 @@ def run_agent_pipeline(app, job_id):
                 print(f"[Pipeline] Batch {batch_num+1}: '{prompt_text[:50]}...' | {ar} | x{len(batch)}")
 
                 try:
+                    # Reference image path (only for first batch — Flow keeps it after)
+                    ref_image = None
+                    if job.reference_image:
+                        ref_image = os.path.join(
+                            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'static', job.reference_image
+                        )
+                        if not os.path.exists(ref_image):
+                            ref_image = None
+
                     files = session.run_batch(
                         prompt=prompt_text,
                         aspect_ratio=ar,
                         count=len(batch),
                         output_dir=output_dir,
+                        reference_image=ref_image,
                         is_first=(batch_num == 0),
                     )
 
@@ -196,6 +236,10 @@ def run_agent_pipeline(app, job_id):
 
                 image_index += len(batch)
                 time.sleep(15)  # Pause between batches to avoid Flow rate-limiting
+
+                if not _check_job_control(job, db):
+                    session.close()
+                    return
             finally:
                 session.close()
 

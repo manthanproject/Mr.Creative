@@ -98,6 +98,24 @@ def create_app():
     with app.app_context():
         db.create_all()
 
+        # Auto-migrate: add new columns to existing tables
+        import sqlite3
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        conn = sqlite3.connect(db_path)
+        migrations = [
+            ("agent_jobs", "aspect_ratio", "VARCHAR(10) DEFAULT 'mixed'"),
+            ("agent_jobs", "reference_image", "VARCHAR(255)"),
+            ("agent_jobs", "control_action", "VARCHAR(10) DEFAULT ''"),
+        ]
+        for table, column, col_type in migrations:
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+                print(f"[Migration] Added {table}.{column}")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+        conn.commit()
+        conn.close()
+
     # Clean up stale jobs from previous crashes/restarts
     from routes.generate import cleanup_stale_jobs
     cleanup_stale_jobs(app)
