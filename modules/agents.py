@@ -193,7 +193,9 @@ Tone: {brand_kit.tone}
 Content types to include: {types_str}
 Total pieces needed: {target_count}
 
-Plan exactly {target_count} unique content pieces with good variety across types and aspect ratios.
+Plan exactly {target_count} unique content pieces. ONLY use these content types: {types_str}. Do NOT create any other content types.
+Vary the aspect ratios and visual angles, but every piece MUST be one of the allowed types.
+A product reference image will be provided to the image generator for product-focused shots — use engine "flow" for these.
 Prioritize social posts and banners. Use "pollinations" engine for most pieces (it's fastest and free).
 Use "flow" only when product image reference is essential. Use "pomelli" for campaign-style creatives."""
 
