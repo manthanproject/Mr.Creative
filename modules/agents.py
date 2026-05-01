@@ -211,18 +211,25 @@ Use "flow" only when product image reference is essential. Use "pomelli" for cam
     # ═══════════════════════════════════════════
     def craft_prompts(self, content_plan, brand_analysis, brand_kit):
         """Write optimized generation prompts for each content piece."""
-        system = """You are an expert AI image prompt engineer.
-For each content piece, write the BEST possible prompt optimized for the target engine.
+        system = """You are an expert AI image prompt engineer who creates prompts that produce REALISTIC, NON-AI-LOOKING images.
+
+CRITICAL RULES for all prompts:
+- NEVER use words like "hyper-realistic", "8k", "ultra HD", "unreal engine" — these trigger the AI look
+- Instead use: "editorial photography", "shot on Canon R5", "natural lighting", "magazine quality", "real product photo"
+- Describe a REAL scene a photographer would set up — specific props, surfaces, backgrounds
+- Include camera details: lens type, depth of field, lighting setup (softbox, natural window light, studio strobes)
+- Add subtle imperfections: "slight shadow", "natural skin texture", "soft grain", "ambient reflections"
+- Reference real photography styles: "Vogue editorial", "Sephora product page", "lifestyle flat lay", "behind-the-scenes"
 
 Prompt guidelines by engine:
-- "pollinations" (Flux model): Detailed, descriptive, cinematic language. Include lighting, mood, style, composition.
-  Example: "Professional product photography of a luxury serum bottle on marble surface, soft golden hour lighting, bokeh background, minimalist aesthetic, 8k quality"
-- "flow" (Google Flow): Short, direct. Focus on product transformation. Include reference to the product.
-  Example: "Create premium product showcase with elegant lighting and clean background"
-- "pomelli" (Google Pomelli): Campaign-style brief. Focus on the marketing angle.
-  Example: "Summer skincare campaign, bold typography, vibrant colors, call-to-action"
+- "flow" (Google Flow): Direct and descriptive. Focus on the actual product with real-world context. Mention materials, textures, environment.
+  Example: "Editorial product photography, luxury serum bottle on raw marble slab, morning window light casting soft shadows, eucalyptus sprig and linen cloth in background, shot on 85mm f/1.4, shallow depth of field, clean magazine aesthetic"
+- "pollinations" (Flux model): Cinematic, detailed scene. Include mood, atmosphere, real-world setting.
+  Example: "Woman applying skincare serum at vanity mirror, soft morning light through sheer curtains, natural skin texture, candid moment, editorial lifestyle photography, Canon EOS R5, 50mm lens"
+- "pomelli" (Google Pomelli): Campaign brief with real-world grounding.
+  Example: "Premium skincare brand campaign, clean typography on muted background, product hero shot with natural props, editorial magazine layout"
 
-IMPORTANT: Include brand colors and style in every prompt. Use the brand keywords naturally.
+IMPORTANT: Include brand colors and style in every prompt. Make each image feel like it belongs in a premium magazine or brand website — NOT like AI art.
 
 Return ONLY valid JSON array. Each item:
 {
