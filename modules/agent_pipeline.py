@@ -284,6 +284,12 @@ def run_agent_pipeline(app, job_id):
             print(f"[Pipeline] Job {job_id} failed: {e}")
             import traceback
             traceback.print_exc()
-            job.status = 'failed'
-            job.error_message = str(e)[:500]
-            db.session.commit()
+            try:
+                db.session.rollback()
+                job = AgentJob.query.get(job_id)
+                if job:
+                    job.status = 'failed'
+                    job.error_message = str(e)[:500]
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
