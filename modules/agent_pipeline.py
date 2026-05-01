@@ -150,6 +150,28 @@ def run_agent_pipeline(app, job_id):
             image_index = 0
             from modules.flow_runner import FlowSession
 
+            # Pre-clean reference image with rembg (transparent background)
+            if job.reference_image:
+                try:
+                    from modules.post_processor import PostProcessor
+                    pre_processor = PostProcessor(brand_kit)
+                    ref_abs = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'static', job.reference_image
+                    )
+                    cleaned = pre_processor.clean_reference_image(ref_abs)
+                    if cleaned != ref_abs:
+                        # Update job reference to cleaned version
+                        clean_rel = os.path.relpath(
+                            cleaned,
+                            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+                        ).replace('\\', '/')
+                        job.reference_image = clean_rel
+                        db.session.commit()
+                        print(f"[Pipeline] Reference image cleaned with rembg")
+                except Exception as e:
+                    print(f"[Pipeline] rembg pre-clean skipped: {e}")
+
             session = FlowSession()
             if not session.start():
                 raise RuntimeError('Could not start Flow session')
@@ -253,14 +275,16 @@ def run_agent_pipeline(app, job_id):
             job.progress = 90
             db.session.commit()
 
-            # ── Step 5: Post-Processing (TODO: add logo/text overlays) ──
+            # ── Step 5: Post-Processing (logo, text, border, rembg) ──
             job.status = 'processing'
             job.current_agent = 'Post-Processor'
             job.progress = 92
-            job.message = 'Applying brand elements...'
+            job.message = 'Applying brand elements (logo, text, border)...'
             db.session.commit()
-            # Post-processing will be added later
-            time.sleep(1)
+
+            from modules.post_processor import PostProcessor
+            processor = PostProcessor(brand_kit)
+            results = processor.process_batch(results, content_plan, output_dir)
 
             # ── Step 6: Quality Review ──
             job.status = 'reviewing'
