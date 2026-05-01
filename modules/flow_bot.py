@@ -448,6 +448,13 @@ class FlowBot:
         # Paste via clipboard — fastest method that triggers contenteditable events
         import pyperclip
         pyperclip.copy(prompt_text)
+        # Verify clipboard was set correctly
+        try:
+            clip = pyperclip.paste()
+            if clip != prompt_text:
+                print(f"[FlowBot] ⚠️ Clipboard mismatch! Expected prompt, got: {clip[:50]}...")
+        except Exception:
+            pass
         prompt_el.send_keys(Keys.CONTROL, 'v')
         time.sleep(0.5)
         self._update_status('entering_prompt', 'Prompt entered!')
