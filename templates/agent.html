@@ -303,7 +303,9 @@
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                             <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="genMockups()" id="mockupBtn">📱 Mockups</button>
                             <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="genCarousel()" id="carouselBtn">🎠 Carousel</button>
-                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="viewCollection()" id="viewColBtn">📂 View Collection</button>
+                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="exportZip()" id="exportBtn">📦 Export zip</button>
+                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="bulkCreatePosts()" id="bulkPostBtn">📤 Bulk posts</button>
+                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="viewCollection()" id="viewColBtn">📂 View</button>
                         </div>
                         <div id="postActionMsg" style="font-size: 0.68rem; color: var(--ag-text-muted); margin-top: 0.4rem;"></div>
                     </div>
@@ -668,6 +670,39 @@ async function genCarousel() {
 function viewCollection() {
     if (completedCollectionId) {
         window.location = '/collections/' + completedCollectionId;
+    }
+}
+
+function exportZip() {
+    if (!currentJobId) return;
+    document.getElementById('postActionMsg').textContent = 'Preparing download...';
+    window.open('/social/export/' + currentJobId, '_blank');
+    document.getElementById('exportBtn').textContent = '✅ Exported';
+    document.getElementById('postActionMsg').textContent = 'Zip download started!';
+}
+
+async function bulkCreatePosts() {
+    if (!currentJobId) return;
+    var btn = document.getElementById('bulkPostBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Creating...';
+    document.getElementById('postActionMsg').textContent = 'Creating social posts from results...';
+    try {
+        var res = await fetch('/social/bulk-create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: currentJobId, platform: 'pinterest', schedule_interval: 0 })
+        });
+        var data = await res.json();
+        if (data.success) {
+            btn.textContent = '✅ ' + data.count + ' posts';
+            document.getElementById('postActionMsg').textContent = data.count + ' draft posts created! Go to Social page to schedule.';
+        } else {
+            btn.textContent = '❌ Failed';
+            document.getElementById('postActionMsg').textContent = data.error || 'Failed';
+        }
+    } catch (e) {
+        btn.textContent = '❌ Error';
     }
 }
 </script>

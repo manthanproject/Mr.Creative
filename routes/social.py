@@ -241,3 +241,95 @@ def schedule_post(post_id):
         return jsonify({'success': True})
     except ValueError:
         return jsonify({'error': 'Invalid date format'}), 400
+
+
+@social_bp.route('/bulk-create', methods=['POST'])
+@login_required
+def bulk_create():
+    """Create posts from a pipeline job's results."""
+    import json as _json
+    data = request.get_json() or {}
+    job_id = data.get('job_id', '').strip()
+
+    if not job_id:
+        return jsonify({'error': 'Job ID required'}), 400
+
+    from models import AgentJob, BrandKit
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job or job.status != 'complete':
+        return jsonify({'error': 'Job not found or not complete'}), 400
+
+    results = _json.loads(job.results) if job.results else []
+    platform = data.get('platform', 'pinterest')
+    schedule_interval = data.get('schedule_interval', 0)
+
+    from modules.social_manager import bulk_create_posts
+    post_ids = bulk_create_posts(
+        db, current_user.id, results, job.collection_id,
+        platform=platform,
+        schedule_interval=schedule_interval,
+    )
+
+    return jsonify({'success': True, 'count': len(post_ids), 'post_ids': post_ids})
+
+
+@social_bp.route('/export/<job_id>')
+@login_required
+def export_job(job_id):
+    """Export job results as zip (images + captions CSV)."""
+    import json as _json
+    from flask import send_file
+    from models import AgentJob, BrandKit
+
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job or job.status != 'complete':
+        return jsonify({'error': 'Job not found or not complete'}), 400
+
+    results = _json.loads(job.results) if job.results else []
+    brand_kit = BrandKit.query.get(job.brand_kit_id)
+    brand_name = brand_kit.name if brand_kit else 'Brand'
+
+    base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+
+    from modules.social_manager import export_to_zip
+    zip_buffer = export_to_zip(results, base_dir, brand_name=brand_name)
+
+    filename = f'{brand_name.lower().replace(" ", "_")}_content.zip'
+    return send_file(zip_buffer, mimetype='application/zip',
+                     as_attachment=True, download_name=filename)
+
+
+@social_bp.route('/schedule-bulk', methods=['POST'])
+@login_required
+def schedule_bulk():
+    """Auto-schedule multiple posts with optimal timing."""
+    data = request.get_json() or {}
+    post_ids = data.get('post_ids', [])
+    platform = data.get('platform', 'instagram')
+    posts_per_day = data.get('posts_per_day', 3)
+
+    if not post_ids:
+        return jsonify({'error': 'No posts selected'}), 400
+
+    from modules.social_manager import get_posting_schedule
+    schedule = get_posting_schedule(
+        count=len(post_ids),
+        platform=platform,
+        posts_per_day=posts_per_day,
+    )
+
+    updated = 0
+    for pid, sched_time in zip(post_ids, schedule):
+        post = SocialPost.query.filter_by(id=pid, user_id=current_user.id).first()
+        if post:
+            post.scheduled_at = sched_time
+            post.status = 'scheduled'
+            updated += 1
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'scheduled': updated,
+        'first': schedule[0].isoformat() if schedule else '',
+        'last': schedule[-1].isoformat() if len(schedule) > 1 else '',
+    })
