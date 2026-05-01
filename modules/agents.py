@@ -70,17 +70,15 @@ class AgentEngine:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            # Try to find JSON in the response
-            start = text.find('{')
-            end = text.rfind('}')
-            if start == -1:
-                start = text.find('[')
-                end = text.rfind(']')
-            if start != -1 and end != -1:
-                try:
-                    return json.loads(text[start:end+1])
-                except json.JSONDecodeError:
-                    pass
+            # Try array first (most agent responses are arrays), then object
+            for open_ch, close_ch in [('[', ']'), ('{', '}')]:
+                start = text.find(open_ch)
+                end = text.rfind(close_ch)
+                if start != -1 and end > start:
+                    try:
+                        return json.loads(text[start:end+1])
+                    except json.JSONDecodeError:
+                        continue
             print(f"[Agent] Failed to parse JSON: {text[:200]}")
             return None
 
