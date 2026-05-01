@@ -18,7 +18,7 @@ class AgentEngine:
         self.client = Groq(api_key=groq_api_key)
         self.model = 'llama-3.3-70b-versatile'
         self.cerebras_client = None
-        self.cerebras_model = 'llama-3.3-70b'
+        self.cerebras_model = 'llama3.3-70b'
         if cerebras_api_key:
             try:
                 from cerebras.cloud.sdk import Cerebras
