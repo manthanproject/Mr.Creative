@@ -54,7 +54,10 @@ def run_agent_pipeline(app, job_id):
             db.session.commit()
             return
 
-        engine = AgentEngine(groq_key)
+        engine = AgentEngine(
+            groq_api_key=groq_key,
+            cerebras_api_key=app.config.get('CEREBRAS_API_KEY'),
+        )
         pollinations = PollinationsAPI()
 
         try:

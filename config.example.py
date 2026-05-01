@@ -21,6 +21,7 @@ class Config:
 
     # LLM / image API keys
     GROQ_API_KEY = os.environ.get('GROQ_API_KEY', 'gsk_...')
+    CEREBRAS_API_KEY = 'csk-5f8e8xkvvccm8dd25mcf2pmhfjy8xmend89jykyttdkcveej'          # Fallback — get free key at cloud.cerebras.ai
     GEMINI_API_KEY = 'AIza...'
     HF_API_KEY = 'hf_...'
 

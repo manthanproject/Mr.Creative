@@ -13,42 +13,50 @@ from datetime import datetime
 class AgentEngine:
     """Orchestrates multiple AI agents to generate marketing content."""
 
-    def __init__(self, groq_api_key):
+    def __init__(self, groq_api_key, cerebras_api_key=None):
         from groq import Groq
         self.client = Groq(api_key=groq_api_key)
         self.model = 'llama-3.3-70b-versatile'
+        self.cerebras_client = None
+        self.cerebras_model = 'llama-3.3-70b'
+        if cerebras_api_key:
+            try:
+                from cerebras.cloud.sdk import Cerebras
+                self.cerebras_client = Cerebras(api_key=cerebras_api_key)
+                print("[Agent] Cerebras fallback ready")
+            except ImportError:
+                print("[Agent] cerebras-cloud-sdk not installed — pip install cerebras-cloud-sdk")
+        self._using_cerebras = False
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7, max_tokens=2000):
-        """Call Groq LLM with a system + user prompt. Auto-retries on 429."""
-        import re
-        for attempt in range(5):
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {'role': 'system', 'content': system_prompt},
-                        {'role': 'user', 'content': user_prompt},
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-                return response.choices[0].message.content.strip()
-            except Exception as e:
-                err = str(e)
-                if '429' in err or 'rate_limit' in err:
-                    # Extract wait time from error message
-                    match = re.search(r'(\d+)m(\d+)', err)
-                    if match:
-                        wait = int(match.group(1)) * 60 + int(match.group(2)) + 5
-                    else:
-                        wait = 65 * (attempt + 1)
-                    print(f"[Agent] Rate limited — waiting {wait}s (attempt {attempt+1}/5)...")
-                    time.sleep(wait)
-                    continue
-                print(f"[Agent] LLM error: {e}")
-                return None
-        print(f"[Agent] Failed after 5 retries")
-        return None
+        """Call Groq LLM → on 429, switch to Cerebras for rest of session."""
+        # Pick client
+        if self._using_cerebras and self.cerebras_client:
+            client = self.cerebras_client
+            model = self.cerebras_model
+        else:
+            client = self.client
+            model = self.model
+
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_prompt},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            err = str(e)
+            if ('429' in err or 'rate_limit' in err) and self.cerebras_client and not self._using_cerebras:
+                print(f"[Agent] Groq rate limited — switching to Cerebras")
+                self._using_cerebras = True
+                return self._call_llm(system_prompt, user_prompt, temperature, max_tokens)
+            print(f"[Agent] LLM error: {e}")
+            return None
 
     def _parse_json(self, text):
         """Extract JSON from LLM response (handles ```json blocks)."""
