@@ -187,6 +187,7 @@ def launch_job():
     content_types = data.get('content_types', ['social_post', 'banner', 'a_plus', 'lifestyle', 'ad_creative'])
     aspect_ratio = data.get('aspect_ratio', 'mixed')
     reference_image = data.get('reference_image', None)
+    post_options = data.get('post_options', {})
 
     job = AgentJob(
         user_id=current_user.id,
@@ -195,6 +196,7 @@ def launch_job():
         content_types=json.dumps(content_types),
         aspect_ratio=aspect_ratio,
         reference_image=reference_image,
+        post_options=json.dumps(post_options),
         status='pending',
     )
     db.session.add(job)
@@ -243,3 +245,136 @@ def list_jobs():
         'collection_id': j.collection_id,
         'created_at': j.created_at.isoformat() if j.created_at else '',
     } for j in jobs]})
+
+
+@agent_bp.route('/mockups/<job_id>', methods=['POST'])
+@login_required
+def generate_mockups(job_id):
+    """Generate mockups from a completed job's results."""
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job or job.status != 'complete':
+        return jsonify({'error': 'Job not found or not complete'}), 400
+
+    results = json.loads(job.results) if job.results else []
+    brand_kit = BrandKit.query.get(job.brand_kit_id)
+    if not brand_kit:
+        return jsonify({'error': 'Brand kit not found'}), 404
+
+    # Use first successful image for mockups
+    first_image = None
+    base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+    for r in results:
+        if 'error' not in r and r.get('path'):
+            candidate = os.path.join(base_dir, r['path'])
+            if os.path.exists(candidate):
+                first_image = candidate
+                break
+
+    if not first_image:
+        return jsonify({'error': 'No images found in job results'}), 400
+
+    data = request.get_json() or {}
+    mockup_types = data.get('types', ['phone', 'laptop', 'floating'])
+
+    from modules.mockup_generator import generate_mockup as gen_mockup
+    output_dir = os.path.join(base_dir, 'outputs', f'collection_{job.collection_id}')
+    os.makedirs(output_dir, exist_ok=True)
+
+    generated = []
+    for mtype in mockup_types:
+        out_path = os.path.join(output_dir, f'mockup_{mtype}.png')
+        result = gen_mockup(
+            mtype, first_image, out_path,
+            brand_name=brand_kit.name,
+            bg_color=brand_kit.primary_color,
+            accent_color=brand_kit.accent_color,
+        )
+        if result:
+            rel = os.path.relpath(result, base_dir).replace('\\', '/')
+            generated.append({'type': mtype, 'path': rel})
+
+            # Add to collection
+            gen = __import__('models', fromlist=['Generation']).Generation(
+                user_id=job.user_id,
+                collection_id=job.collection_id,
+                output_path=rel,
+                pomelli_feature='mockup',
+                status='completed',
+                tags=f'Mockup — {mtype} | {brand_kit.name}',
+            )
+            db.session.add(gen)
+
+    db.session.commit()
+    return jsonify({'success': True, 'mockups': generated})
+
+
+@agent_bp.route('/carousel/<job_id>', methods=['POST'])
+@login_required
+def generate_carousel_route(job_id):
+    """Generate Instagram carousel from a completed job's results."""
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job or job.status != 'complete':
+        return jsonify({'error': 'Job not found or not complete'}), 400
+
+    results = json.loads(job.results) if job.results else []
+    brand_kit = BrandKit.query.get(job.brand_kit_id)
+    if not brand_kit:
+        return jsonify({'error': 'Brand kit not found'}), 404
+
+    base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+
+    # Collect successful image paths (max 8 for carousel)
+    image_paths = []
+    captions = []
+    for r in results:
+        if 'error' not in r and r.get('path'):
+            full = os.path.join(base_dir, r['path'])
+            if os.path.exists(full):
+                image_paths.append(full)
+                captions.append(r.get('caption', r.get('title', '')))
+        if len(image_paths) >= 8:
+            break
+
+    if len(image_paths) < 2:
+        return jsonify({'error': 'Need at least 2 images for a carousel'}), 400
+
+    data = request.get_json() or {}
+    hook = data.get('hook_headline', f'{brand_kit.name}\nContent Collection')
+    hook_sub = data.get('hook_subheadline', 'Swipe to explore →')
+    cta = data.get('cta_text', f'Follow @{brand_kit.name.lower().replace(" ", "")}\nfor more')
+
+    from modules.carousel_generator import generate_carousel
+    output_dir = os.path.join(base_dir, 'outputs', f'collection_{job.collection_id}', 'carousel')
+
+    slides = generate_carousel(
+        image_paths=image_paths,
+        output_dir=output_dir,
+        brand_name=brand_kit.name,
+        hook_headline=hook,
+        hook_subheadline=hook_sub,
+        captions=captions,
+        cta_text=cta,
+        primary=brand_kit.primary_color,
+        secondary=brand_kit.secondary_color,
+        accent=brand_kit.accent_color,
+        heading_font=brand_kit.heading_font,
+        body_font=brand_kit.body_font,
+    )
+
+    generated = []
+    for slide_path in slides:
+        rel = os.path.relpath(slide_path, base_dir).replace('\\', '/')
+        generated.append({'path': rel})
+
+        gen = __import__('models', fromlist=['Generation']).Generation(
+            user_id=job.user_id,
+            collection_id=job.collection_id,
+            output_path=rel,
+            pomelli_feature='carousel',
+            status='completed',
+            tags=f'Carousel | {brand_kit.name}',
+        )
+        db.session.add(gen)
+
+    db.session.commit()
+    return jsonify({'success': True, 'slides': generated, 'count': len(generated)})

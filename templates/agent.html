@@ -255,6 +255,14 @@
                     </div>
                 </div>
 
+                <div class="ag-group">
+                    <label class="ag-label">Post-processing options</label>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 0.3rem;">
+                        <div class="ag-pill active" data-opt="color_correct" onclick="togglePill(this)">🎨 Color correct</div>
+                        <div class="ag-pill" data-opt="brand_tint" onclick="togglePill(this)">🖌 Brand tint</div>
+                    </div>
+                </div>
+
                 <button class="ag-btn ag-btn-primary" id="launchBtn" onclick="launchAgent()" style="width: 100%; margin-top: 0.5rem; padding: 0.65rem;">
                     🤖 Launch Agent Pipeline
                 </button>
@@ -267,6 +275,7 @@
                         <div class="ag-step" data-step="crafting">✍️ Craft</div>
                         <div class="ag-step" data-step="generating">🎨 Generate</div>
                         <div class="ag-step" data-step="processing">✨ Process</div>
+                        <div class="ag-step" data-step="copywriting">📝 Copy</div>
                         <div class="ag-step" data-step="reviewing">✅ Review</div>
                     </div>
 
@@ -288,6 +297,15 @@
                     <div id="jobControls" style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
                         <button class="ag-btn ag-btn-ghost" id="pauseBtn" onclick="pauseJob()" style="flex: 1; font-size: 0.72rem;">⏸ Pause</button>
                         <button class="ag-btn ag-btn-danger" id="stopBtn" onclick="stopJob()" style="flex: 1; font-size: 0.72rem; border: 1px solid var(--ag-danger);">⏹ Stop</button>
+                    </div>
+                    <div id="postActions" style="display: none; margin-top: 0.75rem; border-top: 1px solid var(--ag-border-light); padding-top: 0.75rem;">
+                        <label class="ag-label" style="margin-bottom: 0.4rem;">Post-completion tools</label>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="genMockups()" id="mockupBtn">📱 Mockups</button>
+                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="genCarousel()" id="carouselBtn">🎠 Carousel</button>
+                            <button class="ag-btn ag-btn-ghost ag-btn-sm" onclick="viewCollection()" id="viewColBtn">📂 View Collection</button>
+                        </div>
+                        <div id="postActionMsg" style="font-size: 0.68rem; color: var(--ag-text-muted); margin-top: 0.4rem;"></div>
                     </div>
                 </div>
             </div>
@@ -336,10 +354,12 @@
             <div class="ag-card-body" style="font-size: 0.75rem; color: var(--ag-text-sec); line-height: 1.6;">
                 <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">1. Brand Analyst</strong> — extracts colors, tone, audience from your brand kit.</p>
                 <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">2. Content Strategist</strong> — plans the exact mix of content types.</p>
-                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">3. Prompt Crafter</strong> — writes optimized AI prompts per piece.</p>
-                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">4. Image Generator</strong> — creates images via Pollinations AI.</p>
-                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">5. Post-Processor</strong> — adds logo, text, brand elements.</p>
-                <p style="margin: 0;"><strong style="color: var(--ag-accent);">6. Quality Reviewer</strong> — scores and approves each image.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">3. Prompt Crafter</strong> — writes anti-AI photography prompts per piece.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">4. Image Generator</strong> — creates images via Flow bot.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">5. Post-Processor</strong> — rembg, logo, text overlays, borders, color correction.</p>
+                <p style="margin: 0 0 0.5rem;"><strong style="color: var(--ag-accent);">6. Copywriter</strong> — AI captions + hashtags per image.</p>
+                <p style="margin: 0;"><strong style="color: var(--ag-accent);">7. Quality Reviewer</strong> — scores and approves each image.</p>
+                <p style="margin: 0.5rem 0 0; font-size: 0.7rem; color: var(--ag-text-muted);">After completion: generate mockups (phone/laptop/billboard) or Instagram carousels.</p>
             </div>
         </div>
 
@@ -363,6 +383,7 @@ var currentJobId = '';
 var pollInterval = null;
 var selectedAR = 'mixed';
 var refImagePath = null;
+var completedCollectionId = '';
 
 var agentIcons = {
     'Brand Analyst': '🔍',
@@ -370,6 +391,7 @@ var agentIcons = {
     'Prompt Crafter': '✍️',
     'Image Generator': '🎨',
     'Post-Processor': '✨',
+    'Copywriter': '📝',
     'Quality Reviewer': '✅',
 };
 
@@ -440,6 +462,10 @@ async function launchAgent() {
                 content_types: types,
                 aspect_ratio: selectedAR,
                 reference_image: refImagePath,
+                post_options: {
+                    color_correct: !!document.querySelector('[data-opt="color_correct"].active'),
+                    brand_tint: !!document.querySelector('[data-opt="brand_tint"].active'),
+                },
             })
         });
         var data = await res.json();
@@ -496,8 +522,10 @@ function pollJobStatus() {
 
 
             // Update step indicators
-            var steps = ['analyzing', 'planning', 'crafting', 'generating', 'processing', 'reviewing'];
+            var steps = ['analyzing', 'planning', 'crafting', 'generating', 'processing', 'copywriting', 'reviewing'];
             var currentIdx = steps.indexOf(d.status);
+            // Map Copywriter agent to copywriting status
+            if (d.current_agent === 'Copywriter') currentIdx = steps.indexOf('copywriting');
             document.querySelectorAll('.ag-step').forEach(function(step, i) {
                 step.classList.remove('active', 'done');
                 if (i < currentIdx) step.classList.add('done');
@@ -513,20 +541,14 @@ function pollJobStatus() {
                 btn.disabled = false;
                 btn.textContent = '🤖 Launch Agent Pipeline';
                 document.getElementById('jobControls').style.display = 'none';
+                document.getElementById('postActions').style.display = 'block';
+                completedCollectionId = d.collection_id;
 
                 // Mark all steps done
                 document.querySelectorAll('.ag-step').forEach(function(s) {
                     s.classList.remove('active');
                     s.classList.add('done');
                 });
-
-                if (d.collection_id) {
-                    setTimeout(function() {
-                        if (confirm('Agent finished! View the generated collection?')) {
-                            window.location = '/collections/' + d.collection_id;
-                        }
-                    }, 500);
-                }
             }
 
             if (d.status === 'failed') {
@@ -589,6 +611,64 @@ async function stopJob() {
     await fetch('/agent/job/' + currentJobId + '/stop', { method: 'POST' });
     document.getElementById('stopBtn').disabled = true;
     document.getElementById('stopBtn').textContent = '⏹ Stopping...';
+}
+
+async function genMockups() {
+    if (!currentJobId) return;
+    var btn = document.getElementById('mockupBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating...';
+    document.getElementById('postActionMsg').textContent = 'Creating phone, laptop & floating mockups...';
+    try {
+        var res = await fetch('/agent/mockups/' + currentJobId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ types: ['phone', 'laptop', 'floating'] })
+        });
+        var data = await res.json();
+        if (data.success) {
+            btn.textContent = '✅ Mockups done';
+            document.getElementById('postActionMsg').textContent = data.mockups.length + ' mockups added to collection!';
+        } else {
+            btn.textContent = '❌ Failed';
+            document.getElementById('postActionMsg').textContent = data.error || 'Mockup generation failed';
+        }
+    } catch (e) {
+        btn.textContent = '❌ Error';
+        document.getElementById('postActionMsg').textContent = 'Connection error';
+    }
+}
+
+async function genCarousel() {
+    if (!currentJobId) return;
+    var btn = document.getElementById('carouselBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Creating...';
+    document.getElementById('postActionMsg').textContent = 'Building Instagram carousel slides...';
+    try {
+        var res = await fetch('/agent/carousel/' + currentJobId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        var data = await res.json();
+        if (data.success) {
+            btn.textContent = '✅ Carousel done';
+            document.getElementById('postActionMsg').textContent = data.count + ' carousel slides added to collection!';
+        } else {
+            btn.textContent = '❌ Failed';
+            document.getElementById('postActionMsg').textContent = data.error || 'Carousel generation failed';
+        }
+    } catch (e) {
+        btn.textContent = '❌ Error';
+        document.getElementById('postActionMsg').textContent = 'Connection error';
+    }
+}
+
+function viewCollection() {
+    if (completedCollectionId) {
+        window.location = '/collections/' + completedCollectionId;
+    }
 }
 </script>
 {% endblock %}

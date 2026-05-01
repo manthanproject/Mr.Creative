@@ -286,6 +286,24 @@ def run_agent_pipeline(app, job_id):
             processor = PostProcessor(brand_kit)
             results = processor.process_batch(results, content_plan, output_dir)
 
+            # ── Step 5a: Color Correction (optional) ──
+            post_opts = json.loads(job.post_options) if hasattr(job, 'post_options') and job.post_options else {}
+            if post_opts.get('color_correct', False) or post_opts.get('brand_tint', False):
+                job.message = 'Applying color correction...'
+                db.session.commit()
+                try:
+                    from modules.color_correction import process_image as cc_process
+                    for result in results:
+                        if 'error' in result:
+                            continue
+                        img_path = os.path.join(output_dir, result.get('filename', ''))
+                        if os.path.exists(img_path):
+                            tint_color = brand_kit.primary_color if post_opts.get('brand_tint') else None
+                            cc_process(img_path, hex_color=tint_color)
+                    print(f"[Pipeline] Color correction applied")
+                except Exception as e:
+                    print(f"[Pipeline] Color correction skipped: {e}")
+
             if not _check_job_control(job, db):
                 return
 

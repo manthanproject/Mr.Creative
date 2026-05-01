@@ -107,6 +107,7 @@ def create_app():
             ("agent_jobs", "reference_image", "VARCHAR(255)"),
             ("agent_jobs", "control_action", "VARCHAR(10) DEFAULT ''"),
             ("agent_jobs", "llm_provider", "VARCHAR(20) DEFAULT ''"),
+            ("agent_jobs", "post_options", "TEXT DEFAULT '{}'"),
         ]
         for table, column, col_type in migrations:
             try:
