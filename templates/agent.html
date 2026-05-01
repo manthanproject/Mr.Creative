@@ -475,6 +475,15 @@ function pollJobStatus() {
             }
             document.getElementById('agentIcon').textContent = agentIcons[d.current_agent] || '🤖';
 
+            // Show LLM provider badge
+            if (d.message && d.message.includes('Cerebras')) {
+                document.getElementById('agentPct').title = 'Using Cerebras (Groq rate limited)';
+                document.getElementById('agentPct').style.color = '#f59e0b';
+            } else if (d.message && d.message.includes('Groq')) {
+                document.getElementById('agentPct').title = 'Using Groq';
+                document.getElementById('agentPct').style.color = '';
+            }
+
             // Update step indicators
             var steps = ['analyzing', 'planning', 'crafting', 'generating', 'processing', 'reviewing'];
             var currentIdx = steps.indexOf(d.status);

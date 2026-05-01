@@ -69,6 +69,10 @@ def run_agent_pipeline(app, job_id):
             db.session.commit()
 
             brand_analysis = engine.analyze_brand(brand_kit)
+            # Report which LLM provider is active
+            provider = 'Cerebras' if engine._using_cerebras else 'Groq'
+            job.message = f'Using {provider}'
+            db.session.commit()
             job.brand_analysis = json.dumps(brand_analysis)
             job.progress = 15
             db.session.commit()
