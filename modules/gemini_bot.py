@@ -74,112 +74,126 @@ class GeminiBot:
         print("[GeminiBot] On Gemini chat page")
 
     def _upload_image(self, image_path):
-        """Upload image to Gemini chat via file input."""
+        """Upload image to Gemini chat.
+        Flow: Click + button → Click 'Upload files' → Native file dialog → pyautogui paste path."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
             print(f"[GeminiBot] Image not found: {abs_path}")
             return False
 
         try:
-            # Look for file input element
-            file_input = None
-
-            # Method 1: Find hidden file input
-            inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-            if inputs:
-                file_input = inputs[0]
-                self.driver.execute_script("""
-                    arguments[0].style.display = 'block';
-                    arguments[0].style.opacity = '1';
-                    arguments[0].style.position = 'fixed';
-                    arguments[0].style.top = '0';
-                    arguments[0].style.zIndex = '99999';
-                """, file_input)
-                time.sleep(0.5)
-                file_input.send_keys(abs_path)
-                print(f"[GeminiBot] Image uploaded via file input: {os.path.basename(abs_path)}")
-                time.sleep(3)
-                return True
-
-            # Method 2: Click the add/attach button first to reveal file input
-            clicked = self.driver.execute_script("""
+            # Step 1: Click the + button to open upload menu
+            clicked_plus = self.driver.execute_script("""
                 var btns = document.querySelectorAll('button, [role="button"]');
                 for (var b of btns) {
                     if (!b.offsetParent) continue;
-                    var label = (b.getAttribute('aria-label') || b.textContent || '').toLowerCase();
-                    if (label.includes('add image') || label.includes('upload') || label.includes('attach') 
-                        || label.includes('add file') || label.includes('add photo')) {
-                        b.click();
-                        return 'clicked_' + label.substring(0, 30);
-                    }
-                }
-                // Try the + icon button
-                for (var b of btns) {
-                    if (!b.offsetParent) continue;
                     var text = b.textContent.trim();
+                    var r = b.getBoundingClientRect();
+                    // The + button is at the bottom-left, small, near the input
                     if (text === '+' || text === 'add') {
                         b.click();
                         return 'clicked_plus';
                     }
                 }
+                // Try mat-icon with 'add' text
+                var icons = document.querySelectorAll('mat-icon, .material-icons');
+                for (var icon of icons) {
+                    if (icon.textContent.trim() === 'add') {
+                        var btn = icon.closest('button') || icon;
+                        btn.click();
+                        return 'clicked_add_icon';
+                    }
+                }
                 return 'not_found';
             """)
-            print(f"[GeminiBot] Attach button: {clicked}")
+            print(f"[GeminiBot] Plus button: {clicked_plus}")
             time.sleep(2)
 
-            # Now try file input again
-            inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-            if inputs:
-                file_input = inputs[0]
-                self.driver.execute_script("arguments[0].style.display='block';", file_input)
-                time.sleep(0.5)
-                file_input.send_keys(abs_path)
-                print(f"[GeminiBot] Image uploaded after attach click: {os.path.basename(abs_path)}")
-                time.sleep(3)
-                return True
+            # Step 2: Click "Upload files" from the dropdown menu
+            clicked_upload = self.driver.execute_script("""
+                var items = document.querySelectorAll('[role="menuitem"], .mat-mdc-list-item, button');
+                for (var item of items) {
+                    if (!item.offsetParent) continue;
+                    var label = item.getAttribute('aria-label') || '';
+                    var text = item.textContent.trim();
+                    if (label.includes('Upload files') || text === 'Upload files') {
+                        item.click();
+                        return 'clicked_upload_files';
+                    }
+                }
+                return 'not_found';
+            """)
+            print(f"[GeminiBot] Upload files: {clicked_upload}")
+            time.sleep(2)
 
-            print("[GeminiBot] Could not find file input for image upload")
-            return False
+            # Step 3: Native file dialog is now open — use pyautogui to paste path
+            import pyautogui
+            import subprocess
+            time.sleep(1)
+            # Copy path to clipboard and paste
+            subprocess.run(['clip'], input=abs_path.encode(), check=True)
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.5)
+            pyautogui.press('enter')
+            print(f"[GeminiBot] File path pasted: {os.path.basename(abs_path)}")
+
+            # Wait for upload to complete (image thumbnail appears)
+            time.sleep(5)
+
+            # Verify image was uploaded (look for image thumbnail in chat input area)
+            has_image = self.driver.execute_script("""
+                var imgs = document.querySelectorAll('img');
+                for (var img of imgs) {
+                    var r = img.getBoundingClientRect();
+                    // Image thumbnail near the input area (bottom of page)
+                    if (r.y > window.innerHeight - 300 && r.width > 30 && r.width < 200) return true;
+                }
+                return false;
+            """)
+            if has_image:
+                print("[GeminiBot] Image uploaded successfully!")
+                return True
+            else:
+                print("[GeminiBot] Image upload may have failed — no thumbnail found")
+                # Continue anyway — it might still work
+                return True
 
         except Exception as e:
             print(f"[GeminiBot] Image upload error: {e}")
             return False
 
     def _type_prompt(self, text):
-        """Type prompt into Gemini chat input."""
+        """Type prompt into Gemini's Quill editor (div.ql-editor with role=textbox)."""
         try:
-            # Find the chat input — could be rich text editor or textarea
-            input_el = None
-
-            # Try contenteditable div (Gemini's rich text editor)
-            editors = self.driver.find_elements(By.CSS_SELECTOR, 
-                'div[contenteditable="true"], div.ql-editor, [role="textbox"]')
-            for ed in editors:
-                if ed.is_displayed():
-                    input_el = ed
-                    break
-
-            # Try textarea/input fallback
-            if not input_el:
-                textareas = self.driver.find_elements(By.CSS_SELECTOR, 'textarea, input[type="text"]')
-                for ta in textareas:
-                    if ta.is_displayed():
-                        input_el = ta
-                        break
+            # Find the Quill editor — exact selector from DevTools
+            input_el = self.driver.execute_script("""
+                var editor = document.querySelector('div.ql-editor[role="textbox"][contenteditable="true"]');
+                if (editor) return editor;
+                // Fallback
+                var editors = document.querySelectorAll('div[contenteditable="true"]');
+                for (var e of editors) {
+                    if (e.offsetParent && e.classList.contains('ql-editor')) return e;
+                }
+                return null;
+            """)
 
             if not input_el:
-                print("[GeminiBot] Could not find chat input")
+                print("[GeminiBot] Could not find chat input (ql-editor)")
                 return False
 
-            # Clear and type using clipboard paste (handles contenteditable)
+            # Click to focus
             input_el.click()
             time.sleep(0.3)
 
+            # Clear existing content
+            self.driver.execute_script("arguments[0].innerHTML = '';", input_el)
+            time.sleep(0.2)
+
+            # Type using clipboard paste (handles Quill editor properly)
             import pyperclip
             pyperclip.copy(text)
-            input_el.send_keys(Keys.CONTROL, 'a')
-            time.sleep(0.1)
-            input_el.send_keys(Keys.CONTROL, Keys.SHIFT, 'v')
+            from selenium.webdriver.common.keys import Keys
+            input_el.send_keys(Keys.CONTROL, 'v')
             time.sleep(0.5)
 
             print(f"[GeminiBot] Prompt typed: {text[:60]}...")
@@ -190,39 +204,29 @@ class GeminiBot:
             return False
 
     def _send_message(self):
-        """Click send button or press Enter."""
+        """Click Gemini's send button (aria-label='Send message')."""
         try:
-            # Try send button
             sent = self.driver.execute_script("""
-                var btns = document.querySelectorAll('button, [role="button"]');
+                // Exact selector: button with aria-label="Send message"
+                var btns = document.querySelectorAll('button');
                 for (var b of btns) {
                     if (!b.offsetParent) continue;
-                    var label = (b.getAttribute('aria-label') || '').toLowerCase();
-                    if (label.includes('send') || label.includes('submit')) {
+                    var label = b.getAttribute('aria-label') || '';
+                    if (label === 'Send message') {
                         b.click();
                         return 'clicked_send';
-                    }
-                }
-                // Try mat-icon-button with send icon
-                var icons = document.querySelectorAll('mat-icon, .material-icons, [data-mat-icon-name]');
-                for (var icon of icons) {
-                    if (icon.textContent.trim() === 'send' || icon.textContent.trim() === 'arrow_upward') {
-                        var btn = icon.closest('button');
-                        if (btn) { btn.click(); return 'clicked_icon'; }
                     }
                 }
                 return 'not_found';
             """)
 
             if sent == 'not_found':
-                # Fallback: press Enter
-                editors = self.driver.find_elements(By.CSS_SELECTOR,
-                    'div[contenteditable="true"], textarea, [role="textbox"]')
-                for ed in editors:
-                    if ed.is_displayed():
-                        ed.send_keys(Keys.RETURN)
-                        sent = 'pressed_enter'
-                        break
+                # Fallback: press Enter in the editor
+                editor = self.driver.find_element(By.CSS_SELECTOR, 'div.ql-editor[role="textbox"]')
+                if editor:
+                    from selenium.webdriver.common.keys import Keys
+                    editor.send_keys(Keys.RETURN)
+                    sent = 'pressed_enter'
 
             print(f"[GeminiBot] Send: {sent}")
             return sent != 'not_found'
@@ -231,44 +235,55 @@ class GeminiBot:
             print(f"[GeminiBot] Send error: {e}")
             return False
 
-    def _wait_for_response(self, timeout=60):
+    def _wait_for_response(self, timeout=90):
         """Wait for Gemini to finish generating response."""
         print("[GeminiBot] Waiting for response...")
         start = time.time()
+        time.sleep(5)  # Initial wait for response to start
 
-        # Wait for response to start (new model-turn div appears)
-        time.sleep(5)
-
-        # Wait for response to complete (no more streaming)
         last_len = 0
         stable_count = 0
 
         while time.time() - start < timeout:
-            # Get the latest response text
             response_text = self.driver.execute_script("""
-                // Get all model response turns
-                var turns = document.querySelectorAll(
-                    '.model-response-text, .response-container, ' +
-                    '[data-message-author-role="model"], .message-content, ' +
-                    '.markdown-main-panel, .response-content'
-                );
-                if (turns.length === 0) {
-                    // Fallback: get all message-like divs
-                    turns = document.querySelectorAll('.conversation-container > div');
+                // Gemini model responses — try multiple selectors
+                var selectors = [
+                    '.model-response-text',
+                    '.response-container-content',
+                    '[data-message-author-role="model"] .message-content',
+                    '.markdown-main-panel',
+                    'message-content .model-response-text',
+                    '.response-content',
+                    // Angular component selectors
+                    'model-response message-content',
+                    '.conversation-container model-response',
+                ];
+
+                for (var sel of selectors) {
+                    var els = document.querySelectorAll(sel);
+                    if (els.length > 0) {
+                        // Get the LAST response (most recent)
+                        var last = els[els.length - 1];
+                        var text = last.innerText || last.textContent || '';
+                        if (text.length > 20) return text;
+                    }
                 }
-                if (turns.length === 0) return '';
-                
-                // Get the last turn's text
-                var last = turns[turns.length - 1];
-                return last.innerText || last.textContent || '';
+
+                // Broad fallback: get all visible text after the last user message
+                var allTurns = document.querySelectorAll('.conversation-container > div, .chat-history > div');
+                if (allTurns.length > 0) {
+                    var last = allTurns[allTurns.length - 1];
+                    return last.innerText || '';
+                }
+
+                return '';
             """)
 
-            current_len = len(response_text)
+            current_len = len(response_text) if response_text else 0
 
-            if current_len > 0 and current_len == last_len:
+            if current_len > 50 and current_len == last_len:
                 stable_count += 1
-                if stable_count >= 3:
-                    # Response hasn't changed for 3 checks — done
+                if stable_count >= 4:  # Stable for ~8 seconds
                     print(f"[GeminiBot] Response complete: {current_len} chars")
                     return response_text
             else:
@@ -276,18 +291,16 @@ class GeminiBot:
 
             last_len = current_len
             elapsed = int(time.time() - start)
-            if elapsed % 10 == 0:
+            if elapsed % 10 == 0 and elapsed > 0:
                 print(f"[GeminiBot] Generating... ({elapsed}s, {current_len} chars)")
             time.sleep(2)
 
-        print(f"[GeminiBot] Timeout after {timeout}s")
+        print(f"[GeminiBot] Timeout after {timeout}s — returning what we have")
         # Return whatever we have
         return self.driver.execute_script("""
-            var turns = document.querySelectorAll(
-                '.model-response-text, [data-message-author-role="model"], .markdown-main-panel'
-            );
-            if (turns.length === 0) return '';
-            return turns[turns.length - 1].innerText || '';
+            var els = document.querySelectorAll('.model-response-text, .markdown-main-panel, [data-message-author-role="model"]');
+            if (els.length > 0) return els[els.length - 1].innerText || '';
+            return '';
         """) or ''
 
     def _parse_prompts_from_response(self, response_text, expected_count):

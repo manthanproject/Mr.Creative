@@ -13,3 +13,5 @@ rembg[cpu]>=2.0.57
 playwright>=1.49.0
 instagrapi>=2.1.2
 tweepy>=4.14.0
+pyperclip>=1.8.0
+pyautogui>=0.9.54
