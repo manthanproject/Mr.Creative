@@ -150,29 +150,39 @@ Additional product info: {product_description or 'None'}"""
 Given a brand profile, plan exactly the requested number of content pieces.
 Each piece should be unique — different layout, angle, message.
 
-Available image engines:
-- "pollinations": Best for backgrounds, lifestyle shots, abstract visuals, stock-style images. Text-to-image AI.
-- "flow": Best for product shots, product mockups, A+ content with product focus. Needs reference image.
-- "pomelli": Best for campaign creatives with text overlays and marketing copy. Campaign-focused.
+CONTENT TYPE DEFINITIONS:
+- "social_post": Lifestyle editorial — person using product, flat lays, candid moments. For Instagram, Pinterest.
+- "banner": Hero product shot with text-safe negative space. For website headers, ads.
+- "a_plus": Amazon/Flipkart A+ listing content — DESIGNED INFOGRAPHIC IMAGES with text overlays, feature grids, before/after panels, step-by-step instructions, comparison charts, award badges. These are NOT simple product photos — they are marketing infographics with bold headlines, bullet points, icons, and data. Think Sephora/CeraVe Amazon listings.
+- "lifestyle": Documentary-style real-world usage — morning routines, bathroom shelves, gym bags.
+- "ad_creative": Bold, scroll-stopping campaign creative for Meta/Google ads. Dynamic angles, dramatic lighting.
 
-Aspect ratios available:
-- "1:1" (1024x1024): Instagram, Facebook
-- "9:16" (1024x1792): Instagram Stories, Reels, TikTok
-- "16:9" (1792x1024): YouTube thumbnail, website banner
-- "4:5" (1024x1280): Pinterest, Instagram portrait
-- "3:4" (1024x1365): Pinterest optimal
+A+ CONTENT SUBTYPES (use these when type is a_plus):
+- "hero_banner": Product centered with bold headline, bullet points, award badge
+- "feature_grid": 2x3 or 3x2 grid of icons + feature titles + descriptions
+- "before_after": Split image showing problem vs result with the product
+- "how_to_steps": 3-4 numbered steps with icons showing product usage
+- "comparison_chart": Product vs competitors/alternatives table with checkmarks
+- "multi_panel": 4-6 panel infographic combining hero, science, steps, and results
+- "size_reference": Product in hand with bold text overlay
+- "full_page": Complete A+ page layout with multiple sections
+
+ENGINE RULES:
+- "flow": Use for ALL content types when a reference image is uploaded. Best quality.
+- "pollinations": Only if NO reference image is uploaded. Text-to-image.
+- Do NOT use "pomelli".
 
 Return ONLY valid JSON array (no other text). Each item:
 {
     "id": 1,
     "type": "social_post|banner|a_plus|lifestyle|ad_creative",
-    "subtype": "specific format name",
+    "subtype": "specific format name from subtypes above",
     "title": "short descriptive title for this piece",
     "aspect_ratio": "1:1|9:16|16:9|4:5|3:4",
     "width": 1024,
     "height": 1024,
-    "engine": "pollinations|flow|pomelli",
-    "description": "detailed visual description of what this image should look like",
+    "engine": "flow",
+    "description": "detailed visual description of what this image should look like — for a_plus include the exact text, headlines, features, steps that should appear in the image",
     "text_overlay": true,
     "headline": "headline text if text_overlay is true",
     "subheadline": "optional subheadline",
@@ -201,11 +211,12 @@ Tone: {brand_kit.tone}
 Content types to include: {types_str}
 Total pieces needed: {target_count}
 
-Plan exactly {target_count} unique content pieces. ONLY use these content types: {types_str}. Do NOT create any other content types.
-Vary the aspect ratios and visual angles, but every piece MUST be one of the allowed types.
-A product reference image will be provided to the image generator for product-focused shots — use engine "flow" for these.
-Prioritize social posts and banners. Use "pollinations" engine for most pieces (it's fastest and free).
-Use "flow" only when product image reference is essential. Use "pomelli" for campaign-style creatives."""
+Plan exactly {target_count} unique content pieces. EVERY piece MUST be one of these types: {types_str}. Do NOT create any other content types.
+If only ONE content type is selected, ALL {target_count} pieces must be that type — vary the subtype, layout, and messaging.
+
+For A+ content specifically: each piece should have a DIFFERENT subtype (hero_banner, feature_grid, before_after, how_to_steps, comparison_chart, multi_panel, size_reference, full_page). Include the actual marketing text, features, and data in the description field.
+
+Use "flow" engine for ALL pieces (reference image is provided)."""
 
         print(f"[Agent 2] Content Strategist: Planning {target_count} pieces...")
         result = self._call_llm(system, user, temperature=0.7, max_tokens=4000)
@@ -267,6 +278,13 @@ Each prompt MUST include a specific camera (not always the same one — vary the
 4. Add subtle imperfections: "slight film grain", "ambient reflections", "natural shadow"
 5. For Flow engine: describe the SCENE around the product (reference image provides the product)
 6. Write in natural language paragraphs, not keyword lists
+
+SPECIAL RULE FOR A+ CONTENT:
+A+ content prompts should describe DESIGNED INFOGRAPHIC LAYOUTS, not just photography scenes.
+Include in the prompt: bold headline text, bullet points, feature grids, before/after panels,
+step-by-step instructions, comparison charts, award badges, icons — whatever the content plan describes.
+The prompt should tell Flow to generate an IMAGE that looks like a designed Amazon/Flipkart product listing page.
+Use the description and title from the content plan to write the actual marketing text that appears in the image.
 
 Return ONLY valid JSON array. Each item:
 {{
