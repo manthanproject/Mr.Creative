@@ -186,7 +186,7 @@ Return ONLY valid JSON array (no other text). Each item:
 }
 
 Post-processing rules:
-- "remove_background": true ONLY for product cutout shots, lifestyle composites, or A+ content where clean product isolation is needed
+- "remove_background": ALMOST ALWAYS false. Set true ONLY for product-only cutout shots (no person, no scene, just the product bottle/box on white background). NEVER true for social posts, banners, lifestyle, or ad creatives with people or scenes.
 - "border_style": "solid" for social posts and banners to frame the content. "gradient" for premium/luxury brands. "none" for lifestyle and editorial shots.
 - "text_safe_zone": where the post-processor will place headline/subheadline/CTA text overlays. Pick "bottom" for hero shots, "top" for product-focused images, "center" for bold statements."""
 

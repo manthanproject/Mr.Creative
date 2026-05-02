@@ -157,11 +157,13 @@ def get_collection_files(collection_id, output_folder):
     if not os.path.exists(col_dir):
         return files
 
+    static_dir = os.path.dirname(os.path.dirname(col_dir))
     for root, dirs, filenames in os.walk(col_dir):
         for f in sorted(filenames, reverse=True):
+            # Skip intermediate files (rembg _nobg outputs)
+            if '_nobg' in f:
+                continue
             fp = os.path.join(root, f)
-            # Path relative to static/ to keep outputs/collection_xxx/ prefix
-            static_dir = os.path.dirname(os.path.dirname(col_dir))
             rel = os.path.relpath(fp, static_dir).replace(os.sep, '/')
             files.append({
                 'filename': f,
