@@ -266,35 +266,256 @@ class ExportAdapter(PlatformAdapter):
         super().__init__('export')
 
     def post(self, image_path, title, caption, hashtags, **kwargs):
-        # No-op — export handles this via zip
         return (200, {'status': 'exported'})
 
     def validate_credentials(self):
         return {'connected': True, 'message': 'Export mode — no credentials needed'}
 
 
+class InstagramAdapter(PlatformAdapter):
+    """Instagram posting via instagrapi (no API key needed — uses login).
+    Source: Klaudiusz321/social-media-agents pattern."""
+
+    def __init__(self, username, password):
+        super().__init__('instagram')
+        self.username = username
+        self.password = password
+        self._client = None
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                from instagrapi import Client
+                self._client = Client()
+                self._client.login(self.username, self.password)
+                print(f"[Instagram] Logged in as {self.username}")
+            except ImportError:
+                print("[Instagram] pip install instagrapi")
+                return None
+            except Exception as e:
+                print(f"[Instagram] Login failed: {e}")
+                return None
+        return self._client
+
+    def post(self, image_path, title, caption, hashtags, **kwargs):
+        client = self._get_client()
+        if not client:
+            return {'success': False, 'error': 'Instagram login failed'}
+
+        try:
+            full_caption = caption
+            if hashtags:
+                full_caption += '\n\n' + hashtags
+
+            media = client.photo_upload(
+                path=image_path,
+                caption=full_caption,
+            )
+            media_url = f"https://www.instagram.com/p/{media.code}"
+            print(f"[Instagram] Posted: {media_url}")
+            return {
+                'success': True,
+                'post_id': media.id,
+                'url': media_url,
+            }
+        except Exception as e:
+            print(f"[Instagram] Post failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def post_carousel(self, image_paths, caption, hashtags='', **kwargs):
+        """Post multiple images as Instagram carousel."""
+        client = self._get_client()
+        if not client:
+            return {'success': False, 'error': 'Instagram login failed'}
+
+        try:
+            full_caption = caption
+            if hashtags:
+                full_caption += '\n\n' + hashtags
+
+            media = client.album_upload(
+                paths=image_paths,
+                caption=full_caption,
+            )
+            media_url = f"https://www.instagram.com/p/{media.code}"
+            print(f"[Instagram] Carousel posted: {media_url}")
+            return {
+                'success': True,
+                'post_id': media.id,
+                'url': media_url,
+            }
+        except Exception as e:
+            print(f"[Instagram] Carousel failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def validate_credentials(self):
+        client = self._get_client()
+        if client:
+            info = client.account_info()
+            return {
+                'connected': True,
+                'username': info.username,
+                'followers': info.follower_count,
+            }
+        return {'connected': False, 'error': 'Login failed'}
+
+
+class TwitterAdapter(PlatformAdapter):
+    """Twitter/X posting via tweepy."""
+
+    def __init__(self, api_key, api_secret, access_token, access_secret):
+        super().__init__('twitter')
+        self.api_key = api_key
+        self.api_secret = api_secret
+        self.access_token = access_token
+        self.access_secret = access_secret
+        self._client = None
+        self._api = None
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                import tweepy
+                # v2 client for tweets
+                self._client = tweepy.Client(
+                    consumer_key=self.api_key,
+                    consumer_secret=self.api_secret,
+                    access_token=self.access_token,
+                    access_token_secret=self.access_secret,
+                )
+                # v1.1 API for media upload
+                auth = tweepy.OAuth1UserHandler(
+                    self.api_key, self.api_secret,
+                    self.access_token, self.access_secret,
+                )
+                self._api = tweepy.API(auth)
+                print("[Twitter] Authenticated")
+            except ImportError:
+                print("[Twitter] pip install tweepy")
+                return None, None
+            except Exception as e:
+                print(f"[Twitter] Auth failed: {e}")
+                return None, None
+        return self._client, self._api
+
+    def post(self, image_path, title, caption, hashtags, **kwargs):
+        client, api = self._get_client()
+        if not client or not api:
+            return {'success': False, 'error': 'Twitter auth failed'}
+
+        try:
+            # Upload media via v1.1
+            media = api.media_upload(filename=image_path)
+
+            # Post tweet with media via v2
+            text = caption[:250]  # Leave room for hashtags
+            if hashtags:
+                remaining = 280 - len(text) - 2
+                tags = hashtags.split()[:3]  # Max 3 hashtags for Twitter
+                tag_text = ' '.join(tags)
+                if len(tag_text) <= remaining:
+                    text += '\n\n' + tag_text
+
+            response = client.create_tweet(
+                text=text,
+                media_ids=[media.media_id],
+            )
+            tweet_id = response.data['id']
+            tweet_url = f"https://twitter.com/i/status/{tweet_id}"
+            print(f"[Twitter] Posted: {tweet_url}")
+            return {
+                'success': True,
+                'tweet_id': tweet_id,
+                'url': tweet_url,
+            }
+        except Exception as e:
+            print(f"[Twitter] Post failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def validate_credentials(self):
+        client, api = self._get_client()
+        if client:
+            me = client.get_me()
+            return {
+                'connected': True,
+                'username': me.data.username,
+            }
+        return {'connected': False, 'error': 'Auth failed'}
+
+
+# ═══════════════════════════════════════════════
+# Platform Constraints (from social-media-agents)
+# ═══════════════════════════════════════════════
+
+PLATFORM_CONSTRAINTS = {
+    'instagram': {
+        'max_caption_length': 2200,
+        'hashtag_limit': 30,
+        'ideal_image_ratio': '1:1',
+        'image_sizes': {'square': (1080, 1080), 'portrait': (1080, 1350), 'story': (1080, 1920)},
+        'supports_carousel': True,
+        'max_carousel_images': 10,
+    },
+    'twitter': {
+        'max_caption_length': 280,
+        'hashtag_limit': 3,
+        'ideal_image_ratio': '16:9',
+        'image_sizes': {'landscape': (1200, 675), 'square': (1200, 1200)},
+        'supports_carousel': False,
+        'max_carousel_images': 4,
+    },
+    'pinterest': {
+        'max_caption_length': 500,
+        'hashtag_limit': 5,
+        'ideal_image_ratio': '2:3',
+        'image_sizes': {'pin': (1000, 1500), 'square': (1000, 1000)},
+        'supports_carousel': True,
+        'max_carousel_images': 5,
+    },
+    'facebook': {
+        'max_caption_length': 63206,
+        'hashtag_limit': 5,
+        'ideal_image_ratio': '1.91:1',
+        'image_sizes': {'landscape': (1200, 630), 'square': (1080, 1080)},
+        'supports_carousel': True,
+        'max_carousel_images': 10,
+    },
+    'tiktok': {
+        'max_caption_length': 2200,
+        'hashtag_limit': 5,
+        'ideal_image_ratio': '9:16',
+        'image_sizes': {'vertical': (1080, 1920)},
+        'supports_carousel': True,
+        'max_carousel_images': 35,
+    },
+}
+
+
 # Adapter registry
 ADAPTERS = {
-    'pinterest': lambda token: PinterestAdapter(token) if token else None,
-    'export': lambda _: ExportAdapter(),
+    'pinterest': lambda config: PinterestAdapter(config.get('PINTEREST_ACCESS_TOKEN', ''))
+                                if config.get('PINTEREST_ACCESS_TOKEN') else None,
+    'instagram': lambda config: InstagramAdapter(
+                                config.get('INSTAGRAM_USERNAME', ''),
+                                config.get('INSTAGRAM_PASSWORD', ''))
+                                if config.get('INSTAGRAM_USERNAME') else None,
+    'twitter': lambda config: TwitterAdapter(
+                              config.get('TWITTER_API_KEY', ''),
+                              config.get('TWITTER_API_SECRET', ''),
+                              config.get('TWITTER_ACCESS_TOKEN', ''),
+                              config.get('TWITTER_ACCESS_SECRET', ''))
+                              if config.get('TWITTER_API_KEY') else None,
+    'export': lambda config: ExportAdapter(),
 }
 
 
 def get_adapter(platform, config):
-    """Get platform adapter instance.
-
-    Args:
-        platform: Platform name
-        config: Flask app config dict
-
-    Returns:
-        PlatformAdapter instance or None
-    """
+    """Get platform adapter instance."""
     factory = ADAPTERS.get(platform)
     if not factory:
         return None
-
-    if platform == 'pinterest':
-        token = config.get('PINTEREST_ACCESS_TOKEN', '')
-        return factory(token)
-    return factory(None)
+    try:
+        return factory(config)
+    except Exception as e:
+        print(f"[SocialManager] Adapter error for {platform}: {e}")
+        return None

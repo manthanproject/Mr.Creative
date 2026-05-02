@@ -69,6 +69,7 @@ class Copywriter:
                      'Front-load keywords naturally. Use 2-5 targeted hashtags at the end. '
                      'Include product benefits, not just features. Write for search discovery.',
             'hashtag_count': '3-5',
+            'max_length': 500,
             'tone': 'informative, aspirational, search-friendly',
             'example': 'Hydrate and protect your skin with this lightweight vitamin C serum. '
                        'Perfect for morning routines — absorbs quickly, no sticky residue. '
@@ -78,8 +79,10 @@ class Copywriter:
             'rules': 'Instagram caption — hook in the FIRST LINE (before "more" truncation). '
                      'Body: 2-3 punchy sentences delivering value. CTA at the end. '
                      'Hashtags: 15-25 at the end, mix of popular (500K+) and niche (10K-100K). '
-                     'Conversational, not corporate. Use line breaks for readability.',
+                     'Conversational, not corporate. Use line breaks for readability. '
+                     'MUST be under 2200 characters total.',
             'hashtag_count': '15-25',
+            'max_length': 2200,
             'tone': 'conversational, engaging, authentic',
             'example': 'Your morning routine is missing this one step 👇\n\n'
                        'Vitamin C before sunscreen = the glow-up your skin deserves. '
@@ -88,22 +91,44 @@ class Copywriter:
                        '#skincare #vitaminc #morningroutine #skincareroutine #glowingskin '
                        '#serumreview #beautytips #skincareobsessed',
         },
+        'twitter': {
+            'rules': 'Twitter/X post — MUST be under 280 characters including hashtags. '
+                     'Short, punchy, one strong statement or question. '
+                     'Max 3 hashtags. No emojis overload. Conversational tone.',
+            'hashtag_count': '1-3',
+            'max_length': 280,
+            'tone': 'witty, concise, engaging',
+            'example': 'This serum absorbed before I could finish my coffee. '
+                       'No sticky residue, just results.\n\n#skincare #vitaminC',
+        },
         'facebook': {
             'rules': 'Facebook post — conversational, engaging, clear CTA. '
                      '2-4 sentences. Ask a question or share a tip to drive comments. '
                      '3-5 hashtags max. Emojis sparingly (1-2).',
             'hashtag_count': '3-5',
+            'max_length': 2000,
             'tone': 'friendly, conversational, community-focused',
             'example': 'Ever wonder why your moisturizer feels heavy by noon? 🤔\n\n'
                        'Try switching to a water-based formula — your skin will thank you. '
                        'We\'ve been loving this lightweight gel cream for summer.\n\n'
                        '#skincaretips #summerskincare #beautyhack',
         },
+        'tiktok': {
+            'rules': 'TikTok caption — ultra-short hook that makes people stop scrolling. '
+                     'Max 1-2 sentences. Trend-friendly hashtags. '
+                     'Use trending sounds language. Under 2200 chars but shorter is better.',
+            'hashtag_count': '3-5',
+            'max_length': 2200,
+            'tone': 'trendy, casual, gen-z friendly',
+            'example': 'POV: you found the skincare holy grail 🧴✨\n\n'
+                       '#skincareroutine #glowup #beautytok #fyp',
+        },
         'general': {
             'rules': 'Marketing description — clear, benefit-focused, 2-3 sentences. '
                      'Lead with the key benefit. Include one specific detail or number. '
                      'End with a soft CTA. 3-5 hashtags.',
             'hashtag_count': '3-5',
+            'max_length': 2000,
             'tone': 'professional, benefit-focused',
             'example': 'Clinically proven to boost hydration by 72% in just 4 weeks. '
                        'This serum combines hyaluronic acid with niacinamide for visible results. '
