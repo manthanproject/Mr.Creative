@@ -92,3 +92,8 @@ def ensure_flow_chrome(email=None):
         profile = f'chrome_flow_{safe_name}'
 
     return launch_chrome(9223, profile, 'https://labs.google/fx/tools/flow')
+
+
+def ensure_gemini_chrome():
+    """Ensure Gemini Chrome is running on port 9224 with its own profile."""
+    return launch_chrome(9224, 'chrome_gemini', 'https://gemini.google.com')

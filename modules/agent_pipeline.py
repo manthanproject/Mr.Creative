@@ -106,6 +106,14 @@ def run_agent_pipeline(app, job_id):
             job.message = f'Crafting {len(content_plan)} prompts...'
             db.session.commit()
 
+            # Pass reference image path to engine for Gemini bot
+            if job.reference_image:
+                ref_abs = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'static', job.reference_image
+                )
+                engine._reference_image_path = ref_abs
+
             prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
             job.prompts = json.dumps(prompts)
             job.progress = 40

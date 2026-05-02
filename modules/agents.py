@@ -230,18 +230,23 @@ Use "flow" engine for ALL pieces (reference image is provided)."""
     # ═══════════════════════════════════════════
     def craft_prompts(self, content_plan, brand_analysis, brand_kit):
         """Write optimized generation prompts for each content piece.
-        A+ content: uses expert prompts directly (no LLM rewriting).
-        Other types: uses LLM with prompt library examples."""
+        Priority: Gemini bot (vision) → expert prompts (A+) → LLM (other types)."""
 
         from modules.prompt_library import get_prompt_context_for_llm, build_prompt, CONTENT_TYPE_CONFIG
 
-        # Check if ALL items are a_plus — if so, bypass LLM entirely
+        content_types = list(set(item.get('type', 'social_post') for item in content_plan))
         all_aplus = all(item.get('type') == 'a_plus' for item in content_plan)
 
+        # Try Gemini bot first (best quality — has vision)
+        gemini_prompts = self._try_gemini_prompts(content_plan, brand_kit, content_types)
+        if gemini_prompts:
+            return gemini_prompts
+
+        # Fallback: expert prompts for A+ content (no LLM rewriting needed)
         if all_aplus:
             return self._craft_aplus_prompts_direct(content_plan, brand_analysis, brand_kit)
 
-        # For mixed or non-A+ content, use LLM with prompt library
+        # Fallback: LLM with prompt library
 
         # Get content types from the plan
         content_types = list(set(item.get('type', 'social_post') for item in content_plan))
@@ -333,6 +338,70 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
     # ═══════════════════════════════════════════
     # AGENT 6: Quality Reviewer
     # ═══════════════════════════════════════════
+    def _try_gemini_prompts(self, content_plan, brand_kit, content_types):
+        """Try to generate prompts via Gemini bot (vision-based).
+        Returns list of prompt dicts, or empty list if Gemini unavailable."""
+        try:
+            from modules.gemini_bot import GeminiBot
+
+            # Need a reference image for Gemini to see
+            # Get it from the pipeline job (stored in self or passed through)
+            ref_image = getattr(self, '_reference_image_path', None)
+            if not ref_image:
+                print("[Agent 3] No reference image for Gemini — skipping")
+                return []
+
+            bot = GeminiBot()
+            if not bot.connect():
+                print("[Agent 3] Gemini bot connection failed — falling back")
+                return []
+
+            try:
+                # Use the first content type for the prompt instruction
+                primary_type = content_types[0] if content_types else 'social_post'
+                total_images = len(content_plan)
+
+                raw_prompts = bot.generate_prompts(
+                    image_path=ref_image,
+                    content_type=primary_type,
+                    count=total_images,
+                    brand_name=brand_kit.name,
+                    product_category=brand_kit.product_category or '',
+                )
+
+                if not raw_prompts:
+                    print("[Agent 3] Gemini returned no prompts — falling back")
+                    return []
+
+                # Build prompt dicts matching pipeline format
+                prompts = []
+                for i, plan_item in enumerate(content_plan):
+                    # Cycle through Gemini prompts if fewer than plan items
+                    prompt_idx = i // 4  # Each prompt covers 4 images (one batch)
+                    prompt_text = raw_prompts[prompt_idx % len(raw_prompts)]
+
+                    prompts.append({
+                        'id': plan_item.get('id', i + 1),
+                        'prompt': prompt_text,
+                        'negative_prompt': '',
+                        'engine': 'flow',
+                        'width': plan_item.get('width', 1024),
+                        'height': plan_item.get('height', 1024),
+                    })
+
+                print(f"[Agent 3] Gemini prompts ready: {len(raw_prompts)} unique prompts for {len(prompts)} images")
+                return prompts
+
+            finally:
+                bot.close()
+
+        except ImportError:
+            print("[Agent 3] Gemini bot not available — falling back")
+            return []
+        except Exception as e:
+            print(f"[Agent 3] Gemini error: {e} — falling back")
+            return []
+
     def _craft_aplus_prompts_direct(self, content_plan, brand_analysis, brand_kit):
         """Build A+ prompts directly from expert templates.
         Generic prompts work best — Flow gets product details from reference image."""
