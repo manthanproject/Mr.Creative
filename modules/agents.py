@@ -201,11 +201,20 @@ Tone: {brand_kit.tone}
 Content types to include: {types_str}
 Total pieces needed: {target_count}
 
-Plan exactly {target_count} unique content pieces. ONLY use these content types: {types_str}. Do NOT create any other content types.
-Vary the aspect ratios and visual angles, but every piece MUST be one of the allowed types.
-A product reference image will be provided to the image generator for product-focused shots — use engine "flow" for these.
-Prioritize social posts and banners. Use "pollinations" engine for most pieces (it's fastest and free).
-Use "flow" only when product image reference is essential. Use "pomelli" for campaign-style creatives."""
+Plan exactly {target_count} unique content pieces. EVERY piece MUST be type "{types_str}". Do NOT create any other content types.
+If only ONE content type is selected, ALL {target_count} pieces must be that type — vary the visual angle, composition, and messaging but keep the type.
+
+CONTENT TYPE VISUAL GUIDE:
+- social_post: Lifestyle/editorial — person using product, candid moments, flat lays, real-world context. Casual, Instagram-ready.
+- banner: Hero product shot with text-safe negative space. Clean studio or controlled environment. For ads, website headers, promos.
+- a_plus: Amazon A+ style — product as hero on clean surface (marble, wood, white), multiple angles, ingredient close-ups, texture shots, comparison layouts. E-commerce optimized, informational. Every a_plus image MUST prominently feature the actual product.
+- lifestyle: Documentary-style real-world usage — morning routines, bathroom shelves, gym bags, office desks. Environmental storytelling.
+- ad_creative: Bold, eye-catching campaign shots — dynamic angles, dramatic lighting, high contrast. Designed to stop scrolling.
+
+ENGINE RULES:
+- Use "flow" for ALL images (product reference image will be provided).
+- Only use "pollinations" if NO reference image was uploaded.
+- Do NOT use "pomelli"."""
 
         print(f"[Agent 2] Content Strategist: Planning {target_count} pieces...")
         result = self._call_llm(system, user, temperature=0.7, max_tokens=4000)
