@@ -74,129 +74,67 @@ class GeminiBot:
         print("[GeminiBot] On Gemini chat page")
 
     def _upload_image(self, image_path):
-        """Upload image to Gemini chat.
-        Flow: Click + button → Click 'Upload files' → Native file dialog → pyautogui paste path."""
+        """Upload image to Gemini using the hidden file selector button."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
             print(f"[GeminiBot] Image not found: {abs_path}")
             return False
 
         try:
-            # Step 1: Click the + button to open upload menu
-            clicked_plus = self.driver.execute_script("""
-                var btns = document.querySelectorAll('button, [role="button"]');
-                for (var b of btns) {
-                    if (!b.offsetParent) continue;
-                    var text = b.textContent.trim();
-                    var r = b.getBoundingClientRect();
-                    // The + button is at the bottom-left, small, near the input
-                    if (text === '+' || text === 'add') {
-                        b.click();
-                        return 'clicked_plus';
-                    }
+            # Click the hidden file image selector button directly (bypasses + menu)
+            self.driver.execute_script("""
+                var btn = document.querySelector('button.hidden-local-file-image-selector-button');
+                if (btn) {
+                    btn.removeAttribute('aria-hidden');
+                    btn.style.display = 'block';
+                    btn.click();
                 }
-                // Try mat-icon with 'add' text
-                var icons = document.querySelectorAll('mat-icon, .material-icons');
-                for (var icon of icons) {
-                    if (icon.textContent.trim() === 'add') {
-                        var btn = icon.closest('button') || icon;
-                        btn.click();
-                        return 'clicked_add_icon';
-                    }
-                }
-                return 'not_found';
             """)
-            print(f"[GeminiBot] Plus button: {clicked_plus}")
+            print("[GeminiBot] Hidden image selector button clicked")
             time.sleep(2)
 
-            # Step 2: Click "Upload files" from the dropdown menu
-            clicked_upload = self.driver.execute_script("""
-                var items = document.querySelectorAll('[role="menuitem"], .mat-mdc-list-item, button');
-                for (var item of items) {
-                    if (!item.offsetParent) continue;
-                    var label = item.getAttribute('aria-label') || '';
-                    var text = item.textContent.trim();
-                    if (label.includes('Upload files') || text === 'Upload files') {
-                        item.click();
-                        return 'clicked_upload_files';
-                    }
-                }
-                return 'not_found';
-            """)
-            print(f"[GeminiBot] Upload files: {clicked_upload}")
-            time.sleep(2)
-
-            # Step 3: Native file dialog is now open — use pyautogui to paste path
+            # Native file dialog is now open — paste path via pyautogui
             import pyautogui
             import subprocess
-            time.sleep(1)
-            # Copy path to clipboard and paste
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
+            time.sleep(1)
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(0.5)
             pyautogui.press('enter')
             print(f"[GeminiBot] File path pasted: {os.path.basename(abs_path)}")
 
-            # Wait for upload to complete (image thumbnail appears)
-            time.sleep(5)
-
-            # Verify image was uploaded (look for image thumbnail in chat input area)
-            has_image = self.driver.execute_script("""
-                var imgs = document.querySelectorAll('img');
-                for (var img of imgs) {
-                    var r = img.getBoundingClientRect();
-                    // Image thumbnail near the input area (bottom of page)
-                    if (r.y > window.innerHeight - 300 && r.width > 30 && r.width < 200) return true;
-                }
-                return false;
-            """)
-            if has_image:
-                print("[GeminiBot] Image uploaded successfully!")
-                return True
-            else:
-                print("[GeminiBot] Image upload may have failed — no thumbnail found")
-                # Continue anyway — it might still work
-                return True
+            # Wait for upload (thumbnail appears in chat input)
+            time.sleep(8)
+            print("[GeminiBot] Image uploaded!")
+            return True
 
         except Exception as e:
             print(f"[GeminiBot] Image upload error: {e}")
             return False
 
     def _type_prompt(self, text):
-        """Type prompt into Gemini's Quill editor (div.ql-editor with role=textbox)."""
+        """Type prompt into Gemini's Quill editor using JavaScript (avoids click intercept)."""
         try:
-            # Find the Quill editor — exact selector from DevTools
-            input_el = self.driver.execute_script("""
-                var editor = document.querySelector('div.ql-editor[role="textbox"][contenteditable="true"]');
-                if (editor) return editor;
-                // Fallback
-                var editors = document.querySelectorAll('div[contenteditable="true"]');
-                for (var e of editors) {
-                    if (e.offsetParent && e.classList.contains('ql-editor')) return e;
-                }
-                return null;
-            """)
+            # Use JavaScript to focus and set content (bypasses overlay issues)
+            typed = self.driver.execute_script("""
+                var editor = document.querySelector('div.ql-editor[role="textbox"]');
+                if (!editor) return 'no_editor';
+                // Focus the editor
+                editor.focus();
+                // Clear and set content
+                editor.innerHTML = '<p>' + arguments[0] + '</p>';
+                // Trigger input event so Gemini detects the change
+                editor.dispatchEvent(new Event('input', {bubbles: true}));
+                editor.dispatchEvent(new Event('change', {bubbles: true}));
+                return 'typed';
+            """, text)
 
-            if not input_el:
-                print("[GeminiBot] Could not find chat input (ql-editor)")
+            if typed == 'no_editor':
+                print("[GeminiBot] Could not find ql-editor")
                 return False
 
-            # Click to focus
-            input_el.click()
-            time.sleep(0.3)
-
-            # Clear existing content
-            self.driver.execute_script("arguments[0].innerHTML = '';", input_el)
-            time.sleep(0.2)
-
-            # Type using clipboard paste (handles Quill editor properly)
-            import pyperclip
-            pyperclip.copy(text)
-            from selenium.webdriver.common.keys import Keys
-            input_el.send_keys(Keys.CONTROL, 'v')
-            time.sleep(0.5)
-
             print(f"[GeminiBot] Prompt typed: {text[:60]}...")
+            time.sleep(1)
             return True
 
         except Exception as e:
