@@ -85,39 +85,46 @@ class GeminiBot:
             pass
 
     def _upload_image(self, image_path):
-        """Upload image to Gemini using the hidden file selector button."""
+        """Upload image to Gemini — click hidden button to create file input, then send_keys."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
             print(f"[GeminiBot] Image not found: {abs_path}")
             return False
 
         try:
-            self._bring_chrome_to_front()
-
-            # Click the hidden file image selector button directly
+            # Click the hidden file image selector button — this creates a file input
             self.driver.execute_script("""
                 var btn = document.querySelector('button.hidden-local-file-image-selector-button');
                 if (btn) {
                     btn.removeAttribute('aria-hidden');
-                    btn.style.display = 'block';
                     btn.click();
                 }
             """)
             print("[GeminiBot] Hidden image selector button clicked")
-            time.sleep(3)
+            time.sleep(2)
 
-            # Native file dialog is open — paste path
+            # Now look for the file input that was created by the button click
+            file_inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+            if file_inputs:
+                # Use send_keys on file input (same as Flow bot — no native dialog needed)
+                file_input = file_inputs[-1]  # Use the last one (most recently created)
+                file_input.send_keys(abs_path)
+                print(f"[GeminiBot] Image sent via file input: {os.path.basename(abs_path)}")
+                time.sleep(5)
+                return True
+
+            # Fallback: try pyautogui for native file dialog (needs window focus)
+            print("[GeminiBot] No file input found — trying pyautogui for native dialog")
+            self._bring_chrome_to_front()
             import pyautogui
             import subprocess
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            pyautogui.hotkey('ctrl', 'v')
             time.sleep(1)
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.5)
             pyautogui.press('enter')
-            print(f"[GeminiBot] File path pasted: {os.path.basename(abs_path)}")
-
-            # Wait for upload
+            print(f"[GeminiBot] File path pasted via pyautogui: {os.path.basename(abs_path)}")
             time.sleep(8)
-            print("[GeminiBot] Image uploaded!")
             return True
 
         except Exception as e:
@@ -253,40 +260,43 @@ class GeminiBot:
         if not response_text:
             return []
 
+        # Debug: log raw response
+        print(f"[GeminiBot] Raw response (first 500 chars):\n{response_text[:500]}")
+
         prompts = []
         lines = response_text.strip().split('\n')
 
         current_prompt = ''
         for line in lines:
             line = line.strip()
+
+            # Empty line = prompt separator
             if not line:
                 if current_prompt and len(current_prompt) > 30:
                     prompts.append(current_prompt.strip())
                     current_prompt = ''
                 continue
 
-            # Skip headers, labels, numbering prefixes
-            cleaned = line
-            # Remove "Prompt 1:", "1.", "1)", etc.
-            for prefix in ['Prompt ', 'prompt ', 'PROMPT ']:
-                if cleaned.startswith(prefix):
-                    cleaned = cleaned[len(prefix):]
-                    # Remove number and colon
-                    if cleaned and cleaned[0].isdigit():
-                        i = 0
-                        while i < len(cleaned) and (cleaned[i].isdigit() or cleaned[i] in ':.)- '):
-                            i += 1
-                        cleaned = cleaned[i:].strip()
-                    break
+            # Strip markdown formatting
+            cleaned = line.replace('**', '').replace('*', '').replace('`', '')
 
-            if cleaned.startswith(('# ', '## ', '### ', '**Prompt', '---')):
+            # Remove numbered prefixes: "1.", "1)", "Prompt 1:", "- ", "• "
+            import re
+            cleaned = re.sub(r'^(?:Prompt\s*)?\d+[\.\)\:\-]\s*', '', cleaned).strip()
+            cleaned = re.sub(r'^[\-\•\*]\s+', '', cleaned).strip()
+
+            # Skip headers and meta-text
+            if cleaned.startswith(('# ', '## ', '### ', '---')):
                 if current_prompt and len(current_prompt) > 30:
                     prompts.append(current_prompt.strip())
                     current_prompt = ''
                 continue
 
-            # Remove markdown bold/italic
-            cleaned = cleaned.replace('**', '').replace('*', '').replace('`', '')
+            # Skip obvious non-prompt lines
+            skip_starts = ('Here are', 'Sure,', 'Sure!', 'I\'ll', 'These are', 'Note:', 'Remember',
+                          'Each prompt', 'Below are', 'Let me', 'Okay', 'I\'ve', 'The following')
+            if any(cleaned.startswith(s) for s in skip_starts):
+                continue
 
             if cleaned:
                 if current_prompt:
@@ -298,14 +308,16 @@ class GeminiBot:
         if current_prompt and len(current_prompt) > 30:
             prompts.append(current_prompt.strip())
 
-        # Filter out non-prompt text (too short or looks like instructions)
-        prompts = [p for p in prompts if len(p) > 50 and not p.startswith(('Here', 'Sure', 'I\'ll', 'These', 'Note', 'Remember', 'Each'))]
+        # Filter: only keep prompts that look like image generation prompts (> 40 chars)
+        prompts = [p for p in prompts if len(p) > 40]
 
         # Trim to expected count
         if len(prompts) > expected_count:
             prompts = prompts[:expected_count]
 
         print(f"[GeminiBot] Parsed {len(prompts)} prompts from response")
+        for i, p in enumerate(prompts):
+            print(f"  Prompt {i+1}: {p[:80]}...")
         return prompts
 
     # ═══════════════════════════════════════════
