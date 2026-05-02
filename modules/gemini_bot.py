@@ -73,6 +73,17 @@ class GeminiBot:
             time.sleep(3)
         print("[GeminiBot] On Gemini chat page")
 
+    def _bring_chrome_to_front(self):
+        """Bring Chrome window to foreground before pyautogui actions."""
+        try:
+            self.driver.switch_to.window(self.driver.current_window_handle)
+            time.sleep(0.3)
+            # Also maximize to ensure it's visible
+            self.driver.execute_script("window.focus();")
+            time.sleep(0.3)
+        except Exception:
+            pass
+
     def _upload_image(self, image_path):
         """Upload image to Gemini using the hidden file selector button."""
         abs_path = os.path.abspath(image_path)
@@ -81,7 +92,9 @@ class GeminiBot:
             return False
 
         try:
-            # Click the hidden file image selector button directly (bypasses + menu)
+            self._bring_chrome_to_front()
+
+            # Click the hidden file image selector button directly
             self.driver.execute_script("""
                 var btn = document.querySelector('button.hidden-local-file-image-selector-button');
                 if (btn) {
@@ -91,19 +104,18 @@ class GeminiBot:
                 }
             """)
             print("[GeminiBot] Hidden image selector button clicked")
-            time.sleep(2)
+            time.sleep(3)
 
-            # Native file dialog is now open — paste path via pyautogui
+            # Native file dialog is open — paste path
             import pyautogui
             import subprocess
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            time.sleep(1)
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.5)
+            time.sleep(1)
             pyautogui.press('enter')
             print(f"[GeminiBot] File path pasted: {os.path.basename(abs_path)}")
 
-            # Wait for upload (thumbnail appears in chat input)
+            # Wait for upload
             time.sleep(8)
             print("[GeminiBot] Image uploaded!")
             return True
@@ -113,31 +125,21 @@ class GeminiBot:
             return False
 
     def _type_prompt(self, text):
-        """Type prompt into Gemini's Quill editor using JS focus + clipboard paste."""
+        """Type prompt into Gemini's Quill editor."""
         try:
-            # Focus the editor via JavaScript (avoids click intercept)
-            focused = self.driver.execute_script("""
+            self._bring_chrome_to_front()
+
+            # Focus the editor via JavaScript
+            self.driver.execute_script("""
                 var editor = document.querySelector('div.ql-editor[role="textbox"]');
-                if (!editor) return 'no_editor';
-                editor.focus();
-                // Select all existing content and delete it
-                var sel = window.getSelection();
-                sel.selectAllChildren(editor);
-                return 'focused';
+                if (editor) { editor.focus(); }
             """)
+            time.sleep(0.5)
 
-            if focused == 'no_editor':
-                print("[GeminiBot] Could not find ql-editor")
-                return False
-
-            time.sleep(0.3)
-
-            # Paste text via clipboard (bypasses TrustedHTML restriction)
+            # Paste text via clipboard + pyautogui
             import pyperclip
-            pyperclip.copy(text)
-
-            # Use pyautogui for Ctrl+V since Selenium send_keys may also get intercepted
             import pyautogui
+            pyperclip.copy(text)
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(1)
 
