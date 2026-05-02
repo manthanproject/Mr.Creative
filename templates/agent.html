@@ -486,6 +486,12 @@ async function launchAgent() {
     var btn = document.getElementById('launchBtn');
     btn.disabled = true;
     btn.textContent = '⏳ Launching...';
+    document.getElementById('postActions').style.display = 'none';
+    document.getElementById('jobControls').style.display = 'flex';
+    document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('pauseBtn').textContent = '⏸ Pause';
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('stopBtn').textContent = '⏹ Stop';
 
     try {
         var res = await fetch('/agent/launch', {
