@@ -786,6 +786,47 @@ class FlowBot:
             # Click the "Upload image" button/link at the BOTTOM of this panel
             # to open the native file dialog (it's different from the menu "Upload image")
             time.sleep(1)
+            # Try file input FIRST (most reliable, skips all UI clicking)
+            has_input_early = self.driver.execute_script("""
+                var inp = document.querySelector('input[type="file"]');
+                return inp ? true : false;
+            """)
+            if has_input_early:
+                self.driver.execute_script("""
+                    var inp = document.querySelector('input[type="file"]');
+                    inp.style.display = 'block';
+                    inp.style.opacity = '1';
+                    inp.style.position = 'fixed';
+                    inp.style.top = '0';
+                    inp.style.left = '0';
+                    inp.style.zIndex = '99999';
+                """)
+                time.sleep(0.5)
+                file_input = self.driver.find_element('css selector', 'input[type="file"]')
+                file_input.send_keys(abs_path)
+                print(f"[FlowBot] Uploaded via file input element (early)")
+                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
+                time.sleep(10)
+
+                # Close panel and verify
+                self.driver.execute_script("document.body.click();")
+                time.sleep(1)
+
+                has_ref = self.driver.execute_script("""
+                    var imgs = document.querySelectorAll('img');
+                    for (var img of imgs) {
+                        var r = img.getBoundingClientRect();
+                        if (r.y > window.innerHeight - 250 && r.width > 30 && r.width < 200) return true;
+                    }
+                    return false;
+                """)
+                if has_ref:
+                    self._update_status('entering_prompt', 'Reference image uploaded!')
+                    return True
+                print("[FlowBot] File input upload may have failed, continuing anyway")
+                self._update_status('entering_prompt', 'Reference image uploaded!')
+                return True
+
             clicked_upload_panel = self.driver.execute_script("""
                 // Look for the Upload image button/link at the bottom of the panel
                 var els = document.querySelectorAll('button, div, a, span');

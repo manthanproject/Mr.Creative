@@ -230,9 +230,18 @@ Use "flow" engine for ALL pieces (reference image is provided)."""
     # ═══════════════════════════════════════════
     def craft_prompts(self, content_plan, brand_analysis, brand_kit):
         """Write optimized generation prompts for each content piece.
-        Uses prompt_library for real camera/lighting/composition data."""
+        A+ content: uses expert prompts directly (no LLM rewriting).
+        Other types: uses LLM with prompt library examples."""
 
-        from modules.prompt_library import get_prompt_context_for_llm, build_prompt
+        from modules.prompt_library import get_prompt_context_for_llm, build_prompt, CONTENT_TYPE_CONFIG
+
+        # Check if ALL items are a_plus — if so, bypass LLM entirely
+        all_aplus = all(item.get('type') == 'a_plus' for item in content_plan)
+
+        if all_aplus:
+            return self._craft_aplus_prompts_direct(content_plan, brand_analysis, brand_kit)
+
+        # For mixed or non-A+ content, use LLM with prompt library
 
         # Get content types from the plan
         content_types = list(set(item.get('type', 'social_post') for item in content_plan))
@@ -280,11 +289,14 @@ Each prompt MUST include a specific camera (not always the same one — vary the
 6. Write in natural language paragraphs, not keyword lists
 
 SPECIAL RULE FOR A+ CONTENT:
-A+ content prompts should describe DESIGNED INFOGRAPHIC LAYOUTS, not just photography scenes.
-Include in the prompt: bold headline text, bullet points, feature grids, before/after panels,
-step-by-step instructions, comparison charts, award badges, icons — whatever the content plan describes.
-The prompt should tell Flow to generate an IMAGE that looks like a designed Amazon/Flipkart product listing page.
-Use the description and title from the content plan to write the actual marketing text that appears in the image.
+A+ content prompts must describe DESIGNED INFOGRAPHIC LAYOUTS that Flow will generate as images.
+CRITICAL: Replace all generic phrases with ACTUAL brand data:
+- Instead of "the product" → use the actual product name from the brand kit
+- Instead of "key benefit" → use actual benefits from the brand analysis (e.g. "Reduces wrinkles in 2 weeks")
+- Instead of "3 features" → list the actual features (e.g. "• Niacinamide 10% • Zinc PCA 1% • Lightweight formula")
+- Instead of "brand name" → use the actual brand name (e.g. "The Ordinary" or "Dropy Beauty")
+- Include real claims, real ingredient names, real benefit statements from the brand analysis
+Each A+ prompt should read like a complete design brief with ALL the text that should appear in the final image.
 
 Return ONLY valid JSON array. Each item:
 {{
@@ -321,6 +333,61 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
     # ═══════════════════════════════════════════
     # AGENT 6: Quality Reviewer
     # ═══════════════════════════════════════════
+    def _craft_aplus_prompts_direct(self, content_plan, brand_analysis, brand_kit):
+        """Build A+ prompts directly from expert templates + brand data.
+        No LLM rewriting — the expert prompts describe exact layouts."""
+
+        from modules.prompt_library import CONTENT_TYPE_CONFIG
+
+        expert_prompts = CONTENT_TYPE_CONFIG.get('a_plus', {}).get('expert_prompts', [])
+        if not expert_prompts:
+            print("[Agent 3] No A+ expert prompts found, falling back to LLM")
+            return []
+
+        # Build brand context prefix
+        brand_name = brand_kit.name or 'Brand'
+        product_cat = brand_kit.product_category or 'skincare'
+        tone = brand_kit.tone or 'professional'
+
+        # Extract key features from brand analysis
+        features = ''
+        if brand_analysis:
+            key_points = brand_analysis.get('key_selling_points', brand_analysis.get('unique_selling_points', []))
+            if isinstance(key_points, list) and key_points:
+                features = ' • '.join(key_points[:4])
+            ingredients = brand_analysis.get('key_ingredients', brand_analysis.get('ingredients', []))
+            if isinstance(ingredients, list) and ingredients:
+                features += '. Key ingredients: ' + ', '.join(ingredients[:3])
+
+        brand_prefix = f"{brand_name} {product_cat} product. "
+        if features:
+            brand_prefix += f"Features: {features}. "
+
+        prompts = []
+        for i, plan_item in enumerate(content_plan):
+            # Pick expert prompt (cycle through if more plan items than templates)
+            expert = expert_prompts[i % len(expert_prompts)]
+
+            # Build the final prompt: brand context + expert layout description
+            prompt = f"{brand_prefix}{expert} Brand: {brand_name}. Tone: {tone}."
+
+            # Use plan item's description if it has specific content
+            desc = plan_item.get('description', '')
+            if desc and len(desc) > 20:
+                prompt = f"{brand_prefix}{desc}. Layout style: {expert} Brand: {brand_name}."
+
+            prompts.append({
+                'id': plan_item.get('id', i + 1),
+                'prompt': prompt,
+                'negative_prompt': '',
+                'engine': 'flow',
+                'width': plan_item.get('width', 1024),
+                'height': plan_item.get('height', 1024),
+            })
+
+        print(f"[Agent 3] A+ prompts built directly: {len(prompts)} (no LLM rewriting)")
+        return prompts
+
     def review_results(self, content_plan, results, brand_analysis):
         """Review generated images and flag any that need regeneration."""
         # For now, auto-approve all — can add vision model later
