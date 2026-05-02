@@ -113,28 +113,35 @@ class GeminiBot:
             return False
 
     def _type_prompt(self, text):
-        """Type prompt into Gemini's Quill editor using JavaScript (avoids click intercept)."""
+        """Type prompt into Gemini's Quill editor using JS focus + clipboard paste."""
         try:
-            # Use JavaScript to focus and set content (bypasses overlay issues)
-            typed = self.driver.execute_script("""
+            # Focus the editor via JavaScript (avoids click intercept)
+            focused = self.driver.execute_script("""
                 var editor = document.querySelector('div.ql-editor[role="textbox"]');
                 if (!editor) return 'no_editor';
-                // Focus the editor
                 editor.focus();
-                // Clear and set content
-                editor.innerHTML = '<p>' + arguments[0] + '</p>';
-                // Trigger input event so Gemini detects the change
-                editor.dispatchEvent(new Event('input', {bubbles: true}));
-                editor.dispatchEvent(new Event('change', {bubbles: true}));
-                return 'typed';
-            """, text)
+                // Select all existing content and delete it
+                var sel = window.getSelection();
+                sel.selectAllChildren(editor);
+                return 'focused';
+            """)
 
-            if typed == 'no_editor':
+            if focused == 'no_editor':
                 print("[GeminiBot] Could not find ql-editor")
                 return False
 
-            print(f"[GeminiBot] Prompt typed: {text[:60]}...")
+            time.sleep(0.3)
+
+            # Paste text via clipboard (bypasses TrustedHTML restriction)
+            import pyperclip
+            pyperclip.copy(text)
+
+            # Use pyautogui for Ctrl+V since Selenium send_keys may also get intercepted
+            import pyautogui
+            pyautogui.hotkey('ctrl', 'v')
             time.sleep(1)
+
+            print(f"[GeminiBot] Prompt typed: {text[:60]}...")
             return True
 
         except Exception as e:
