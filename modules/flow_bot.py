@@ -567,14 +567,20 @@ class FlowBot:
             self._update_status('downloading', 'Download button not found!')
             return
         print(f"[FlowBot] ✓ Download button clicked")
-        time.sleep(2)
+        time.sleep(3)  # Wait for dropdown menu to fully render
 
-        # Try 2K Upscaled — if not available, standard download already started
-        clicked_2k = self._js_click("""
+        # Retry loop — dropdown may take time to appear
+        clicked_2k = None
+        for attempt in range(5):
+            clicked_2k = self._js_click("""
             var btns = document.querySelectorAll('button');
             for (var b of btns) { if (b.offsetParent && b.textContent.includes('2K') && b.textContent.includes('Upscaled')) return b; }
             return null;
         """)
+            if clicked_2k:
+                print(f"[FlowBot] 2K option found on attempt {attempt + 1}")
+                break
+            time.sleep(1)
         if clicked_2k:
             self._update_status('downloading', 'Downloading 2K image...')
         else:
