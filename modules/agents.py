@@ -201,20 +201,11 @@ Tone: {brand_kit.tone}
 Content types to include: {types_str}
 Total pieces needed: {target_count}
 
-Plan exactly {target_count} unique content pieces. EVERY piece MUST be type "{types_str}". Do NOT create any other content types.
-If only ONE content type is selected, ALL {target_count} pieces must be that type — vary the visual angle, composition, and messaging but keep the type.
-
-CONTENT TYPE VISUAL GUIDE:
-- social_post: Lifestyle/editorial — person using product, candid moments, flat lays, real-world context. Casual, Instagram-ready.
-- banner: Hero product shot with text-safe negative space. Clean studio or controlled environment. For ads, website headers, promos.
-- a_plus: Amazon A+ style — product as hero on clean surface (marble, wood, white), multiple angles, ingredient close-ups, texture shots, comparison layouts. E-commerce optimized, informational. Every a_plus image MUST prominently feature the actual product.
-- lifestyle: Documentary-style real-world usage — morning routines, bathroom shelves, gym bags, office desks. Environmental storytelling.
-- ad_creative: Bold, eye-catching campaign shots — dynamic angles, dramatic lighting, high contrast. Designed to stop scrolling.
-
-ENGINE RULES:
-- Use "flow" for ALL images (product reference image will be provided).
-- Only use "pollinations" if NO reference image was uploaded.
-- Do NOT use "pomelli"."""
+Plan exactly {target_count} unique content pieces. ONLY use these content types: {types_str}. Do NOT create any other content types.
+Vary the aspect ratios and visual angles, but every piece MUST be one of the allowed types.
+A product reference image will be provided to the image generator for product-focused shots — use engine "flow" for these.
+Prioritize social posts and banners. Use "pollinations" engine for most pieces (it's fastest and free).
+Use "flow" only when product image reference is essential. Use "pomelli" for campaign-style creatives."""
 
         print(f"[Agent 2] Content Strategist: Planning {target_count} pieces...")
         result = self._call_llm(system, user, temperature=0.7, max_tokens=4000)
@@ -224,129 +215,71 @@ ENGINE RULES:
         return parsed or []
 
     # ═══════════════════════════════════════════
-    # PROMPT TEMPLATE LIBRARY
-    # ═══════════════════════════════════════════
-
-    # Per-content-type prompt templates with photography direction
-    PROMPT_TEMPLATES = {
-        'social_post': {
-            'style': 'lifestyle editorial',
-            'direction': 'Candid, in-context product usage. Real person or hands interacting with product. '
-                         'Natural environment — bathroom counter, vanity mirror, kitchen shelf. '
-                         'Soft natural lighting from nearby window. Slight film grain, warm tones.',
-            'camera': 'Canon EOS R5, 35mm f/1.8, natural light, shallow depth of field',
-            'examples': [
-                'Hands applying moisturizer at a bathroom vanity, morning sunlight through frosted window, toothbrush holder and small plant in background, candid lifestyle photography, slight lens flare',
-                'Flat lay on linen bedsheet — skincare bottles, coffee cup, reading glasses, morning routine, overhead shot, soft diffused light, editorial Instagram style',
-            ],
-        },
-        'banner': {
-            'style': 'hero product photography',
-            'direction': 'Clean, text-safe composition with product as hero. Generous negative space on one side for text overlay. '
-                         'Studio or controlled lighting. Premium surface (marble, wood, brushed metal). '
-                         'Minimal props that complement but don\'t distract.',
-            'camera': 'Phase One IQ4, 80mm f/2.8, studio strobes with softbox, clean white/neutral backdrop',
-            'examples': [
-                'Product bottle centered on polished concrete surface, single eucalyptus branch, studio lighting with soft gradient background, clean negative space on right side for text, commercial product photography',
-                'Premium serum bottle on raw oak shelf, blurred bathroom tiles in background, warm key light from left, editorial banner composition with text-safe zone at top',
-            ],
-        },
-        'a_plus': {
-            'style': 'Amazon A+ / product page infographic',
-            'direction': 'Product cutout on clean background OR product in use with callout-friendly composition. '
-                         'Show texture, ingredients, or key features clearly. Multiple angles welcome. '
-                         'Clean, informational, e-commerce optimized.',
-            'camera': 'Sony A7R V, 90mm macro f/2.8, ring light + fill, white sweep background',
-            'examples': [
-                'Product bottle at 3/4 angle on white background, clean product photography, visible texture and label details, e-commerce listing style, even studio lighting',
-                'Close-up product texture being applied to skin, macro photography showing cream consistency, natural skin texture visible, informational beauty photography',
-            ],
-        },
-        'lifestyle': {
-            'style': 'editorial lifestyle photography',
-            'direction': 'Real-world scene telling a story. Person using product in daily routine. '
-                         'Environmental context — home, gym, office, outdoors. Authentic moment, not posed. '
-                         'Documentary-style candidness. Natural imperfections in the scene.',
-            'camera': 'Fujifilm X-T5, 23mm f/1.4, available light, documentary style',
-            'examples': [
-                'Woman doing evening skincare routine in warmly lit bathroom, cotton towel on shoulder, small succulents on shelf, reflection in mirror, warm ambient light, candid documentary style',
-                'Morning kitchen scene, person with coffee holding product, sunlight streaming through blinds casting shadows, lived-in kitchen details, editorial lifestyle for wellness brand',
-            ],
-        },
-        'ad_creative': {
-            'style': 'campaign creative / performance ad',
-            'direction': 'Bold, eye-catching composition designed to stop scrolling. High contrast, dynamic angles. '
-                         'Product prominent with aspirational context. Action-oriented scene. '
-                         'Designed for Meta/Google ads with clear focal point.',
-            'camera': 'Canon R5, 24-70mm f/2.8, dramatic lighting, high contrast grade',
-            'examples': [
-                'Dynamic product splash shot — serum bottle with water droplets frozen mid-air, dark moody background, single dramatic spotlight, premium cosmetics advertising',
-                'Bold overhead shot of product arrangement in brand colors, geometric composition, strong shadows from directional lighting, social media ad creative style',
-            ],
-        },
-    }
-
-    # ═══════════════════════════════════════════
-    # AGENT 3: Prompt Crafter
+    # AGENT 3: Prompt Crafter (uses modules/prompt_library.py)
     # ═══════════════════════════════════════════
     def craft_prompts(self, content_plan, brand_analysis, brand_kit):
         """Write optimized generation prompts for each content piece.
-        Uses per-content-type template library for realistic, anti-AI prompts."""
+        Uses prompt_library for real camera/lighting/composition data."""
 
-        # Build template reference for the LLM
-        template_ref = []
-        for ctype, tmpl in self.PROMPT_TEMPLATES.items():
-            template_ref.append(
-                f'### {ctype}\n'
-                f'Style: {tmpl["style"]}\n'
-                f'Direction: {tmpl["direction"]}\n'
-                f'Camera: {tmpl["camera"]}\n'
-                f'Example prompts:\n- ' + '\n- '.join(tmpl["examples"])
-            )
-        templates_text = '\n\n'.join(template_ref)
+        from modules.prompt_library import get_prompt_context_for_llm, build_prompt
 
-        system = f"""You are an expert AI image prompt engineer who creates prompts that produce REALISTIC, NON-AI-LOOKING images.
+        # Get content types from the plan
+        content_types = list(set(item.get('type', 'social_post') for item in content_plan))
+        library_context = get_prompt_context_for_llm(content_types)
 
-BANNED WORDS — NEVER use any of these (they trigger the "AI art" look):
+        # Build example prompts from library for each type
+        examples = []
+        for ctype in content_types:
+            example = build_prompt(ctype, {
+                'name': brand_kit.name,
+                'product_category': brand_kit.product_category,
+                'tone': brand_kit.tone,
+            }, index=0)
+            examples.append(f"### Example {ctype} prompt:\n{example['prompt']}\n(Camera: {example['camera']}, Lighting: {example['lighting']})")
+
+        examples_text = '\n\n'.join(examples)
+
+        system = f"""You are an expert FLUX image prompt engineer. FLUX uses natural language paragraphs — NOT comma-separated keyword lists.
+
+FLUX PROMPT STRUCTURE: Subject + Action + Style + Context
+Write each prompt as a dense, descriptive paragraph like a professional photography brief.
+
+BANNED WORDS — NEVER use (they trigger the AI art look):
 hyper-realistic, ultra-realistic, 8k, ultra HD, unreal engine, octane render, masterpiece,
 highly detailed, best quality, super resolution, trending on artstation, concept art,
-digital painting, CGI, 3D render, photorealistic (use "real photography" instead)
+digital painting, CGI, 3D render, photorealistic
 
-REQUIRED LANGUAGE — use these instead:
-"editorial photography", "shot on [specific camera]", "natural lighting", "magazine quality",
-"commercial product photo", "candid moment", "slight film grain", "available light",
-"shallow depth of field", "[specific mm] lens", "studio strobes/softbox"
+REQUIRED: Use real camera+lens specs, real lighting setups, and real composition rules from the options below.
+Each prompt MUST include a specific camera (not always the same one — vary them!).
 
-REAL SCENE RULE: Describe a scene a real photographer would set up. Include:
-- Specific surface/backdrop (marble slab, oak shelf, linen cloth, bathroom counter)
-- Props that make sense (eucalyptus, coffee cup, towel, plant)
-- Lighting setup (window light direction, softbox position, golden hour)
-- Camera + lens (Canon R5, Sony A7R, Fuji X-T5, specific focal length + aperture)
-- Subtle imperfections (slight shadow, ambient reflections, natural grain)
+═══ PROMPT LIBRARY — PICK FROM THESE FOR EACH CONTENT TYPE ═══
 
-═══ PROMPT TEMPLATES BY CONTENT TYPE ═══
+{library_context}
 
-{templates_text}
+═══ EXAMPLE PROMPTS (for reference style — make yours unique) ═══
 
-═══ ENGINE RULES ═══
-- "flow": Direct, descriptive product prompts. Reference image will be provided — describe the SCENE around the product.
-- "pollinations": Cinematic scene prompts with full environmental detail + camera specs.
-- "pomelli": Campaign brief style with brand grounding.
+{examples_text}
+
+═══ RULES ═══
+1. Each prompt must read like a professional photography brief — a real scene a photographer would set up
+2. VARY the camera, lighting, and composition across prompts — never repeat the same combo
+3. Include specific surfaces, props, and environmental details that make the scene believable
+4. Add subtle imperfections: "slight film grain", "ambient reflections", "natural shadow"
+5. For Flow engine: describe the SCENE around the product (reference image provides the product)
+6. Write in natural language paragraphs, not keyword lists
 
 Return ONLY valid JSON array. Each item:
 {{
     "id": 1,
-    "prompt": "the full generation prompt incorporating the template style",
-    "negative_prompt": "what to avoid (for pollinations only — include: cartoon, illustration, 3D render, CGI, anime, painting, drawing, sketch, artificial, plastic, overexposed)",
-    "engine": "pollinations|flow|pomelli",
+    "prompt": "the full FLUX-optimized generation prompt as a natural language paragraph",
+    "negative_prompt": "",
+    "engine": "flow",
     "width": 1024,
     "height": 1024
 }}"""
 
         user = f"""Brand: {brand_kit.name}
 Colors: Primary={brand_kit.primary_color}, Secondary={brand_kit.secondary_color}, Accent={brand_kit.accent_color}
-Fonts: {brand_kit.heading_font} / {brand_kit.body_font}
-Style: {brand_kit.font_style}
 Tone: {brand_kit.tone}
 Product category: {brand_kit.product_category or 'General'}
 Brand analysis: {json.dumps(brand_analysis, indent=2)}
@@ -354,9 +287,13 @@ Brand analysis: {json.dumps(brand_analysis, indent=2)}
 Content plan to write prompts for:
 {json.dumps(content_plan, indent=2)}
 
-Write one optimized prompt per content piece. FOLLOW the template for each content type — use the style, camera specs, and direction from the matching template above. Each prompt must feel like a real photography brief, NOT an AI art prompt."""
+Write one FLUX-optimized prompt per content piece. Each prompt must:
+- Use a DIFFERENT camera+lens from the library (vary across prompts)
+- Use a DIFFERENT lighting setup from the library
+- Describe a unique, specific scene with real-world details
+- Sound like a production brief, not AI art keywords"""
 
-        print(f"[Agent 3] Prompt Crafter: Writing {len(content_plan)} prompts with template library...")
+        print(f"[Agent 3] Prompt Crafter: Writing {len(content_plan)} prompts with prompt library ({len(content_types)} types)...")
         result = self._call_llm(system, user, temperature=0.8, max_tokens=4000)
         parsed = self._parse_json(result)
         if parsed and isinstance(parsed, list):
