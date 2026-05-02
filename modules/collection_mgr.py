@@ -157,12 +157,15 @@ def get_collection_files(collection_id, output_folder):
     if not os.path.exists(col_dir):
         return files
 
-    for f in sorted(os.listdir(col_dir), reverse=True):
-        fp = os.path.join(col_dir, f)
-        if os.path.isfile(fp):
+    for root, dirs, filenames in os.walk(col_dir):
+        for f in sorted(filenames, reverse=True):
+            fp = os.path.join(root, f)
+            # Path relative to static/ to keep outputs/collection_xxx/ prefix
+            static_dir = os.path.dirname(os.path.dirname(col_dir))
+            rel = os.path.relpath(fp, static_dir).replace(os.sep, '/')
             files.append({
                 'filename': f,
-                'path': f'outputs/collection_{collection_id}/{f}',
+                'path': rel,
                 'file_type': get_file_type(f),
                 'file_size': os.path.getsize(fp),
                 'modified': datetime.fromtimestamp(os.path.getmtime(fp)),
