@@ -737,6 +737,27 @@ class FlowBot:
             self._update_status('entering_prompt', f'Plus button: {clicked}')
             time.sleep(2)
 
+            # Check for file input RIGHT AFTER + button (before clicking anything else)
+            has_input_after_plus = self.driver.execute_script("""
+                var inp = document.querySelector('input[type="file"]');
+                return inp ? true : false;
+            """)
+            if has_input_after_plus:
+                self.driver.execute_script("""
+                    var inp = document.querySelector('input[type="file"]');
+                    inp.style.display = 'block';
+                """)
+                time.sleep(0.5)
+                file_input = self.driver.find_element('css selector', 'input[type="file"]')
+                file_input.send_keys(abs_path)
+                print(f"[FlowBot] Uploaded via file input (after + button)")
+                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
+                time.sleep(10)
+                self.driver.execute_script("document.body.click();")
+                time.sleep(1)
+                self._update_status('entering_prompt', 'Reference image uploaded!')
+                return True
+
             # Step 2: Click "Upload image" option (div with class containing sc-f4d15a74)
             clicked = self.driver.execute_script("""
                 var els = document.querySelectorAll('div[class*="sc-f4d15a74"]');
