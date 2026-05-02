@@ -69,6 +69,27 @@ ALL_MOOD = _flatten_grouped(_MOOD)
 # ═══════════════════════════════════════════════
 
 CONTENT_TYPE_CONFIG = {
+    'a_plus': {
+        'description': 'Amazon A+ style e-commerce product photography',
+        'preferred_cameras': ['Hasselblad', 'Phase One', 'Sony', 'Canon'],
+        'preferred_lighting': ['Studio Lighting'],
+        'preferred_composition': ['Special Purpose', 'Spatial Techniques'],
+        'preferred_mood': ['Visual Aesthetics'],
+        'photo_types': ['front view', 'close-up detail', 'macro view', 'overhead shot', 'three-quarter view', 'hero shot'],
+        'surfaces': [],
+        'scenarios': [],
+        'prompt_template': '{scenario}',
+        'expert_prompts': [
+            'A pristine studio macro shot of the product standing perfectly upright and centered against a seamless pure white acrylic background. Photographed with a Phase One XF IQ4 and a 120mm macro lens at f/11, the image captures razor-sharp details of the label, text, and cap. Two large studio softboxes are angled at 45 degrees to provide even, shadowless illumination, ensuring the clinical aesthetic is flawless, readable, and perfectly isolated.',
+            'Two identical product bottles arranged together on a stark white infinity cove, with one bottle facing directly forward and the other angled at exactly 45 degrees. Captured using a Hasselblad H6D-100c with an 80mm lens at f/8, the depth of field keeps both labels perfectly in focus to show the front and side profile. A large overhead softbox and white bounce cards fill all shadows, emphasizing the clean lines and translucent glass of the bottles.',
+            'A close-up, high-resolution shot of a hand gently squeezing the glass dropper of the product, dispensing a single, thick, clear drop of liquid. Shot on a Canon EOS R5 with a 100mm f/2.8L Macro lens at f/5.6 against a soft, clinical light-grey background. A ring light illuminates the scene, catching the perfect specular highlight in the falling serum drop while keeping the brand label on the partially visible bottle incredibly sharp and legible.',
+            'The product sits majestically in the center of a clean, white marble slab, surrounded by artistic, stylized representations of its key ingredients: natural powders and pure water droplets. Captured with a Sony A7RV and a 90mm Macro lens at f/8, the composition uses the rule of thirds to balance the product with the raw ingredients. Diffused window-style lighting from the left creates soft, natural shadows that give texture to the ingredients while keeping the product label the clear hero.',
+            'A conceptual studio shot of the product resting on a surface perfectly divided down the middle, half matte rough stone and half polished, ultra-smooth white glass. Photographed with a Fujifilm GFX 100S and a 110mm f/2 lens at f/8, symbolizing a transformation. Directional spotlighting sweeps across the frame from the right, highlighting the smooth side while casting deep, moody shadows on the rough side to emphasize contrast.',
+            'The product stands slightly overlapping its minimalist white cardboard packaging box on a light grey concrete surface. Shot with a Leica SL2 and a 50mm Summilux lens at f/8, ensuring both the bottle and the box text are razor-sharp. Even studio lighting with a large parabolic umbrella ensures the matte finish of the box and the slight gloss of the label are accurately represented without harsh glare.',
+            'A perfectly manicured hand delicately holds the product against a soft beige studio backdrop, clearly illustrating the product actual size. Captured on a Canon EOS R5 with an 85mm f/1.2 lens stepped down to f/5.6, keeping the hand and the label in sharp focus. Soft, wrap-around clamshell lighting provides a flattering glow on the hand while eliminating reflections on the glass, making the brand name pop.',
+            'An extreme macro shot focusing on a pool of clear, viscous serum resting on a pristine white acrylic surface, with the base of the product bottle blurred slightly in the background. Photographed using a Phase One XF IQ4 with a 120mm macro lens at f/16 to capture the microscopic bubbles and gel-like consistency of the liquid. A hard pinpoint rim light creates a glowing, luminous effect within the serum droplet, emphasizing its lightweight yet hydrating texture.',
+        ],
+    },
     'social_post': {
         'description': 'Lifestyle editorial for social media',
         'preferred_cameras': ['Canon', 'Fujifilm', 'Sony'],
@@ -76,31 +97,19 @@ CONTENT_TYPE_CONFIG = {
         'preferred_composition': ['Classic Rules', 'Leading & Framing'],
         'preferred_mood': ['Emotional Tones', 'Visual Aesthetics'],
         'photo_types': ['close-up detail', 'three-quarter view', 'overhead shot', 'front view', 'soft focus'],
-        'surfaces': [
-            'bathroom vanity with morning light',
-            'linen bedsheet flat lay',
-            'marble countertop near a window',
-            'wooden shelf with small plant',
-            'coffee table with magazine',
-            'kitchen counter with fresh ingredients',
-            'vanity mirror with warm lighting',
-            'bedside table with soft lamp glow',
+        'surfaces': [],
+        'scenarios': [],
+        'prompt_template': '{scenario}',
+        'expert_prompts': [
+            'A candid, aesthetically pleasing shot of the product resting on a terrazzo bathroom vanity next to a minimalist ceramic toothbrush holder. Captured with a Sony A7IV and a 35mm f/1.4 lens at f/2.8, creating a soft, creamy background blur that keeps the environment contextual but the product in sharp focus. Natural morning light filters through a frosted bathroom window, casting soft, inviting highlights on the label and glass bottle.',
+            'A top-down flat lay composition featuring the product as the focal point, surrounded by a minimalist cup of black coffee, an open neutral-toned journal, and a pair of chic tortoiseshell glasses. Photographed with a Canon EOS R6 and a 50mm lens at f/5.6 to ensure edge-to-edge sharpness across the items lying on clean white bedsheets. Soft, diffused daylight from a nearby window creates gentle, natural shadows that give depth to the lifestyle scene.',
+            'The product stands proudly on a wooden windowsill, bathed in warm, directional morning sunlight that casts long, dramatic shadows. Shot on a Fujifilm X-T5 with a 23mm f/1.4 lens at f/4, the golden hour light creates a bright, optimistic mood perfect for a morning skincare routine post. The bottle label is perfectly exposed and readable, contrasting beautifully against the warm tones of the wood and the bright glow of the sunrise.',
+            'A trendy shelfie featuring the product front and center on a floating acrylic bathroom shelf, flanked slightly out of focus by other minimalist beauty products. Captured using a Leica Q3 with its fixed 28mm lens at f/2.8, framing the product as the hero while providing aspirational bathroom context. Soft, warm overhead bathroom lighting mixed with an LED vanity ring light creates a cozy, modern glow that perfectly illuminates the label.',
+            'The product is peeking out of a high-end, neutral-toned canvas cosmetic bag resting on a marble cafe table. Photographed with a Hasselblad X2D 100C and a 45mm lens at f/4, capturing incredible detail in the canvas texture while keeping the label razor-sharp and centered. Soft, overcast natural light from the cafe patio provides even, flattering illumination that highlights the product as a daily, on-the-go essential.',
+            'A beautiful, soft social media flat lay showing the product resting gently on flowing white silk fabric, accompanied by fresh, minimal white eucalyptus sprigs. Shot with a Sony A7RV and a 50mm f/1.2 lens at f/4, the composition is airy and elegant. A large diffused softbox from above mimics soft overcast daylight, eliminating harsh shadows and enhancing the pure, clean aesthetic of the white label.',
+            'The product sits on a dark slate bathroom counter, illuminated by the warm, cozy glow of a nearby lit candle in the background. Captured on a Canon EOS R5 with an 85mm f/1.2 lens at f/2.0 to create a moody, shallow depth of field perfect for an evening wind-down routine post. The ambient candlelight is supplemented by a hidden, cool-toned LED fill light that specifically targets the product label, making it pop.',
+            'A close-up shot of the product resting on a beautifully textured, ribbed beige stone tray. Photographed using a Fujifilm GFX 100S with an 80mm lens at f/5.6, focusing intently on the interaction between the smooth glass of the dropper bottle and the rough, tactile grooves of the tray. Side-angled window light creates micro-shadows across the ribbed stone, framing the perfectly exposed, crisp label in the center.',
         ],
-        'scenarios': [
-            'person applying product at vanity mirror, candid morning routine moment',
-            'hands holding product bottle, soft natural light from nearby window',
-            'flat lay arrangement on textured surface with complementary props',
-            'product in daily life context — gym bag, travel pouch, office desk',
-            'close-up of product texture being applied to skin',
-            'product bottles arranged aesthetically with fresh flowers and greenery',
-            'someone reaching for product on bathroom shelf, casual candid shot',
-            'product next to coffee cup and book, cozy morning scene',
-        ],
-        'prompt_template': (
-            '{scenario}. {camera_prompt}, {lighting_prompt}. '
-            '{composition_prompt}. {mood_prompt}. '
-            'Editorial lifestyle photography, magazine quality, natural imperfections.'
-        ),
     },
     'banner': {
         'description': 'Hero product shot for ads/website headers',
@@ -109,61 +118,19 @@ CONTENT_TYPE_CONFIG = {
         'preferred_composition': ['Special Purpose', 'Spatial Techniques'],
         'preferred_mood': ['Visual Aesthetics', 'Stylistic Moods'],
         'photo_types': ['hero shot', 'front view', 'three-quarter view', 'close-up detail'],
-        'surfaces': [
-            'polished concrete surface with single accent prop',
-            'raw oak shelf against blurred bathroom tiles',
-            'brushed marble slab with dramatic shadow',
-            'matte black surface with gradient background',
-            'frosted glass shelf with soft backlight',
-            'premium leather surface with warm spotlight',
-            'white sweep background, clean studio',
-            'terrazzo surface with eucalyptus sprig',
+        'surfaces': [],
+        'scenarios': [],
+        'prompt_template': '{scenario}',
+        'expert_prompts': [
+            'A wide-format website banner featuring the product placed on the far right side of the frame, leaving abundant clean, textured white plaster space on the left for text placement. Captured with a Phase One XF IQ4 and an 80mm lens at f/11, the bottle is incredibly crisp and commanding. A large softbox with a grid highlights the edge of the glass bottle and casts a subtle, elegant shadow to the left, grounding the product on the plaster surface.',
+            'A moody, high-end banner shot of the product standing on a slab of black Nero Marquina marble, utilizing a wide 16:9 aspect ratio. Photographed with a Hasselblad H6D-100c and a 100mm lens at f/8, the white label creates a striking, bold contrast against the dark environment. A single, focused snoot light creates a dramatic pool of illumination strictly around the bottle, letting the edges of the marble fade into deep, luxurious shadows.',
+            'A striking, modern composition where the product appears to be levitating an inch above a seamless pastel blue backdrop, designed for an ad header. Shot on a Sony A7RV with a 90mm Macro lens at f/8, the image freezes the bottle mid-air with complete sharpness. A hard overhead strobe casts a sharp, distinct drop shadow directly beneath the floating bottle, emphasizing the bold, weightless, clinical nature of the product.',
+            'An ultra-modern, scroll-stopping wide banner featuring the product resting on a geometric, bright yellow acrylic podium. Captured with a Canon EOS R5 and a 50mm f/1.2 lens at f/8, the vibrant pop of yellow contrasts heavily with the clinical label, commanding immediate attention. Bright, punchy commercial lighting with edge highlights ensures the glass bottle looks premium and three-dimensional.',
+            'A dynamic, wide panoramic shot of the product sitting in a shallow pool of pure, rippling water with a perfect mirror reflection underneath. Photographed using a Leica SL2 with a 90mm lens at f/8 to capture the crisp text of the label and the intricate details of the water ripples. Backlighting combined with a soft front fill creates glowing, luminous water while keeping the label perfectly legible.',
+            'A wide-angle website hero banner showing the product standing on a smooth, cylindrical concrete pedestal against a soft grey background. Shot with a Fujifilm GFX 100S and a 45mm lens at f/11, the composition places the pedestal exactly in the lower center, leaving the top and sides open for web copy. Diffused, wrap-around softbox lighting creates an incredibly smooth gradient across the grey background.',
+            'A horizontal banner layout where the product is positioned strongly on the left third of the frame, resting on frosted glass, leaving the right side completely open. Captured with a Hasselblad X2D 100C and a 65mm lens at f/8, the clinical packaging is meticulously sharp. Lighting from beneath the frosted glass gives the surface a glowing, ethereal quality, while a subtle front light ensures the brand typography is perfectly readable.',
+            'A highly symmetrical, imposing hero banner of the product shot perfectly head-on, taking up the center third of a 16:9 frame. Photographed with a Phase One XF IQ4 and a 150mm lens at f/16 to flatten the perspective and eliminate any distortion. Dual strip softboxes on the left and right create perfect, identical vertical reflection lines down the sides of the glass bottle, exuding clinical perfection against a pure white background.',
         ],
-        'scenarios': [
-            'hero product shot centered on {surface}, generous negative space on right for text overlay',
-            'premium product on {surface}, single key light from left creating dramatic shadow, editorial banner composition',
-            'product at 3/4 angle on {surface}, clean gradient background fading to brand color, commercial photography',
-            'dynamic angle product shot on {surface}, bold lighting with single spotlight, text-safe zone at top',
-            'product floating above {surface} with dramatic shadow below, clean isolated composition',
-            'two products side by side on {surface}, symmetrical arrangement, premium brand photography',
-        ],
-        'prompt_template': (
-            '{scenario}. {camera_prompt}, {lighting_prompt}. '
-            '{composition_prompt}. {mood_prompt}. '
-            'Professional commercial product photography, text-safe composition, premium brand aesthetic.'
-        ),
-    },
-    'a_plus': {
-        'description': 'Amazon A+ style e-commerce product photography',
-        'preferred_cameras': ['Hasselblad', 'Phase One', 'Sony', 'Canon'],
-        'preferred_lighting': ['Studio Lighting'],
-        'preferred_composition': ['Special Purpose', 'Spatial Techniques'],
-        'preferred_mood': ['Visual Aesthetics'],
-        'photo_types': ['front view', 'close-up detail', 'macro view', 'overhead shot', 'three-quarter view', 'hero shot'],
-        'surfaces': [
-            'clean white background, studio sweep',
-            'light gray seamless background',
-            'marble slab with clean edges',
-            'matte white surface with soft shadows',
-            'neutral backdrop with product centered',
-            'wooden surface showing natural grain texture',
-        ],
-        'scenarios': [
-            'product at 3/4 angle on {surface}, every label detail visible and sharp, e-commerce listing style',
-            'macro close-up of product texture and finish, showing ingredient quality, {surface}',
-            'product from directly front on {surface}, clean and informational, Amazon product page style',
-            'multiple angles of the same product — front, side, top — arranged on {surface}, catalog style',
-            'product being held in hand showing scale and size, {surface} in background, real usage context',
-            'before and after comparison layout style, product prominently featured on {surface}',
-            'product ingredients or key features visible through packaging, studio macro on {surface}',
-            'product with its packaging box partially open, revealing the product inside, unboxing style on {surface}',
-        ],
-        'prompt_template': (
-            '{scenario}. {camera_prompt}, {lighting_prompt}. '
-            '{composition_prompt}. '
-            'E-commerce product photography, informational, clean, every detail sharp and visible. '
-            'The product must be the clear hero of the image.'
-        ),
     },
     'lifestyle': {
         'description': 'Documentary-style real-world usage photography',
@@ -173,52 +140,39 @@ CONTENT_TYPE_CONFIG = {
         'preferred_mood': ['Emotional Tones', 'Environmental Moods'],
         'photo_types': ['soft focus', 'bokeh effect', 'close-up detail', 'front view', 'side view'],
         'surfaces': [],
-        'scenarios': [
-            'person doing evening skincare routine in warmly lit bathroom, product visible on counter, cotton towel on shoulder, reflection in mirror',
-            'morning kitchen scene, someone with coffee holding product, sunlight streaming through blinds casting shadows on counter',
-            'product tucked in gym bag between water bottle and headphones, locker room background, active lifestyle context',
-            'product on office desk next to laptop and plant, afternoon light through window, professional wellness context',
-            'person applying product outdoors at golden hour, park bench, natural setting, wind in hair',
-            'bathroom shelf vignette — product among real toiletries, toothbrush holder, small succulent, lived-in authentic',
-            'travel context — product in carry-on bag, airport lounge or hotel room, cosmopolitan lifestyle',
-            'evening self-care ritual, candles lit, product on bath tray, warm ambient lighting, relaxation mood',
+        'scenarios': [],
+        'prompt_template': '{scenario}',
+        'expert_prompts': [
+            'A documentary-style lifestyle shot of a person hands placing the product onto a wet, steamy bathroom sink edge after a shower. Photographed with a Leica M11 and a 35mm Summilux lens at f/2.0, focusing sharply on the bottle while the background shows blurred, steamy tiles and a damp towel. Authentic, moody natural light filters through a condensation-covered bathroom window, giving the scene a raw, lived-in morning routine atmosphere.',
+            'A candid, over-the-shoulder lifestyle image of a young woman looking into a bathroom mirror as she applies a drop of serum to her cheek from the glass dropper. Shot with a Sony A7IV and a 50mm f/1.4 lens at f/2.8, the camera focuses strictly on the dropper and the bottle in her hand, blurring her face slightly in the mirror reflection. Soft, flattering LED vanity lights combined with ambient room lighting create a realistic, modern skincare routine moment.',
+            'A gritty, realistic editorial shot looking down into an open gym duffel bag on a locker room bench, where the product sits securely next to a folded towel and headphones. Captured with a Fujifilm X-Pro3 and a 23mm f/1.4 lens at f/4 to give a slightly raw, photojournalistic feel. The harsh, overhead fluorescent lights of the locker room cast authentic, contrasty shadows, grounding the product as a staple in an active daily lifestyle.',
+            'An atmospheric lifestyle photograph of the product resting on a hotel room nightstand, with a blurred cityscape visible through a large window in the background. Photographed with a Canon EOS R6 and an 85mm lens at f/1.8, the shallow depth of field isolates the crisp label against the busy urban bokeh. The moody, blue-hour twilight from the window illuminates the bottle softly, portraying the product as a reliable travel companion.',
+            'A warm, documentary-style image of a person sitting on a messy, cozy bed, holding the product thoughtfully in their lap. Shot using a Hasselblad X1D II 50C and a 45mm lens at f/2.8, the focal point is entirely on the bottle label and the relaxed grip of their hands. Dappled afternoon sunlight streams through window blinds, casting organic, uneven light patterns across the bedsheets.',
+            'An editorial-style lifestyle shot of two friends getting ready, with one person hand holding the product while offering the dropper to the other person out of frame. Captured with a Sony A7S III and a 35mm lens at f/2.8 for a wide, inclusive, and authentic feel. Natural, bright daylight fills the modern bedroom, rendering the label bright and clear against the casual, lifestyle-driven backdrop.',
+            'A close-up lifestyle photograph focusing on a person dispensing a drop of serum onto the back of their hand, with the bottle held prominently in the frame. Shot with a Canon EOS R5 and a 100mm Macro lens at f/4, capturing the tactile interaction between the dropper and human skin. Soft, diffused natural light from a nearby window creates a gentle, realistic skin texture and highlights the viscous drop.',
+            'A top-down documentary shot of a person packing a hardshell suitcase, with their hand placing the product into a mesh toiletry compartment. Captured with a Leica Q2 using its 28mm lens at f/4, the image feels spontaneous and real, prioritizing the sharp label among folded clothes. Ambient, soft room lighting provides an even, low-contrast exposure that feels like a genuine, unstyled travel moment.',
         ],
-        'prompt_template': (
-            '{scenario}. {camera_prompt}, {lighting_prompt}. '
-            '{composition_prompt}. {mood_prompt}. '
-            'Documentary lifestyle photography, authentic and unstaged, natural imperfections, '
-            'real human moment, editorial wellness brand aesthetic.'
-        ),
     },
     'ad_creative': {
         'description': 'Bold campaign creative for Meta/Google ads',
-        'preferred_cameras': ['Canon', 'Sony', 'Nikon'],
+        'preferred_cameras': ['Canon', 'Sony', 'Phase One', 'Hasselblad'],
         'preferred_lighting': ['Dramatic & Cinematic', 'Studio Lighting', 'Color & Creative'],
         'preferred_composition': ['Dynamic Compositions', 'Spatial Techniques'],
         'preferred_mood': ['Visual Aesthetics', 'Stylistic Moods'],
         'photo_types': ['hero shot', 'close-up detail', 'front view', 'overhead shot'],
-        'surfaces': [
-            'dark moody background with single spotlight',
-            'bold brand-colored gradient background',
-            'dynamic splash of water or powder',
-            'geometric shapes in brand colors',
-            'abstract color field background',
-            'dramatic dark surface with rim lighting',
+        'surfaces': [],
+        'scenarios': [],
+        'prompt_template': '{scenario}',
+        'expert_prompts': [
+            'A high-impact, scroll-stopping ad creative featuring the product centered on a vibrant, electric pink acrylic backdrop. Photographed with a Phase One XF IQ4 and an 80mm lens at f/11, the stark clinical label violently contrasts with the intense background color. Hard, punchy commercial strobe lighting with sharp shadows ensures the bottle jumps off the screen, designed to immediately grab attention in a fast-paced social feed.',
+            'A dynamic, freeze-frame action shot for a performance ad, showing the product crashing into a shallow pool of milky water, sending dramatic, sculptural splashes into the air. Captured with a Sony A1 and a 90mm Macro lens at f/8 using an ultra-fast shutter speed. High-speed flash sync lighting freezes the chaotic water droplets in mid-air while keeping the product label perfectly crisp and legible amidst the splash.',
+            'An edgy, modern ad creative showing the product standing on a black reflective glass surface, illuminated by cyberpunk-style neon rim lighting. Shot on a Canon EOS R5 with a 50mm f/1.2 lens at f/5.6, the bottle is dark in the center but outlined by glowing vibrant blue and magenta lights from the sides. The clinical label is spot-lit perfectly from the front, ensuring brand recognition within the trendy, dramatic aesthetic.',
+            'A surreal, eye-catching ad composition where the product rests on a stone podium floating in the sky against a backdrop of fluffy, stylized pastel clouds. Photographed using a Hasselblad H6D-100c with a 100mm lens at f/8 to achieve a high-end look. Bright, omnidirectional studio lighting mimics perfect sunlight, casting sharp shadows on the floating stone while keeping the product label impossibly clean and in focus.',
+            'A luxurious, aspirational ad creative positioning the product next to a flowing, miniature tabletop waterfall on a bed of smooth river stones. Captured with a Fujifilm GFX 100S and a 110mm lens at f/5.6, blending the clinical nature of the product with high-end spa aesthetics. Shimmering, dappled lighting creates caustic light reflections on the glass bottle and the stones, making the product look incredibly refreshing and premium.',
+            'A highly engaging, extreme macro ad shot focusing entirely on the tip of the glass dropper as a perfectly spherical drop of serum falls, with the brand label heavily blurred in the deep background. Shot with a Leica SL2 and a 100mm Macro lens at f/8, the falling droplet acts like a magnifying glass, catching vibrant studio reflections. A targeted ring light makes the droplet sparkle.',
+            'A visually striking ad creative featuring the product resting on a bright orange seamless paper backdrop, cut by a harsh, diagonal slash of shadow from a window blind. Captured on a Canon EOS R3 with an 85mm lens at f/8, utilizing bold geometric lighting to create instant visual interest. The bright sunlight brilliantly illuminates the label in the top half of the frame, while the bottom fades into dramatic, artistic shadow.',
+            'An energetic, playful ad creative mimicking a stop-motion frame, showing the product, the glass dropper, and the box exploding outward and levitating separately against a mint-green background. Photographed with a Sony A7RV and a 50mm lens at f/8, everything is kept in critical focus to showcase all elements of the packaging. Even, flat strobe lighting ensures bold color saturation and makes the labels pop aggressively.',
         ],
-        'scenarios': [
-            'dynamic product splash shot — product with water droplets frozen mid-air, {surface}, premium cosmetics advertising',
-            'bold overhead shot of product arrangement in brand colors, {surface}, geometric composition, strong directional shadows',
-            'product mid-action — being squeezed, poured, or applied — capturing motion, {surface}, high-speed photography feel',
-            'product against {surface}, dramatic rim lighting outlining product shape, bold and eye-catching for social media ads',
-            'split-composition — product on one side, lifestyle context on other, {surface}, Meta ad creative format',
-            'product floating in dramatic scene with ingredients or brand elements orbiting around it, {surface}',
-        ],
-        'prompt_template': (
-            '{scenario}. {camera_prompt}, {lighting_prompt}. '
-            '{composition_prompt}. {mood_prompt}. '
-            'Bold campaign photography designed to stop scrolling, high contrast, '
-            'dynamic composition, performance ad creative style.'
-        ),
     },
 }
 
@@ -342,35 +296,36 @@ def get_photo_type(content_type=None, seed=None):
 def build_prompt(content_type, brand_info=None, index=0):
     """Build a complete FLUX-optimized prompt for the given content type.
 
-    Args:
-        content_type: 'social_post', 'banner', 'a_plus', 'lifestyle', 'ad_creative'
-        brand_info: Dict with brand details (name, colors, tone, product_category)
-        index: Prompt index (used as seed offset for variety)
-
-    Returns:
-        Dict with 'prompt', 'photo_type', 'camera', 'lighting', 'composition', 'mood'
+    Uses expert prompts (complete paragraphs) when available,
+    falls back to template assembly for custom types.
     """
     seed = hash(f'{content_type}_{index}') & 0xFFFFFFFF
+    rng = random.Random(seed)
 
-    camera = get_camera(content_type, seed)
-    lighting = get_lighting(content_type, seed + 1)
-    composition = get_composition(content_type, seed + 2)
-    mood = get_mood(content_type, seed + 3)
-    scenario = get_scenario(content_type, seed + 4)
-    photo_type = get_photo_type(content_type, seed + 5)
+    config = CONTENT_TYPE_CONFIG.get(content_type, CONTENT_TYPE_CONFIG.get('social_post'))
 
-    config = CONTENT_TYPE_CONFIG.get(content_type, CONTENT_TYPE_CONFIG['social_post'])
-    template = config['prompt_template']
+    # Use expert prompts if available (preferred — these are complete, self-contained)
+    expert_prompts = config.get('expert_prompts', [])
+    if expert_prompts:
+        prompt = expert_prompts[index % len(expert_prompts)]
+    else:
+        # Fallback to template assembly
+        camera = get_camera(content_type, seed)
+        lighting = get_lighting(content_type, seed + 1)
+        composition = get_composition(content_type, seed + 2)
+        mood = get_mood(content_type, seed + 3)
+        scenario = get_scenario(content_type, seed + 4)
 
-    prompt = template.format(
-        scenario=scenario,
-        camera_prompt=camera.get('prompt', ''),
-        lighting_prompt=lighting.get('prompt', ''),
-        composition_prompt=composition.get('prompt', ''),
-        mood_prompt=mood.get('prompt', ''),
-    )
+        template = config['prompt_template']
+        prompt = template.format(
+            scenario=scenario,
+            camera_prompt=camera.get('prompt', ''),
+            lighting_prompt=lighting.get('prompt', ''),
+            composition_prompt=composition.get('prompt', ''),
+            mood_prompt=mood.get('prompt', ''),
+        )
 
-    # Inject brand info if provided
+    # Inject brand info
     if brand_info:
         brand_context = []
         if brand_info.get('name'):
@@ -382,13 +337,15 @@ def build_prompt(content_type, brand_info=None, index=0):
         if brand_context:
             prompt += f" Brand context: {', '.join(brand_context)}."
 
+    photo_type = get_photo_type(content_type, seed + 5)
+
     return {
         'prompt': prompt,
         'photo_type': photo_type,
-        'camera': camera.get('name', ''),
-        'lighting': lighting.get('name', ''),
-        'composition': composition.get('name', ''),
-        'mood': mood.get('name', ''),
+        'camera': '',
+        'lighting': '',
+        'composition': '',
+        'mood': '',
     }
 
 
@@ -413,15 +370,8 @@ def build_prompt_batch(content_type, count, brand_info=None):
 def get_prompt_context_for_llm(content_types, count=5):
     """Generate a rich context block for the LLM prompt crafter.
 
-    Instead of the LLM making up camera specs, we provide real ones
-    from our library for it to choose from.
-
-    Args:
-        content_types: List of content type strings
-        count: Number of examples per type
-
-    Returns:
-        String with camera/lighting/composition options per content type
+    Provides expert prompt examples for the LLM to follow as templates,
+    plus camera/lighting options for variety.
     """
     context_parts = []
 
@@ -431,7 +381,11 @@ def get_prompt_context_for_llm(content_types, count=5):
 
         config = CONTENT_TYPE_CONFIG[ctype]
 
-        # Get sample cameras for this type
+        # Expert prompt examples (show 3 as reference)
+        expert_prompts = config.get('expert_prompts', [])
+        examples = expert_prompts[:3] if expert_prompts else []
+
+        # Get sample cameras for variety
         cameras = []
         for group in config['preferred_cameras']:
             if group in _CAMERAS:
@@ -443,31 +397,28 @@ def get_prompt_context_for_llm(content_types, count=5):
             if group in _LIGHTING:
                 lighting.extend([l['prompt'] for l in _LIGHTING[group][:3]])
 
-        # Get sample compositions
-        compositions = []
-        for group in config['preferred_composition']:
-            if group in _COMPOSITION:
-                compositions.extend([c['prompt'] for c in _COMPOSITION[group][:2]])
-
-        # Get scenarios
-        scenarios = config['scenarios'][:4]
+        examples_text = '\n'.join(f'  EXAMPLE {i+1}: {p}' for i, p in enumerate(examples))
 
         context_parts.append(f"""
 === {ctype.upper()} ===
 Description: {config['description']}
-Photo types to use: {', '.join(config['photo_types'])}
 
-Camera options (pick one per prompt):
-{chr(10).join(f'  - {c}' for c in cameras[:6])}
+EXPERT PROMPT EXAMPLES (follow this style exactly — complete natural language paragraphs with camera specs, lighting, surface, and composition built in):
+{examples_text}
 
-Lighting options (pick one per prompt):
-{chr(10).join(f'  - {l}' for l in lighting[:6])}
+Additional camera options to vary across prompts:
+{chr(10).join(f'  - {c}' for c in cameras[:4])}
 
-Composition options (pick one per prompt):
-{chr(10).join(f'  - {c}' for c in compositions[:4])}
+Additional lighting options:
+{chr(10).join(f'  - {l}' for l in lighting[:4])}
 
-Scene scenarios (use as inspiration, vary each prompt):
-{chr(10).join(f'  - {s}' for s in scenarios)}
+RULES FOR {ctype.upper()}:
+- Each prompt must be a complete, self-contained paragraph (3-4 sentences)
+- Include specific camera + lens + aperture (vary across prompts!)
+- Include specific lighting setup
+- Include specific surface/backdrop/environment
+- The product MUST be the clear hero — visible, in focus, readable label
+- Write like a professional photography brief, NOT keyword lists
 """)
 
     return '\n'.join(context_parts)
