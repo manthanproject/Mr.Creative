@@ -334,8 +334,8 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
     # AGENT 6: Quality Reviewer
     # ═══════════════════════════════════════════
     def _craft_aplus_prompts_direct(self, content_plan, brand_analysis, brand_kit):
-        """Build A+ prompts directly from expert templates + brand data.
-        No LLM rewriting — the expert prompts describe exact layouts."""
+        """Build A+ prompts directly from expert templates.
+        Generic prompts work best — Flow gets product details from reference image."""
 
         from modules.prompt_library import CONTENT_TYPE_CONFIG
 
@@ -344,37 +344,10 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
             print("[Agent 3] No A+ expert prompts found, falling back to LLM")
             return []
 
-        # Build brand context prefix
-        brand_name = brand_kit.name or 'Brand'
-        product_cat = brand_kit.product_category or 'skincare'
-        tone = brand_kit.tone or 'professional'
-
-        # Extract key features from brand analysis
-        features = ''
-        if brand_analysis:
-            key_points = brand_analysis.get('key_selling_points', brand_analysis.get('unique_selling_points', []))
-            if isinstance(key_points, list) and key_points:
-                features = ' • '.join(key_points[:4])
-            ingredients = brand_analysis.get('key_ingredients', brand_analysis.get('ingredients', []))
-            if isinstance(ingredients, list) and ingredients:
-                features += '. Key ingredients: ' + ', '.join(ingredients[:3])
-
-        brand_prefix = f"{brand_name} {product_cat} product. "
-        if features:
-            brand_prefix += f"Features: {features}. "
-
         prompts = []
         for i, plan_item in enumerate(content_plan):
-            # Pick expert prompt (cycle through if more plan items than templates)
-            expert = expert_prompts[i % len(expert_prompts)]
-
-            # Build the final prompt: brand context + expert layout description
-            prompt = f"{brand_prefix}{expert} Brand: {brand_name}. Tone: {tone}."
-
-            # Use plan item's description if it has specific content
-            desc = plan_item.get('description', '')
-            if desc and len(desc) > 20:
-                prompt = f"{brand_prefix}{desc}. Layout style: {expert} Brand: {brand_name}."
+            # Use expert prompt directly — no brand prefix needed
+            prompt = expert_prompts[i % len(expert_prompts)]
 
             prompts.append({
                 'id': plan_item.get('id', i + 1),
