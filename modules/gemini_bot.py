@@ -125,22 +125,20 @@ class GeminiBot:
             return False
 
     def _type_prompt(self, text):
-        """Type prompt into Gemini's Quill editor."""
+        """Type prompt into Gemini's Quill editor using Selenium send_keys."""
         try:
-            self._bring_chrome_to_front()
-
-            # Focus the editor via JavaScript
+            # Focus editor via JS first
             self.driver.execute_script("""
                 var editor = document.querySelector('div.ql-editor[role="textbox"]');
                 if (editor) { editor.focus(); }
             """)
             time.sleep(0.5)
 
-            # Paste text via clipboard + pyautogui
-            import pyperclip
-            import pyautogui
-            pyperclip.copy(text)
-            pyautogui.hotkey('ctrl', 'v')
+            # Use Selenium send_keys on the active/focused element (not pyautogui)
+            from selenium.webdriver.common.action_chains import ActionChains
+            actions = ActionChains(self.driver)
+            actions.send_keys(text)
+            actions.perform()
             time.sleep(1)
 
             print(f"[GeminiBot] Prompt typed: {text[:60]}...")
@@ -154,7 +152,6 @@ class GeminiBot:
         """Click Gemini's send button (aria-label='Send message')."""
         try:
             sent = self.driver.execute_script("""
-                // Exact selector: button with aria-label="Send message"
                 var btns = document.querySelectorAll('button');
                 for (var b of btns) {
                     if (!b.offsetParent) continue;
@@ -168,15 +165,16 @@ class GeminiBot:
             """)
 
             if sent == 'not_found':
-                # Fallback: press Enter in the editor
-                editor = self.driver.find_element(By.CSS_SELECTOR, 'div.ql-editor[role="textbox"]')
-                if editor:
-                    from selenium.webdriver.common.keys import Keys
-                    editor.send_keys(Keys.RETURN)
-                    sent = 'pressed_enter'
+                # Fallback: press Enter via ActionChains on the focused editor
+                from selenium.webdriver.common.action_chains import ActionChains
+                from selenium.webdriver.common.keys import Keys
+                actions = ActionChains(self.driver)
+                actions.send_keys(Keys.RETURN)
+                actions.perform()
+                sent = 'pressed_enter'
 
             print(f"[GeminiBot] Send: {sent}")
-            return sent != 'not_found'
+            return True
 
         except Exception as e:
             print(f"[GeminiBot] Send error: {e}")
