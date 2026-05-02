@@ -567,45 +567,47 @@ class FlowBot:
             self._update_status('downloading', 'Download button not found!')
             return
         print(f"[FlowBot] ✓ Download button clicked")
-        time.sleep(3)  # Wait for dropdown menu to fully render
+        time.sleep(2)
 
-        # Retry loop — dropdown may take time to appear
-        clicked_2k = None
-        for attempt in range(5):
-            clicked_2k = self._js_click("""
+        # Try 2K Upscaled — search ALL clickable elements (dropdown items may not be <button>)
+        time.sleep(1)  # Extra wait for dropdown animation
+        clicked_2k = self._js_click("""
+            // First try buttons
             var btns = document.querySelectorAll('button');
             for (var b of btns) { if (b.offsetParent && b.textContent.includes('2K') && b.textContent.includes('Upscaled')) return b; }
+            // Then try all clickable elements (divs, lis, spans in dropdown)
+            var els = document.querySelectorAll('div, li, a, span, mat-option, [role="menuitem"], [role="option"]');
+            for (var el of els) {
+                var txt = el.textContent.trim();
+                if (el.offsetParent && txt.includes('2K') && (txt.includes('Upscaled') || txt.includes('upscaled'))) return el;
+            }
+            // Try just '2K' text match on any visible element
+            var all = document.querySelectorAll('*');
+            for (var el of all) {
+                if (el.offsetParent && el.children.length === 0 && el.textContent.trim() === '2K') return el.closest('[role]') || el.parentElement || el;
+            }
             return null;
         """)
-            if clicked_2k:
-                print(f"[FlowBot] 2K option found on attempt {attempt + 1}")
-                break
-            time.sleep(1)
         if clicked_2k:
             self._update_status('downloading', 'Downloading 2K image...')
         else:
-            # 2K not available — must click Standard explicitly (first click only opened dropdown)
+            # 2K not available — try 1K/Standard/Original (search all elements)
             clicked_std = self._js_click("""
-                var btns = document.querySelectorAll('button');
-                for (var b of btns) {
-                    if (b.offsetParent && b.textContent.includes('Standard')) return b;
-                }
-                for (var b of btns) {
-                    if (b.offsetParent && b.textContent.includes('Original')) return b;
+                var selectors = 'button, div, li, a, span, mat-option, [role="menuitem"], [role="option"]';
+                var els = document.querySelectorAll(selectors);
+                for (var el of els) {
+                    var txt = el.textContent.trim();
+                    if (el.offsetParent && (txt.includes('1K') || txt.includes('Standard') || txt.includes('Original'))) return el;
                 }
                 return null;
             """)
             if clicked_std:
                 self._update_status('downloading', 'Downloading standard image...')
             else:
-                all_btns = self.driver.execute_script("""
-                    return Array.from(document.querySelectorAll('button'))
-                        .filter(b => b.offsetParent)
-                        .map(b => b.textContent.trim().substring(0, 60));
-                """)
-                print(f"[FlowBot] ⚠️ No download option found after dropdown! Buttons: {all_btns}")
-                self._update_status('downloading', 'No download option found!')
-                return
+                # New Flow UI: Download button triggers direct download (no quality picker)
+                # Just proceed to wait for download completion
+                print(f"[FlowBot] Direct download mode (no quality dropdown)")
+                self._update_status('downloading', 'Downloading image...')
 
         # Wait for download toast or timeout
         for _ in range(DOWNLOAD_WAIT):
@@ -780,16 +782,71 @@ class FlowBot:
                     break
                 time.sleep(1)
 
-            # Step 4: File explorer opens — paste path via pyautogui
-            import pyautogui
-            import subprocess
+            # Step 3b: Flow now has an in-app file picker panel.
+            # Click the "Upload image" button/link at the BOTTOM of this panel
+            # to open the native file dialog (it's different from the menu "Upload image")
+            time.sleep(1)
+            clicked_upload_panel = self.driver.execute_script("""
+                // Look for the Upload image button/link at the bottom of the panel
+                var els = document.querySelectorAll('button, div, a, span');
+                var candidates = [];
+                for (var el of els) {
+                    if (!el.offsetParent) continue;
+                    var txt = el.textContent.trim();
+                    var r = el.getBoundingClientRect();
+                    // The bottom "Upload image" button is lower in the viewport
+                    if (txt === 'Upload image' && r.y > 400) {
+                        candidates.push({el: el, y: r.y});
+                    }
+                }
+                // Click the lowest one (the one at the bottom of the panel)
+                if (candidates.length > 0) {
+                    candidates.sort(function(a,b) { return b.y - a.y; });
+                    candidates[0].el.click();
+                    return 'clicked_panel_upload';
+                }
+                // Also try file input directly
+                var inp = document.querySelector('input[type="file"]');
+                if (inp) {
+                    return 'has_file_input';
+                }
+                return 'not_found';
+            """)
+            print(f"[FlowBot] Panel upload button: {clicked_upload_panel}")
             time.sleep(3)
-            subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.5)
-            pyautogui.press('enter')
-            self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-            time.sleep(10)
+
+            # Step 3c: Try to use hidden file input if available (more reliable than pyautogui)
+            has_input = self.driver.execute_script("""
+                var inp = document.querySelector('input[type="file"]');
+                return inp ? true : false;
+            """)
+            if has_input:
+                self.driver.execute_script("""
+                    var inp = document.querySelector('input[type="file"]');
+                    inp.style.display = 'block';
+                    inp.style.opacity = '1';
+                    inp.style.position = 'fixed';
+                    inp.style.top = '0';
+                    inp.style.left = '0';
+                    inp.style.zIndex = '99999';
+                """)
+                time.sleep(0.5)
+                file_input = self.driver.find_element('css selector', 'input[type="file"]')
+                file_input.send_keys(abs_path)
+                print(f"[FlowBot] Uploaded via file input element")
+                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
+                time.sleep(10)
+            else:
+                # Step 4: Fallback — File explorer opens — paste path via pyautogui
+                import pyautogui
+                import subprocess
+                time.sleep(3)
+                subprocess.run(['clip'], input=abs_path.encode(), check=True)
+                pyautogui.hotkey('ctrl', 'v')
+                time.sleep(0.5)
+                pyautogui.press('enter')
+                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
+                time.sleep(10)
 
             # Step 5: Close the image picker panel if still open (click outside or press Escape)
             self.driver.execute_script("document.body.click();")
