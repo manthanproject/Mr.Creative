@@ -447,9 +447,9 @@ function selectKit(el, kitId) {
 
 function deleteBrandKit(id) {
     if (!confirm('Delete this brand kit?')) return;
-    fetch('/agent/brand-kit/' + id, { method: 'DELETE' })
+    fetch('/agent/brand-kit/' + id + '/delete', { method: 'POST' })
         .then(function(r) { return r.json(); })
-        .then(function(d) { if (d.success) { location.reload(); } else { alert(d.error || 'Delete failed'); } })
+        .then(function(d) { if (d.success) location.reload(); else alert(d.error || 'Failed'); })
         .catch(function(e) { alert('Error: ' + e); });
 }
 
