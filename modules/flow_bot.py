@@ -481,6 +481,29 @@ class FlowBot:
             return document.querySelectorAll('a[href*="/edit/"] img[src*="getMediaUrlRedirect"]').length;
         """)
 
+    def _wait_for_image_processing(self, timeout=60):
+        """Wait for uploaded image to finish processing (Flow shows percentage)."""
+        self._update_status('entering_prompt', 'Waiting for image to process...')
+        for attempt in range(timeout // 2):
+            progress = self.driver.execute_script("""
+                var els = document.querySelectorAll('span, div, p');
+                for (var el of els) {
+                    var txt = el.textContent.trim();
+                    if (txt.match(/^\\d+%$/) && el.offsetParent) {
+                        return parseInt(txt);
+                    }
+                }
+                return -1;
+            """)
+            if progress == -1:
+                break
+            if progress >= 100:
+                print(f"[FlowBot] Image ready: {progress}%")
+                break
+            print(f"[FlowBot] Image processing: {progress}%")
+            time.sleep(2)
+        time.sleep(1)
+
     def wait_for_images(self, count_before, expected=4, timeout=300):
         self._update_status('generating', 'Waiting for images...')
         start = time.time()
@@ -752,7 +775,7 @@ class FlowBot:
                 file_input.send_keys(abs_path)
                 print(f"[FlowBot] Uploaded via file input (after + button)")
                 self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(10)
+                time.sleep(3)
                 self.driver.execute_script("document.body.click();")
                 time.sleep(1)
                 self._update_status('entering_prompt', 'Reference image uploaded!')
@@ -827,7 +850,7 @@ class FlowBot:
                 file_input.send_keys(abs_path)
                 print(f"[FlowBot] Uploaded via file input element (early)")
                 self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(10)
+                time.sleep(3)
 
                 # Close panel and verify
                 self.driver.execute_script("document.body.click();")
@@ -897,7 +920,7 @@ class FlowBot:
                 file_input.send_keys(abs_path)
                 print(f"[FlowBot] Uploaded via file input element")
                 self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(10)
+                time.sleep(3)
             else:
                 # Step 4: Fallback — File explorer opens — paste path via pyautogui
                 import pyautogui
@@ -908,7 +931,7 @@ class FlowBot:
                 time.sleep(0.5)
                 pyautogui.press('enter')
                 self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(10)
+                time.sleep(3)
 
             # Step 5: Close the image picker panel if still open (click outside or press Escape)
             self.driver.execute_script("document.body.click();")
@@ -974,32 +997,18 @@ class FlowBot:
                 # Upload reference image if provided
                 if image_path:
                     self.upload_reference_image(image_path)
-                    # Wait for Flow to fully process the uploaded image
-                    self._update_status('entering_prompt', 'Waiting for image to process...')
-                    time.sleep(5)
-                    # Verify thumbnail is visible in prompt area
-                    for attempt in range(6):
-                        has_thumb = self.driver.execute_script("""
-                            var imgs = document.querySelectorAll('img');
-                            for (var img of imgs) {
-                                var r = img.getBoundingClientRect();
-                                if (r.y > window.innerHeight - 300 && r.width > 30 && r.width < 300 && r.height > 30) return true;
-                            }
-                            return false;
-                        """)
-                        if has_thumb:
-                            self._update_status('entering_prompt', 'Reference image ready!')
-                            break
-                        time.sleep(3)
-                    else:
-                        self._update_status('entering_prompt', 'WARNING: Image thumbnail not confirmed')
 
                 # Count existing images AFTER upload so reference image is included
                 count_before = self.count_images()
                 project_url = self.driver.current_url
 
-            # Type prompt + Create
+            # Type prompt immediately (don't wait for image processing)
             self.type_prompt(prompt)
+
+            # NOW wait for image processing to complete before clicking Create
+            if image_path:
+                self._wait_for_image_processing()
+
             if not self.click_create():
                 result['errors'].append('Could not click Create')
                 return result
