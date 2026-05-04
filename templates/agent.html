@@ -449,8 +449,8 @@ function deleteBrandKit(id) {
     if (!confirm('Delete this brand kit?')) return;
     fetch('/agent/brand-kit/' + id + '/delete', { method: 'POST' })
         .then(function(r) { return r.json(); })
-        .then(function(d) { if (d.success) location.reload(); else alert(d.error || 'Failed'); })
-        .catch(function(e) { alert('Error: ' + e); });
+        .then(function(d) { if (d.success) location.reload(); else showToast(d.error || 'Delete failed', 'error'); })
+        .catch(function(e) { showToast('Error: ' + e, 'error'); });
 }
 
 function togglePill(el) {
@@ -459,7 +459,7 @@ function togglePill(el) {
 
 async function saveBrandKit() {
     var name = document.getElementById('kitName').value.trim();
-    if (!name) { alert('Brand name is required'); return; }
+    if (!name) { showToast('Brand name is required', 'warning'); return; }
 
     try {
         var res = await fetch('/agent/brand-kit', {
@@ -480,9 +480,9 @@ async function saveBrandKit() {
             })
         });
         var data = await res.json();
-        if (data.success) location.reload();
-        else alert(data.error || 'Failed');
-    } catch (e) { alert('Connection error'); }
+        if (data.success) { showToast('Brand kit saved!', 'success'); setTimeout(function() { location.reload(); }, 800); }
+        else showToast(data.error || 'Failed', 'error');
+    } catch (e) { showToast('Connection error', 'error'); }
 }
 
 async function launchAgent() {
@@ -492,7 +492,7 @@ async function launchAgent() {
     document.querySelectorAll('.ag-pill.active').forEach(function(p) {
         types.push(p.getAttribute('data-type'));
     });
-    if (types.length === 0) { alert('Select at least one content type'); return; }
+    if (types.length === 0) { showToast('Select at least one content type', 'warning'); return; }
 
     var count = parseInt(document.getElementById('targetCount').value);
     var btn = document.getElementById('launchBtn');
@@ -527,12 +527,12 @@ async function launchAgent() {
             document.getElementById('progressPanel').style.display = 'block';
             pollJobStatus();
         } else {
-            alert(data.error || 'Failed to launch');
+            showToast(data.error || 'Failed to launch', 'error');
             btn.disabled = false;
             btn.textContent = '🤖 Launch Agent Pipeline';
         }
     } catch (e) {
-        alert('Connection error');
+        showToast('Connection error', 'error');
         btn.disabled = false;
         btn.textContent = '🤖 Launch Agent Pipeline';
     }
@@ -637,8 +637,8 @@ async function uploadRefImage(input) {
             document.getElementById('refImagePreview').style.display = 'block';
             document.getElementById('refImagePlaceholder').textContent = '✅ ' + input.files[0].name;
             document.getElementById('refImageArea').style.borderColor = 'var(--ag-accent)';
-        } else { alert(data.error || 'Upload failed'); }
-    } catch (e) { alert('Upload error'); }
+        } else { showToast(data.error || 'Upload failed', 'error'); }
+    } catch (e) { showToast('Upload error', 'error'); }
 }
 
 async function pauseJob() {

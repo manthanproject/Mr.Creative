@@ -340,7 +340,7 @@ function selectImage(el, path) {
 async function generateCaption() {
     var btn = document.getElementById('aiCaptionBtn');
     var prompt = document.getElementById('captionPrompt').value.trim();
-    if (!prompt) { alert('Enter a description for AI caption'); return; }
+    if (!prompt) { showToast('Enter a description for AI caption', 'warning'); return; }
 
     btn.disabled = true;
     btn.textContent = '⏳ Generating...';
@@ -380,7 +380,7 @@ function updatePreview() {
 
 // ═══ CREATE POST ═══
 async function createPost(mode) {
-    if (!selectedImagePath) { alert('Select an image first'); return; }
+    if (!selectedImagePath) { showToast('Select an image first', 'warning'); return; }
 
     var boardSel = document.getElementById('boardSelect');
     var boardId = boardSel.value;
@@ -388,7 +388,7 @@ async function createPost(mode) {
     var scheduledAt = document.getElementById('scheduleTime').value;
 
     if (mode === 'schedule' && !scheduledAt && !boardId) {
-        alert('Select a board and schedule time, or save as draft');
+        showToast('Select a board and schedule time, or save as draft', 'warning');
         return;
     }
 
@@ -413,9 +413,9 @@ async function createPost(mode) {
         if (data.success) {
             location.reload();
         } else {
-            alert(data.error || 'Failed to create post');
+            showToast(data.error || 'Failed to create post', 'error');
         }
-    } catch (e) { alert('Connection error'); }
+    } catch (e) { showToast('Connection error', 'error'); }
 }
 
 // ═══ POST NOW ═══
@@ -428,9 +428,9 @@ async function postNow(postId) {
         if (data.success) {
             location.reload();
         } else {
-            alert(data.error || 'Failed to post');
+            showToast(data.error || 'Failed to post', 'error');
         }
-    } catch (e) { alert('Connection error'); }
+    } catch (e) { showToast('Connection error', 'error'); }
 }
 
 // ═══ DELETE POST ═══

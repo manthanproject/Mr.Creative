@@ -360,7 +360,7 @@ async function flowSaveSwitch() {
             document.getElementById('flowEmail').value = '';
             loadFlowAccounts();
         } else {
-            alert(data.error || 'Failed to switch');
+            showToast(data.error || 'Failed to switch', 'error');
         }
     } catch (e) {}
 }
@@ -513,7 +513,7 @@ function clearFlowImage() {
 
 async function generateBanners() {
     var prompt = document.getElementById('banner-prompt').value.trim();
-    if (!prompt) { alert('Enter a banner prompt'); return; }
+    if (!prompt) { showToast('Enter a banner prompt', 'warning'); return; }
 
     var btn = document.getElementById('generate-btn');
     var progress = document.getElementById('progress-panel');
