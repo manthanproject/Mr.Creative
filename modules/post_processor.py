@@ -195,7 +195,9 @@ class PostProcessor:
                 base, ext = os.path.splitext(image_path)
                 output_path = f'{base}_nobg.png'
 
-            result.save(output_path, 'PNG')
+            if not hasattr(result, 'save'):
+                result = Image.fromarray(result)  # pyrefly: ignore
+            result.save(output_path, 'PNG')  # pyrefly: ignore
             print(f"[PostProcessor] Background removed: {os.path.basename(output_path)}")
             return output_path
 
@@ -274,7 +276,7 @@ class PostProcessor:
         if logo.width > max_w:
             ratio = max_w / logo.width
             new_h = int(logo.height * ratio)
-            logo = logo.resize((max_w, new_h), Image.LANCZOS)
+            logo = logo.resize((max_w, new_h), Image.LANCZOS)  # pyrefly: ignore
 
         # Apply opacity to logo
         if opacity < 255:

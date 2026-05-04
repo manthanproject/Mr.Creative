@@ -234,7 +234,7 @@ def run_agent_pipeline(app, job_id):
                 else:
                     ar = '1:1'
 
-                print(f"[Pipeline] Batch {batch_num+1}: '{prompt_text[:50]}...' | {ar} | x{len(batch)}")
+                print(f"[Pipeline] Batch {batch_num+1}: '{str(prompt_text)[:50]}...' | {ar} | x{len(batch)}")
 
                 try:
                     # Reference image path (only for first batch — Flow keeps it after)

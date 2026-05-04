@@ -37,6 +37,7 @@ def bulk_create_posts(db, user_id, job_results, collection_id,
 
     posts = []
     schedule_time = datetime.now() + timedelta(minutes=30)  # Start 30min from now
+    status = 'draft'
 
     for i, result in enumerate(job_results):
         if 'error' in result:
@@ -356,7 +357,7 @@ class InstagramAdapter(PlatformAdapter):
             return {
                 'connected': True,
                 'username': info.username,
-                'followers': info.follower_count,
+                'followers': getattr(info, 'follower_count', 0),
             }
         return {'connected': False, 'error': 'Login failed'}
 
@@ -376,7 +377,7 @@ class TwitterAdapter(PlatformAdapter):
     def _get_client(self):
         if self._client is None:
             try:
-                import tweepy
+                import tweepy  # pyrefly: ignore
                 # v2 client for tweets
                 self._client = tweepy.Client(
                     consumer_key=self.api_key,

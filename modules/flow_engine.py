@@ -7,7 +7,7 @@ import os
 import io
 import datetime
 try:
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # pyrefly: ignore
 except ImportError:
     InferenceClient = None  # type: ignore[assignment]
 

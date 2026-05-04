@@ -366,7 +366,8 @@ def generate_mockup(mockup_type, product_image_path, output_path, **kwargs):
     if not entry:
         print(f"[Mockup] Unknown type: {mockup_type}. Options: {list(MOCKUP_TYPES.keys())}")
         return None
-    return entry['func'](product_image_path, output_path, **kwargs)
+    func = entry['func']
+    return func(product_image_path, output_path, **kwargs)  # pyrefly: ignore
 
 
 def generate_all_mockups(product_image_path, output_dir, brand_name='', **kwargs):

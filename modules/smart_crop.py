@@ -55,7 +55,7 @@ def detect_subject_with_rembg(img):
         session = new_session('u2net')
         # Get mask only
         result = remove(img, session=session, only_mask=True, post_process_mask=True)
-        bbox = result.getbbox()
+        bbox = result.getbbox()  # pyrefly: ignore
         if bbox:
             # Add small padding (5%)
             w, h = img.size
@@ -128,7 +128,7 @@ def smart_crop(img, target_ratio='1:1', target_size=None, use_rembg=False):
 
     # Crop and resize
     cropped = img.crop((left, top, left + crop_w, top + crop_h))
-    result = cropped.resize((target_w, target_h), Image.LANCZOS)
+    result = cropped.resize((target_w, target_h), Image.LANCZOS)  # pyrefly: ignore
 
     return result
 
