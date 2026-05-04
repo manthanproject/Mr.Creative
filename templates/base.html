@@ -47,9 +47,13 @@
                     <span class="nav-icon">◉</span>
                     Dashboard
                 </a>
-                <a href="{{ url_for('prompts.index') }}" class="nav-link {% if request.endpoint and 'prompts' in request.endpoint %}active{% endif %}">
+                <a href="{{ url_for('prompts.index') }}" class="nav-link {% if request.endpoint == 'prompts.index' %}active{% endif %}">
                     <span class="nav-icon">✎</span>
                     Prompt Studio
+                </a>
+                <a href="{{ url_for('prompts.library') }}" class="nav-link {% if request.endpoint == 'prompts.library' %}active{% endif %}">
+                    <span class="nav-icon">📚</span>
+                    Prompt Library
                 </a>
                 <a href="{{ url_for('collections.index') }}" class="nav-link {% if request.endpoint and 'collections' in request.endpoint and request.endpoint != 'collections.compare' %}active{% endif %}">
                     <span class="nav-icon">◫</span>

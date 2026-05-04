@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Prompt Library — Mr.Creative{% endblock %}
+
+{% block content %}
+<style>
+    .pl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .pl-header h1 { font-family: 'DM Sans', system-ui; font-style: italic; font-size: 1.5rem; font-weight: 500; color: #e5e3d9; }
+    .pl-header h1 span { color: #c1cd7d; }
+    .pl-header p { color: #919282; font-size: 0.8rem; margin-top: 0.25rem; }
+
+    .pl-stats { display: flex; gap: 1rem; }
+    .pl-stat { background: #0a0a0a; border: 1px solid #1e1e1e; border-radius: 12px; padding: 0.6rem 1rem; text-align: center; }
+    .pl-stat-num { font-size: 1.4rem; font-weight: 700; color: #c1cd7d; }
+    .pl-stat-label { font-size: 0.65rem; color: #919282; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Category filter pills */
+    .pl-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .pl-filter { padding: 0.4rem 0.9rem; border-radius: 9999px; font-size: 0.75rem; border: 1px solid #1e1e1e; background: #0a0a0a; color: #919282; cursor: pointer; transition: all 0.2s; user-select: none; }
+    .pl-filter:hover { border-color: #333; color: #e5e3d9; }
+    .pl-filter.active { background: rgba(193,205,125,0.15); border-color: #c1cd7d; color: #c1cd7d; }
+
+    /* Search */
+    .pl-search { width: 100%; padding: 0.65rem 1rem 0.65rem 2.5rem; border-radius: 12px; border: 1px solid #1e1e1e; background: #0a0a0a; color: #e5e3d9; font-size: 0.85rem; margin-bottom: 1.25rem; transition: border-color 0.2s; }
+    .pl-search:focus { outline: none; border-color: #c1cd7d; }
+    .pl-search-wrap { position: relative; }
+    .pl-search-icon { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #919282; font-size: 0.9rem; pointer-events: none; }
+
+    /* Category sections */
+    .pl-category { margin-bottom: 2rem; }
+    .pl-category-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+    .pl-category-icon { font-size: 1.2rem; }
+    .pl-category-title { font-size: 1rem; font-weight: 600; color: #e5e3d9; }
+    .pl-category-count { font-size: 0.7rem; color: #919282; background: #1e1e1e; padding: 0.15rem 0.5rem; border-radius: 9999px; }
+
+    /* Prompt cards grid */
+    .pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+    /* Prompt card */
+    .pl-card { background: #0a0a0a; border: 1px solid #1e1e1e; border-radius: 16px; overflow: hidden; transition: all 0.25s; cursor: default; }
+    .pl-card:hover { border-color: #333; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+    /* Preview image area */
+    .pl-preview { width: 100%; height: 180px; background: linear-gradient(135deg, #111 0%, #1a1a1a 50%, #0d0d0d 100%); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .pl-preview-placeholder { color: #333; font-size: 2.5rem; }
+    .pl-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .pl-preview-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #c1cd7d; font-size: 0.6rem; padding: 0.2rem 0.5rem; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; backdrop-filter: blur(4px); }
+
+    /* Card body */
+    .pl-body { padding: 1rem; }
+    .pl-prompt-text { font-size: 0.8rem; color: #c7c8b6; line-height: 1.5; min-height: 3.6rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .pl-card:hover .pl-prompt-text { -webkit-line-clamp: unset; }
+
+    /* Card footer */
+    .pl-footer { display: flex; gap: 6px; padding: 0 1rem 1rem; }
+    .pl-btn { padding: 0.35rem 0.7rem; border-radius: 8px; font-size: 0.7rem; border: 1px solid #1e1e1e; background: #141414; color: #919282; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
+    .pl-btn:hover { border-color: #c1cd7d; color: #c1cd7d; background: rgba(193,205,125,0.08); }
+    .pl-btn-primary { background: rgba(193,205,125,0.12); border-color: rgba(193,205,125,0.3); color: #c1cd7d; }
+    .pl-btn-primary:hover { background: rgba(193,205,125,0.2); }
+
+    /* Empty search */
+    .pl-empty { text-align: center; padding: 3rem; color: #919282; }
+    .pl-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+</style>
+
+<div class="pl-header">
+    <div>
+        <h1>📚 <span>Prompt Library</span></h1>
+        <p>{{ total_prompts }} expert prompts across {{ categories|length }} categories — copy, customize, create</p>
+    </div>
+    <div class="pl-stats">
+        <div class="pl-stat">
+            <div class="pl-stat-num">{{ total_prompts }}</div>
+            <div class="pl-stat-label">Prompts</div>
+        </div>
+        <div class="pl-stat">
+            <div class="pl-stat-num">{{ categories|length }}</div>
+            <div class="pl-stat-label">Categories</div>
+        </div>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="pl-search-wrap">
+    <span class="pl-search-icon">🔍</span>
+    <input type="text" class="pl-search" id="plSearch" placeholder="Search prompts..." oninput="filterPrompts()">
+</div>
+
+<!-- Category filter pills -->
+<div class="pl-filters">
+    <div class="pl-filter active" data-cat="all" onclick="filterByCategory('all', this)">All</div>
+    {% for cat in categories %}
+    <div class="pl-filter" data-cat="{{ cat.key }}" onclick="filterByCategory('{{ cat.key }}', this)">{{ cat.icon }} {{ cat.name }}</div>
+    {% endfor %}
+</div>
+
+<!-- Prompt categories -->
+{% for cat in categories %}
+<div class="pl-category" data-category="{{ cat.key }}">
+    <div class="pl-category-header">
+        <span class="pl-category-icon">{{ cat.icon }}</span>
+        <span class="pl-category-title">{{ cat.name }}</span>
+        <span class="pl-category-count">{{ cat.prompts|length }} prompts</span>
+    </div>
+    <div class="pl-grid">
+        {% for prompt in cat.prompts %}
+        <div class="pl-card" data-prompt="{{ prompt.text }}">
+            <div class="pl-preview">
+                {% if prompt.preview %}
+                <img src="{{ prompt.preview }}" alt="Preview" loading="lazy">
+                {% else %}
+                <span class="pl-preview-placeholder">{{ cat.icon }}</span>
+                {% endif %}
+                <span class="pl-preview-badge">{{ cat.name }}</span>
+            </div>
+            <div class="pl-body">
+                <div class="pl-prompt-text">{{ prompt.text }}</div>
+            </div>
+            <div class="pl-footer">
+                <button class="pl-btn" onclick="copyPrompt(this)" data-text="{{ prompt.text }}">📋 Copy</button>
+                <button class="pl-btn" onclick="useInFlow('{{ prompt.text|e }}')">🎨 Use in Flow</button>
+                <button class="pl-btn pl-btn-primary" onclick="useInAgent('{{ prompt.text|e }}')">🤖 Agent Studio</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<div class="pl-empty" id="plEmpty" style="display:none;">
+    <div class="pl-empty-icon">🔍</div>
+    <p>No prompts match your search</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterPrompts() {
+    var query = document.getElementById('plSearch').value.toLowerCase();
+    var cards = document.querySelectorAll('.pl-card');
+    var visibleCount = 0;
+
+    cards.forEach(function(card) {
+        var text = card.getAttribute('data-prompt').toLowerCase();
+        var match = !query || text.includes(query);
+        card.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+
+    // Show/hide category headers based on visible cards
+    document.querySelectorAll('.pl-category').forEach(function(cat) {
+        var visibleCards = cat.querySelectorAll('.pl-card:not([style*="display: none"])').length;
+        cat.style.display = visibleCards > 0 ? '' : 'none';
+    });
+
+    document.getElementById('plEmpty').style.display = visibleCount === 0 ? '' : 'none';
+}
+
+function filterByCategory(cat, el) {
+    // Update active pill
+    document.querySelectorAll('.pl-filter').forEach(function(f) { f.classList.remove('active'); });
+    el.classList.add('active');
+
+    // Show/hide categories
+    document.querySelectorAll('.pl-category').forEach(function(section) {
+        if (cat === 'all' || section.getAttribute('data-category') === cat) {
+            section.style.display = '';
+        } else {
+            section.style.display = 'none';
+        }
+    });
+
+    // Clear search
+    document.getElementById('plSearch').value = '';
+    document.querySelectorAll('.pl-card').forEach(function(c) { c.style.display = ''; });
+    document.getElementById('plEmpty').style.display = 'none';
+}
+
+function copyPrompt(btn) {
+    var text = btn.getAttribute('data-text');
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('Prompt copied!', 'success');
+        btn.textContent = '✓ Copied';
+        setTimeout(function() { btn.innerHTML = '📋 Copy'; }, 2000);
+    });
+}
+
+function useInFlow(prompt) {
+    // Store in sessionStorage and redirect to Flow/Banners page
+    sessionStorage.setItem('prefill_prompt', prompt);
+    window.location.href = '/banners/';
+}
+
+function useInAgent(prompt) {
+    sessionStorage.setItem('prefill_prompt', prompt);
+    window.location.href = '/agent/';
+}
+</script>
+{% endblock %}

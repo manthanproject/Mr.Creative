@@ -5,6 +5,39 @@ from models import db, Prompt
 prompts_bp = Blueprint('prompts', __name__)
 
 
+@prompts_bp.route('/library')
+@login_required
+def library():
+    """Curated prompt library with expert prompts organized by category."""
+    from modules.prompt_library import CONTENT_TYPE_CONFIG
+
+    icons = {
+        'a_plus': '📊',
+        'social_post': '📱',
+        'banner': '🖼',
+        'lifestyle': '🌿',
+        'ad_creative': '📣',
+        'model_photography': '👤',
+    }
+
+    categories = []
+    total = 0
+    for key, config in CONTENT_TYPE_CONFIG.items():
+        prompts = config.get('expert_prompts', [])
+        if not prompts:
+            continue
+        cat = {
+            'key': key,
+            'name': config.get('name', key.replace('_', ' ').title()),
+            'icon': icons.get(key, '📝'),
+            'prompts': [{'text': p, 'preview': None} for p in prompts],
+        }
+        categories.append(cat)
+        total += len(prompts)
+
+    return render_template('prompt_library.html', categories=categories, total_prompts=total)
+
+
 @prompts_bp.route('/')
 @login_required
 def index():
