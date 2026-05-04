@@ -184,11 +184,9 @@ function filterPrompts() {
 }
 
 function filterByCategory(cat, el) {
-    // Update active pill
     document.querySelectorAll('.pl-filter').forEach(function(f) { f.classList.remove('active'); });
     el.classList.add('active');
 
-    // Show/hide categories
     document.querySelectorAll('.pl-category').forEach(function(section) {
         if (cat === 'all' || section.getAttribute('data-category') === cat) {
             section.style.display = '';
@@ -197,10 +195,15 @@ function filterByCategory(cat, el) {
         }
     });
 
-    // Clear search
     document.getElementById('plSearch').value = '';
     document.querySelectorAll('.pl-card').forEach(function(c) { c.style.display = ''; });
     document.getElementById('plEmpty').style.display = 'none';
+
+    // Save to URL so it persists across reloads
+    var url = new URL(window.location);
+    if (cat === 'all') url.searchParams.delete('cat');
+    else url.searchParams.set('cat', cat);
+    history.replaceState(null, '', url);
 }
 
 function copyPrompt(btn) {
@@ -243,7 +246,7 @@ async function saveCustomPrompt() {
     if (data.success) {
         showToast('Prompt saved!', 'success');
         document.getElementById('newPromptText').value = '';
-        location.reload();
+        window.location.href = '/prompts/library?cat=' + category;
     } else {
         showToast(data.error || 'Failed to save', 'error');
     }
@@ -255,8 +258,18 @@ async function deleteCustomPrompt(id) {
     var data = await res.json();
     if (data.success) {
         showToast('Prompt deleted', 'success');
-        location.reload();
+        location.reload();  // URL already has ?cat= param, reload preserves it
     }
 }
+
+// Restore category filter from URL on page load
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var cat = params.get('cat');
+    if (cat) {
+        var pill = document.querySelector('.pl-filter[data-cat="' + cat + '"]');
+        if (pill) filterByCategory(cat, pill);
+    }
+})();
 </script>
 {% endblock %}
