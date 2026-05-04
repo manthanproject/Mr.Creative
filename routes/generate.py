@@ -508,7 +508,7 @@ def launch():
 
     update_bot_status(job.id, 'queued', 'Starting bot...', 0)
 
-    app = current_app
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
     thread = threading.Thread(
         target=run_bot_in_background,
         args=(app, prompt_text, collection_id, current_user.id, job.id,
@@ -594,7 +594,7 @@ def upload_and_launch():
     db.session.add(job)
     db.session.commit()
 
-    app = current_app
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
 
     if photoshoot_mode == 'campaign':
         # Campaign with image — use campaign bot
