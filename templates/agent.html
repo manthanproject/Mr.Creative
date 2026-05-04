@@ -84,7 +84,10 @@
 
     /* Brand kit cards */
     .ag-kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 0.5rem; }
-    .ag-kit-card { padding: 0.6rem; border-radius: var(--ag-radius-sm); background: var(--ag-elevated); border: 2px solid transparent; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .ag-kit-card { position: relative; padding: 0.6rem; border-radius: var(--ag-radius-sm); background: var(--ag-elevated); border: 2px solid transparent; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .ag-kit-delete { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; line-height: 14px; padding: 0; border: none; border-radius: 50%; background: rgba(220, 53, 69, 0.85); color: #fff; font-size: 14px; font-weight: bold; cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; }
+    .ag-kit-card:hover .ag-kit-delete { opacity: 1; }
+    .ag-kit-delete:hover { background: #dc3545; }
     .ag-kit-card:hover { border-color: var(--ag-border); }
     .ag-kit-card.selected { border-color: var(--ag-accent); background: var(--ag-accent-dim); }
     .ag-kit-colors { display: flex; gap: 3px; justify-content: center; margin-bottom: 0.4rem; }
@@ -196,6 +199,7 @@
                     <div class="ag-kit-grid" id="kitGrid">
                         {% for kit in brand_kits %}
                         <div class="ag-kit-card" data-id="{{ kit.id }}" onclick="selectKit(this, '{{ kit.id }}')">
+                            <button type="button" class="ag-kit-delete" title="Delete brand kit" onclick="event.stopPropagation(); deleteBrandKit({{ kit.id }})">&times;</button>
                             <div class="ag-kit-colors">
                                 <span style="background: {{ kit.primary_color }};"></span>
                                 <span style="background: {{ kit.secondary_color }};"></span>
@@ -439,6 +443,14 @@ function selectKit(el, kitId) {
     document.querySelectorAll('.ag-kit-card').forEach(function(c) { c.classList.remove('selected'); });
     el.classList.add('selected');
     selectedKitId = kitId;
+}
+
+function deleteBrandKit(id) {
+    if (!confirm('Delete this brand kit?')) return;
+    fetch('/agent/brand-kit/' + id, { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d.success) { location.reload(); } else { alert(d.error || 'Delete failed'); } })
+        .catch(function(e) { alert('Error: ' + e); });
 }
 
 function togglePill(el) {

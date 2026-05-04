@@ -78,6 +78,7 @@ def get_brand_kit(kit_id):
 
 
 @agent_bp.route('/brand-kit/<kit_id>/delete', methods=['POST'])
+@agent_bp.route('/brand-kit/<int:kit_id>', methods=['DELETE'])
 @login_required
 def delete_brand_kit(kit_id):
     kit = BrandKit.query.filter_by(id=kit_id, user_id=current_user.id).first()
