@@ -171,6 +171,23 @@ CONTENT_TYPE_CONFIG = {
             'An energetic, playful ad creative mimicking a stop-motion frame, showing the product, the glass dropper, and the box exploding outward and levitating separately against a mint-green background. Photographed with a Sony A7RV and a 50mm lens at f/8, everything is kept in critical focus to showcase all elements of the packaging. Even, flat strobe lighting ensures bold color saturation and makes the labels pop aggressively.',
         ],
     },
+    'model_photography': {
+        'name': 'Model Photography',
+        'description': 'Virtual models wearing or using the product',
+        'expert_prompts': [
+            'create a professional product photograph of a female model holding this product in a clean studio setting',
+            'design a lifestyle photograph of a male model casually using this product outdoors in natural lighting',
+            'create an editorial fashion photograph of a model showcasing this product in an urban setting',
+            'design a close-up product photograph with a models hands elegantly presenting this product',
+            'create a lifestyle photograph of a young professional using this product in a modern home setting',
+            'design a fitness lifestyle photograph of an athletic model using this product in a gym environment',
+            'create a beauty editorial photograph of a model applying or wearing this product with soft studio lighting',
+            'design a candid street style photograph of a model incorporating this product into their everyday outfit',
+        ],
+        'cameras': [],
+        'lightings': [],
+        'prompt_template': '{scenario}',
+    },
 }
 
 

@@ -217,7 +217,7 @@ def launch_job():
         kit_id = kit.id
 
     target_count = data.get('target_count', 20)
-    content_types = data.get('content_types', ['social_post', 'banner', 'a_plus', 'lifestyle', 'ad_creative'])
+    content_types = data.get('content_types', ['social_post', 'banner', 'a_plus', 'lifestyle', 'ad_creative', 'model_photography'])
     aspect_ratio = data.get('aspect_ratio', 'mixed')
     reference_image = data.get('reference_image', None)
     post_options = data.get('post_options', {})

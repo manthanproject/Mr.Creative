@@ -67,18 +67,21 @@ def run_agent_pipeline(app, job_id):
             # ── Clamp target count ──
             job.target_count = max(1, min(25, job.target_count or 5))
 
-            # ── Check if all A+ — skip LLM entirely ──
+            # ── Check if all content types support direct mode (skip LLM entirely) ──
             content_types = json.loads(job.content_types) if job.content_types else None
-            all_aplus = content_types and all(t == 'a_plus' for t in content_types)
+            direct_types = {'a_plus', 'model_photography'}
+            all_direct = content_types and all(t in direct_types for t in content_types)
 
-            if all_aplus:
-                # A+ DIRECT MODE: skip Steps 1-3, use expert prompts
+            if all_direct:
+                # DIRECT MODE: skip Steps 1-3, use expert prompts
                 from modules.prompt_library import CONTENT_TYPE_CONFIG
                 import math
 
-                expert_prompts = CONTENT_TYPE_CONFIG.get('a_plus', {}).get('expert_prompts', [])
+                # Use the first content type for prompt selection
+                prompt_type = content_types[0] if content_types else 'a_plus'
+                expert_prompts = CONTENT_TYPE_CONFIG.get(prompt_type, {}).get('expert_prompts', [])
                 if not expert_prompts:
-                    raise RuntimeError('No A+ expert prompts in prompt_library')
+                    raise RuntimeError(f'No expert prompts for {prompt_type} in prompt_library')
 
                 # Build prompts list (same format as Agent 3 output)
                 prompts = []
@@ -95,19 +98,19 @@ def run_agent_pipeline(app, job_id):
                     })
                     content_plan.append({
                         'id': i + 1,
-                        'type': 'a_plus',
-                        'title': f'A+ Image {i + 1}',
+                        'type': prompt_type,
+                        'title': f'{prompt_type} Image {i + 1}',
                     })
 
                 job.status = 'generating'
                 job.current_agent = 'Image Generator'
                 job.progress = 40
-                job.message = f'A+ direct mode: {job.target_count} images, no LLM needed'
+                job.message = f'Direct mode ({prompt_type}): {job.target_count} images, no LLM needed'
                 job.content_plan = json.dumps(content_plan)
                 job.prompts = json.dumps(prompts)
                 job.brand_analysis = json.dumps({})
                 db.session.commit()
-                print(f"[Pipeline] A+ direct mode: {job.target_count} images, skipping LLM")
+                print(f"[Pipeline] Direct mode ({prompt_type}): {job.target_count} images, skipping LLM")
 
             else:
                 # NON-A+ FLOW: run Steps 1-3 with LLM
