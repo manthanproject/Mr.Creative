@@ -489,7 +489,7 @@ async function launchAgent() {
     // Brand kit is optional — backend creates a neutral default if none selected.
 
     var types = [];
-    document.querySelectorAll('.ag-pill.active').forEach(function(p) {
+    document.querySelectorAll('.ag-pill.active[data-type]').forEach(function(p) {
         types.push(p.getAttribute('data-type'));
     });
     if (types.length === 0) { showToast('Select at least one content type', 'warning'); return; }
