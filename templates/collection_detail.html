@@ -135,6 +135,8 @@
     <video id="lightboxVideo" controls autoplay></video>
     <button id="lightboxClose" onclick="closeLightbox()">✕</button>
     <a id="lightboxDownload" download>⬇ Download</a>
+    <button id="lightboxPrev" onclick="event.stopPropagation(); lightboxNav(-1)" style="position:absolute; left:20px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.15); border:none; color:white; font-size:2rem; padding:0.5rem 1rem; border-radius:12px; cursor:pointer; transition:background 0.2s;">‹</button>
+    <button id="lightboxNext" onclick="event.stopPropagation(); lightboxNav(1)" style="position:absolute; right:80px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.15); border:none; color:white; font-size:2rem; padding:0.5rem 1rem; border-radius:12px; cursor:pointer; transition:background 0.2s;">›</button>
 </div>
 
 <style>
@@ -214,6 +216,7 @@
         transition: background 0.2s;
     }
     #lightboxDownload:hover { background: rgba(255,255,255,0.3); }
+    #lightboxPrev:hover, #lightboxNext:hover { background: rgba(255,255,255,0.3); }
 </style>
 
 {% endblock %}
@@ -223,6 +226,9 @@
 // ════════════════════
 // LIGHTBOX (Image + Video)
 // ════════════════════
+var lightboxItems = [];
+var lightboxIndex = 0;
+
 function openLightbox(type, src) {
     var lb = document.getElementById('lightbox');
     var img = document.getElementById('lightboxImg');
@@ -245,6 +251,19 @@ function openLightbox(type, src) {
 
     dl.href = src;
     lb.classList.add('active');
+
+    // Hide arrows if only 1 item
+    var showArrows = lightboxItems.length > 1;
+    document.getElementById('lightboxPrev').style.display = showArrows ? 'block' : 'none';
+    document.getElementById('lightboxNext').style.display = showArrows ? 'block' : 'none';
+}
+
+function lightboxNav(dir) {
+    lightboxIndex += dir;
+    if (lightboxIndex < 0) lightboxIndex = lightboxItems.length - 1;
+    if (lightboxIndex >= lightboxItems.length) lightboxIndex = 0;
+    var item = lightboxItems[lightboxIndex];
+    if (item) openLightbox(item.type, item.src);
 }
 
 function closeLightbox() {
@@ -256,19 +275,28 @@ function closeLightbox() {
 }
 
 function lightboxClick(event) {
-    // Close lightbox when clicking backdrop (not the content)
     if (event.target === document.getElementById('lightbox')) {
         closeLightbox();
     }
 }
 
+// Keyboard navigation
 document.addEventListener('keydown', function(e) {
+    var lb = document.getElementById('lightbox');
+    if (!lb.classList.contains('active')) return;
+    if (e.key === 'ArrowLeft') lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
     if (e.key === 'Escape') closeLightbox();
 });
 
-// Attach click handlers to gallery items
-document.querySelectorAll('.gallery-item').forEach(function(item) {
+// Collect all gallery items and attach click handlers
+document.querySelectorAll('.gallery-item').forEach(function(item, i) {
+    lightboxItems.push({
+        type: item.getAttribute('data-type'),
+        src: item.getAttribute('data-src')
+    });
     item.addEventListener('click', function() {
+        lightboxIndex = i;
         var type = this.getAttribute('data-type');
         var src = this.getAttribute('data-src');
         if (src) openLightbox(type, src);
