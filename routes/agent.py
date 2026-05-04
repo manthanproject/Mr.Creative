@@ -122,6 +122,20 @@ def stop_job(job_id):
     if not job or job.status in ('complete', 'failed'):
         return jsonify({'error': 'Cannot stop this job'}), 400
     job.control_action = 'stop'
+    job.status = 'complete'
+    job.message = f'Stopped by user at {job.progress}%'
+    job.completed_at = datetime.now()
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@agent_bp.route('/job/<job_id>/delete', methods=['POST'])
+@login_required
+def delete_job(job_id):
+    job = AgentJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+    if not job:
+        return jsonify({'error': 'Not found'}), 404
+    db.session.delete(job)
     db.session.commit()
     return jsonify({'success': True})
 

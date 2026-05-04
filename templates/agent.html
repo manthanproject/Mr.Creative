@@ -73,6 +73,9 @@
     .ag-job-info { flex: 1; min-width: 0; }
     .ag-job-title { font-size: 0.78rem; font-weight: 600; color: var(--ag-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ag-job-meta { font-size: 0.65rem; color: var(--ag-text-muted); margin-top: 2px; }
+    .ag-job-delete { background: transparent; border: none; color: var(--ag-text-muted); cursor: pointer; padding: 4px 6px; border-radius: 6px; font-size: 0.85rem; opacity: 0.6; transition: all 0.15s; }
+    .ag-job-item:hover .ag-job-delete { opacity: 1; }
+    .ag-job-delete:hover { background: rgba(220, 53, 69, 0.15); color: #dc3545; }
 
     .ag-badge { display: inline-block; font-size: 0.6rem; font-weight: 600; padding: 2px 8px; border-radius: var(--ag-pill); text-transform: uppercase; }
     .ag-badge-complete { background: rgba(74,222,128,0.15); color: var(--ag-success); }
@@ -342,6 +345,7 @@
                             · {{ job.created_at.strftime('%b %d, %I:%M %p') if job.created_at else '' }}
                         </div>
                     </div>
+                    <button type="button" class="ag-job-delete" title="Delete job" onclick="event.stopPropagation(); deleteJob('{{ job.id }}')">🗑</button>
                 </div>
                 {% endfor %}
                 {% else %}
@@ -661,9 +665,31 @@ async function pauseJob() {
 async function stopJob() {
     if (!currentJobId) return;
     if (!confirm('Stop this job? Images generated so far will be kept.')) return;
-    await fetch('/agent/job/' + currentJobId + '/stop', { method: 'POST' });
-    document.getElementById('stopBtn').disabled = true;
-    document.getElementById('stopBtn').textContent = '⏹ Stopping...';
+    var res = await fetch('/agent/job/' + currentJobId + '/stop', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        clearInterval(pollInterval);
+        document.getElementById('stopBtn').disabled = true;
+        document.getElementById('stopBtn').textContent = '⏹ Stopped';
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('agentIcon').textContent = '🛑';
+        document.getElementById('agentName').textContent = 'Stopped';
+        document.getElementById('agentMsg').textContent = 'Job stopped by user';
+        var btn = document.getElementById('launchBtn');
+        btn.disabled = false;
+        btn.textContent = '🤖 Launch Agent Pipeline';
+        document.getElementById('jobControls').style.display = 'none';
+    }
+}
+
+async function deleteJob(jobId) {
+    if (!confirm('Delete this job?')) return;
+    var res = await fetch('/agent/job/' + jobId + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        showToast('Job deleted', 'success');
+        location.reload();
+    }
 }
 
 async function genMockups() {
