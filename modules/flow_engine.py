@@ -7,9 +7,9 @@ import os
 import io
 import datetime
 try:
-    from huggingface_hub import InferenceClient  # type: ignore[import-not-found]
+    from huggingface_hub import InferenceClient
 except ImportError:
-    InferenceClient = None  # type: ignore[assignment,misc]
+    InferenceClient = None  # type: ignore[assignment]
 
 ASPECT_RATIOS = {
     'story':     {'label': 'Story (9:16)',     'width': 768,  'height': 1344},
@@ -22,6 +22,8 @@ ASPECT_RATIOS = {
 
 def _generate_single_image(api_key, prompt, aspect_ratio='landscape', variation_index=0):
     try:
+        if InferenceClient is None:
+            raise ImportError("huggingface_hub is required — pip install huggingface_hub")
         client = InferenceClient(
             provider="hf-inference",
             api_key=api_key,
