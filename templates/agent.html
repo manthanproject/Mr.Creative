@@ -199,7 +199,7 @@
                     <div class="ag-kit-grid" id="kitGrid">
                         {% for kit in brand_kits %}
                         <div class="ag-kit-card" data-id="{{ kit.id }}" onclick="selectKit(this, '{{ kit.id }}')">
-                            <button type="button" class="ag-kit-delete" title="Delete brand kit" onclick="event.stopPropagation(); deleteBrandKit({{ kit.id }})">&times;</button>
+                            <button type="button" class="ag-kit-delete" title="Delete brand kit" onclick="event.stopPropagation(); deleteBrandKit('{{ kit.id }}')">&times;</button>
                             <div class="ag-kit-colors">
                                 <span style="background: {{ kit.primary_color }};"></span>
                                 <span style="background: {{ kit.secondary_color }};"></span>
