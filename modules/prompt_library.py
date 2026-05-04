@@ -80,11 +80,11 @@ CONTENT_TYPE_CONFIG = {
         'scenarios': [],
         'prompt_template': '{scenario}',
         'expert_prompts': [
-            'generate me A+ content for this product',
-            'create A+ content for this product with features and benefits',
-            'make A+ product content showing this product from different angles',
-            'generate A+ content for this product with size guide and specifications',
-            'create premium product content for this product with lifestyle shots',
+            'create a professional product showcase image for this product',
+            'design a product features overview for this product',
+            'create a detailed product breakdown showing this product from multiple angles',
+            'design a product specification sheet for this product with dimensions and details',
+            'create a lifestyle product image showing this product in real world use',
         ],
     },
     'social_post': {
