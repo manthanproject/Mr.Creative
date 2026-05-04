@@ -60,64 +60,117 @@ def run_agent_pipeline(app, job_id):
         )
         pollinations = PollinationsAPI()
 
+        # Pre-check: if all selected content types are A+, skip LLM planning entirely
+        content_types_pre = json.loads(job.content_types) if job.content_types else None
+        all_aplus = (
+            content_types_pre is not None
+            and len(content_types_pre) > 0
+            and all(t == 'a_plus' for t in content_types_pre)
+        )
+        target_count = max(1, min(job.target_count, 25))
+
         try:
-            # ── Step 1: Brand Analysis ──
-            job.status = 'analyzing'
-            job.current_agent = 'Brand Analyst'
-            job.progress = 5
-            job.message = 'Analyzing brand identity...'
-            db.session.commit()
+            if all_aplus:
+                # ── A+ Direct Mode: skip Steps 1-3, use expert prompts ──
+                from modules.prompt_library import CONTENT_TYPE_CONFIG
+                expert_prompts = CONTENT_TYPE_CONFIG.get('a_plus', {}).get('expert_prompts', [])
+                if not expert_prompts:
+                    raise RuntimeError('No A+ expert prompts available in prompt_library')
 
-            brand_analysis = engine.analyze_brand(brand_kit)
-            # Store which LLM provider is active
-            job.llm_provider = 'cerebras' if engine._using_cerebras else 'groq'
-            db.session.commit()
-            job.brand_analysis = json.dumps(brand_analysis)
-            job.progress = 15
-            db.session.commit()
+                # Build flat prompts list — each Flow batch (4 images) uses one expert prompt
+                prompts = []
+                content_plan = []
+                for i in range(target_count):
+                    batch_idx = i // 4
+                    prompt_text = expert_prompts[batch_idx % len(expert_prompts)]
+                    prompts.append({
+                        'id': i + 1,
+                        'prompt': prompt_text,
+                        'negative_prompt': '',
+                        'engine': 'flow',
+                        'width': 1024,
+                        'height': 1024,
+                    })
+                    content_plan.append({
+                        'id': i + 1,
+                        'type': 'a_plus',
+                        'title': f'A+ image {i + 1}',
+                        'width': 1024,
+                        'height': 1024,
+                        'engine': 'flow',
+                    })
 
-            if not _check_job_control(job, db):
-                return
+                brand_analysis = {}
+                job.brand_analysis = json.dumps(brand_analysis)
+                job.content_plan = json.dumps(content_plan)
+                job.prompts = json.dumps(prompts)
+                job.llm_provider = ''
+                job.progress = 40
+                job.current_agent = 'Image Generator'
+                job.status = 'generating'
+                job.message = f'A+ direct mode: {target_count} images, no LLM calls'
+                db.session.commit()
+                print(f"[Pipeline] A+ direct mode: {len(prompts)} images, skipped LLM planning")
+            else:
+                # ── Step 1: Brand Analysis ──
+                job.status = 'analyzing'
+                job.current_agent = 'Brand Analyst'
+                job.progress = 5
+                job.message = 'Analyzing brand identity...'
+                db.session.commit()
 
-            # ── Step 2: Content Planning ──
-            job.status = 'planning'
-            job.current_agent = 'Content Strategist'
-            job.progress = 20
-            job.message = f'Planning {job.target_count} content pieces...'
-            db.session.commit()
+                brand_analysis = engine.analyze_brand(brand_kit)
+                # Store which LLM provider is active
+                job.llm_provider = 'cerebras' if engine._using_cerebras else 'groq'
+                db.session.commit()
+                job.brand_analysis = json.dumps(brand_analysis)
+                job.progress = 15
+                db.session.commit()
 
-            content_types = json.loads(job.content_types) if job.content_types else None
-            content_plan = engine.plan_content(
-                brand_analysis, brand_kit,
-                target_count=job.target_count,
-                content_types=content_types
-            )
-            job.content_plan = json.dumps(content_plan)
-            job.progress = 30
-            db.session.commit()
+                if not _check_job_control(job, db):
+                    return
 
-            if not _check_job_control(job, db):
-                return
+                # ── Step 2: Content Planning ──
+                job.status = 'planning'
+                job.current_agent = 'Content Strategist'
+                job.progress = 20
+                job.message = f'Planning {target_count} content pieces...'
+                db.session.commit()
 
-            # ── Step 3: Prompt Crafting ──
-            job.status = 'crafting'
-            job.current_agent = 'Prompt Crafter'
-            job.progress = 35
-            job.message = f'Crafting {len(content_plan)} prompts...'
-            db.session.commit()
-
-            # Pass reference image path to engine for Gemini bot
-            if job.reference_image:
-                ref_abs = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    'static', job.reference_image
+                content_plan = engine.plan_content(
+                    brand_analysis, brand_kit,
+                    target_count=target_count,
+                    content_types=content_types_pre
                 )
-                engine._reference_image_path = ref_abs
+                # LLMs ignore exact counts — trim to user's requested target
+                if isinstance(content_plan, list) and len(content_plan) > target_count:
+                    content_plan = content_plan[:target_count]
+                job.content_plan = json.dumps(content_plan)
+                job.progress = 30
+                db.session.commit()
 
-            prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
-            job.prompts = json.dumps(prompts)
-            job.progress = 40
-            db.session.commit()
+                if not _check_job_control(job, db):
+                    return
+
+                # ── Step 3: Prompt Crafting ──
+                job.status = 'crafting'
+                job.current_agent = 'Prompt Crafter'
+                job.progress = 35
+                job.message = f'Crafting {len(content_plan)} prompts...'
+                db.session.commit()
+
+                # Pass reference image path to engine for Gemini bot
+                if job.reference_image:
+                    ref_abs = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'static', job.reference_image
+                    )
+                    engine._reference_image_path = ref_abs
+
+                prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
+                job.prompts = json.dumps(prompts)
+                job.progress = 40
+                db.session.commit()
 
             if not _check_job_control(job, db):
                 return
