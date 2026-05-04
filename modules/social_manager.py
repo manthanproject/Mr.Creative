@@ -15,6 +15,7 @@ import csv
 import zipfile
 import io
 from datetime import datetime, timedelta
+from typing import Any
 
 
 def bulk_create_posts(db, user_id, job_results, collection_id,
@@ -280,7 +281,7 @@ class InstagramAdapter(PlatformAdapter):
         super().__init__('instagram')
         self.username = username
         self.password = password
-        self._client: object | None = None
+        self._client: Any = None
 
     def _get_client(self):
         if self._client is None:
@@ -369,8 +370,8 @@ class TwitterAdapter(PlatformAdapter):
         self.api_secret = api_secret
         self.access_token = access_token
         self.access_secret = access_secret
-        self._client: object | None = None
-        self._api: object | None = None
+        self._client: Any = None
+        self._api: Any = None
 
     def _get_client(self):
         if self._client is None:

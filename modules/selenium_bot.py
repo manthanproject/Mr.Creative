@@ -21,6 +21,7 @@ import time
 import shutil
 import datetime
 import base64
+from typing import Any
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -75,9 +76,9 @@ class PomelliBot:
         self.status_message = ''
         self.errors: list[str] = []
         # Shared state for UI interaction
-        self._pending_ideas: list = []
+        self._pending_ideas: list[Any] = []
         self._selected_idea: int | None = None
-        self._pending_animate_cards: list = []
+        self._pending_animate_cards: list[Any] = []
         self._selected_animate_indices: list[int] | None = None  # None = waiting, [] = skip, [0,1,...] = animate these
         self._current_job_id: str | None = None
         self._force_relogin = False  # Set by bot manager on account switch

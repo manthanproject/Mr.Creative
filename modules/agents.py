@@ -8,6 +8,7 @@ import json
 import os
 import time
 from datetime import datetime
+from typing import Any
 
 
 class AgentEngine:
@@ -17,7 +18,7 @@ class AgentEngine:
         from groq import Groq
         self.client = Groq(api_key=groq_api_key)
         self.model = 'llama-3.3-70b-versatile'
-        self.cerebras_client: object | None = None
+        self.cerebras_client: Any = None
         self.cerebras_model = 'llama3.1-8b'
         if cerebras_api_key:
             try:

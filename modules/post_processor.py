@@ -17,6 +17,7 @@ import io
 import json
 import hashlib
 import urllib.request
+from typing import Any
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 
 # ═══════════════════════════════════════════
@@ -145,7 +146,7 @@ class PostProcessor:
         self.accent = brand_kit.accent_color or '#C1CD7D'
         self.heading_font = brand_kit.heading_font or 'Poppins'
         self.body_font = brand_kit.body_font or 'Inter'
-        self._rembg_session: object | None = None
+        self._rembg_session: Any = None
 
     # ═══════════════════════════════════════
     # Step 0: rembg Background Removal

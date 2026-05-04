@@ -171,7 +171,7 @@ class GeminiBot:
             time.sleep(3)
 
             # Step 4: Paste file path in the dialog and press Enter
-            import pyautogui
+            import pyautogui  # type: ignore[import-untyped]
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
             pyautogui.hotkey('ctrl', 'a')
             time.sleep(0.3)

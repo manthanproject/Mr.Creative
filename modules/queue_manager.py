@@ -7,6 +7,7 @@ import os
 import shutil
 import threading
 from datetime import datetime
+from typing import Any
 
 
 class QueueManager:
@@ -15,7 +16,7 @@ class QueueManager:
     def __init__(self, app):
         self.app = app
         self.is_processing = False
-        self.current_job: object | None = None
+        self.current_job: Any = None
         self._lock = threading.Lock()
 
     def process_next_job(self):
