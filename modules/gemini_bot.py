@@ -81,6 +81,7 @@ class GeminiBot:
     def _upload_image(self, image_path: str) -> bool:
         """Upload image to Gemini.
         Flow: click + button → click 'Upload files' → native file dialog → pyautogui.
+        Selectors hardcoded from DevTools (May 2026).
         """
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
@@ -90,87 +91,40 @@ class GeminiBot:
         drv = self._drv()
 
         try:
-            # Step 1: Click the + button in the input toolbar
+            # Step 1: JS click the + button (open upload file menu)
             clicked_plus = drv.execute_script("""
-                var editor = document.querySelector('div.ql-editor');
-                if (!editor) return 'no_editor';
-
-                // Walk up from editor to find the input container with the + button
-                var container = editor;
-                for (var i = 0; i < 10; i++) {
-                    container = container.parentElement;
-                    if (!container) break;
-                    var btns = container.querySelectorAll('button, [role="button"]');
-                    for (var b of btns) {
-                        if (!b.offsetParent) continue;
-                        var r = b.getBoundingClientRect();
-                        // + button: small, near bottom-left, has an icon child
-                        if (r.width < 60 && r.height < 60 && r.x < 200) {
-                            var hasIcon = b.querySelector('mat-icon, svg, gem-icon');
-                            if (hasIcon) {
-                                b.click();
-                                return 'clicked_at_' + Math.round(r.x) + ',' + Math.round(r.y);
-                            }
-                        }
-                    }
-                }
-
-                // Fallback: any small button in bottom-left of viewport
-                var allBtns = document.querySelectorAll('button');
-                for (var b of allBtns) {
-                    if (!b.offsetParent) continue;
-                    var r = b.getBoundingClientRect();
-                    if (r.y > window.innerHeight - 200 && r.x < 150 && r.width < 60) {
-                        b.click();
-                        return 'fallback_at_' + Math.round(r.x) + ',' + Math.round(r.y);
-                    }
-                }
+                var btn = document.querySelector('button[aria-label="Open upload file menu"]');
+                if (btn) { btn.click(); return 'clicked'; }
                 return 'not_found';
             """)
             print(f"[GeminiBot] Plus button: {clicked_plus}")
-
-            if clicked_plus in ('not_found', 'no_editor'):
-                # Last resort: click at estimated position relative to editor
-                try:
-                    editor_el = drv.find_element(By.CSS_SELECTOR, 'div.ql-editor')
-                    actions = ActionChains(drv)
-                    actions.move_to_element_with_offset(editor_el, -350, 50)
-                    actions.click()
-                    actions.perform()
-                    print("[GeminiBot] Clicked at estimated + position")
-                except Exception:
-                    print("[GeminiBot] Could not click + button at all")
-                    return False
-
-            time.sleep(2)
-
-            # Step 2: Click "Upload files" from dropdown menu
-            clicked_upload = drv.execute_script("""
-                var items = document.querySelectorAll(
-                    'button, [role="menuitem"], [role="option"], .mat-mdc-list-item'
-                );
-                for (var item of items) {
-                    if (!item.offsetParent) continue;
-                    var label = item.getAttribute('aria-label') || '';
-                    var text = (item.textContent || '').trim();
-                    if (label.includes('Upload files') || text === 'Upload files'
-                        || text.startsWith('Upload files')) {
-                        item.click();
-                        return 'clicked';
-                    }
-                }
-                return 'not_found';
-            """)
-            print(f"[GeminiBot] Upload files menu: {clicked_upload}")
-
-            if clicked_upload == 'not_found':
-                print("[GeminiBot] 'Upload files' menu item not found")
+            if clicked_plus == 'not_found':
+                print("[GeminiBot] + button not found (selector: button[aria-label='Open upload file menu'])")
                 return False
 
-            # Step 3: Wait for native file dialog to open (auto-focuses on Windows)
+            # Step 2: Wait for menu to appear
+            time.sleep(2)
+
+            # Step 3: JS click "Upload files" from the dropdown
+            clicked_upload = drv.execute_script("""
+                var btn = document.querySelector('button[aria-label*="Upload files"]');
+                if (btn) { btn.click(); return 'clicked'; }
+                return 'not_found';
+            """)
+            print(f"[GeminiBot] Upload files: {clicked_upload}")
+            if clicked_upload == 'not_found':
+                # Close the menu before returning
+                drv.execute_script("""
+                    var close = document.querySelector('button[aria-label="Close upload file menu"]');
+                    if (close) close.click();
+                """)
+                print("[GeminiBot] 'Upload files' button not found")
+                return False
+
+            # Step 4: Wait for native file dialog (auto-focuses on Windows)
             time.sleep(3)
 
-            # Step 4: Paste file path in the dialog and press Enter
+            # Step 5: Paste file path in dialog and press Enter
             import pyautogui  # type: ignore[import-untyped]
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
             pyautogui.hotkey('ctrl', 'a')
@@ -180,10 +134,10 @@ class GeminiBot:
             pyautogui.press('enter')
             print(f"[GeminiBot] File selected: {os.path.basename(abs_path)}")
 
-            # Step 5: Wait for upload to finish
+            # Step 6: Wait for upload to finish
             time.sleep(8)
 
-            # Step 6: Verify thumbnail appeared
+            # Step 7: Verify thumbnail appeared
             has_thumb = drv.execute_script("""
                 var imgs = document.querySelectorAll('img');
                 for (var img of imgs) {
@@ -217,7 +171,8 @@ class GeminiBot:
         drv = self._drv()
         try:
             drv.execute_script("""
-                var editor = document.querySelector('div.ql-editor[role="textbox"]');
+                var editor = document.querySelector('div.ql-editor[aria-label="Enter a prompt for Gemini"]');
+                if (!editor) editor = document.querySelector('div.ql-editor');
                 if (editor) { editor.focus(); }
             """)
             time.sleep(0.5)
@@ -243,15 +198,8 @@ class GeminiBot:
         drv = self._drv()
         try:
             sent = drv.execute_script("""
-                var btns = document.querySelectorAll('button');
-                for (var b of btns) {
-                    if (!b.offsetParent) continue;
-                    var label = b.getAttribute('aria-label') || '';
-                    if (label === 'Send message') {
-                        b.click();
-                        return 'clicked_send';
-                    }
-                }
+                var btn = document.querySelector('button[aria-label="Send message"]');
+                if (btn) { btn.click(); return 'clicked_send'; }
                 return 'not_found';
             """)
 
@@ -284,27 +232,15 @@ class GeminiBot:
 
         while time.time() - start < timeout:
             response_text: str = drv.execute_script("""
-                var selectors = [
-                    '.model-response-text',
-                    '.response-container-content',
-                    '[data-message-author-role="model"] .message-content',
-                    '.markdown-main-panel',
-                    'model-response message-content',
-                    '.response-content',
-                ];
-                for (var sel of selectors) {
-                    var els = document.querySelectorAll(sel);
-                    if (els.length > 0) {
-                        var last = els[els.length - 1];
-                        var text = last.innerText || last.textContent || '';
-                        if (text.length > 20) return text;
-                    }
+                var els = document.querySelectorAll('message-content');
+                if (els.length > 0) {
+                    var text = els[els.length - 1].innerText || '';
+                    if (text.length > 20) return text;
                 }
-                var allTurns = document.querySelectorAll(
-                    '.conversation-container > div, .chat-history > div'
-                );
-                if (allTurns.length > 0) {
-                    return allTurns[allTurns.length - 1].innerText || '';
+                var alt = document.querySelectorAll('.model-response-text');
+                if (alt.length > 0) {
+                    var text = alt[alt.length - 1].innerText || '';
+                    if (text.length > 20) return text;
                 }
                 return '';
             """) or ''
@@ -326,10 +262,10 @@ class GeminiBot:
 
         print(f"[GeminiBot] Timeout after {timeout}s")
         return drv.execute_script("""
-            var els = document.querySelectorAll(
-                '.model-response-text, .markdown-main-panel, [data-message-author-role="model"]'
-            );
+            var els = document.querySelectorAll('message-content');
             if (els.length > 0) return els[els.length - 1].innerText || '';
+            var alt = document.querySelectorAll('.model-response-text');
+            if (alt.length > 0) return alt[alt.length - 1].innerText || '';
             return '';
         """) or ''
 
