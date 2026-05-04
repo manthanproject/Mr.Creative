@@ -60,29 +60,28 @@ def run_agent_pipeline(app, job_id):
         )
         pollinations = PollinationsAPI()
 
-        # Pre-check: if all selected content types are A+, skip LLM planning entirely
-        content_types_pre = json.loads(job.content_types) if job.content_types else None
-        all_aplus = (
-            content_types_pre is not None
-            and len(content_types_pre) > 0
-            and all(t == 'a_plus' for t in content_types_pre)
-        )
-        target_count = max(1, min(job.target_count, 25))
-
         try:
+            # ── Clamp target count ──
+            job.target_count = max(1, min(25, job.target_count or 5))
+
+            # ── Check if all A+ — skip LLM entirely ──
+            content_types = json.loads(job.content_types) if job.content_types else None
+            all_aplus = content_types and all(t == 'a_plus' for t in content_types)
+
             if all_aplus:
-                # ── A+ Direct Mode: skip Steps 1-3, use expert prompts ──
+                # A+ DIRECT MODE: skip Steps 1-3, use expert prompts
                 from modules.prompt_library import CONTENT_TYPE_CONFIG
+                import math
+
                 expert_prompts = CONTENT_TYPE_CONFIG.get('a_plus', {}).get('expert_prompts', [])
                 if not expert_prompts:
-                    raise RuntimeError('No A+ expert prompts available in prompt_library')
+                    raise RuntimeError('No A+ expert prompts in prompt_library')
 
-                # Build flat prompts list — each Flow batch (4 images) uses one expert prompt
+                # Build prompts list (same format as Agent 3 output)
                 prompts = []
                 content_plan = []
-                for i in range(target_count):
-                    batch_idx = i // 4
-                    prompt_text = expert_prompts[batch_idx % len(expert_prompts)]
+                for i in range(job.target_count):
+                    prompt_text = expert_prompts[i % len(expert_prompts)]
                     prompts.append({
                         'id': i + 1,
                         'prompt': prompt_text,
@@ -94,24 +93,21 @@ def run_agent_pipeline(app, job_id):
                     content_plan.append({
                         'id': i + 1,
                         'type': 'a_plus',
-                        'title': f'A+ image {i + 1}',
-                        'width': 1024,
-                        'height': 1024,
-                        'engine': 'flow',
+                        'title': f'A+ Image {i + 1}',
                     })
 
-                brand_analysis = {}
-                job.brand_analysis = json.dumps(brand_analysis)
+                job.status = 'generating'
+                job.current_agent = 'Image Generator'
+                job.progress = 40
+                job.message = f'A+ direct mode: {job.target_count} images, no LLM needed'
                 job.content_plan = json.dumps(content_plan)
                 job.prompts = json.dumps(prompts)
-                job.llm_provider = ''
-                job.progress = 40
-                job.current_agent = 'Image Generator'
-                job.status = 'generating'
-                job.message = f'A+ direct mode: {target_count} images, no LLM calls'
+                job.brand_analysis = json.dumps({})
                 db.session.commit()
-                print(f"[Pipeline] A+ direct mode: {len(prompts)} images, skipped LLM planning")
+                print(f"[Pipeline] A+ direct mode: {job.target_count} images, skipping LLM")
+
             else:
+                # NON-A+ FLOW: run Steps 1-3 with LLM
                 # ── Step 1: Brand Analysis ──
                 job.status = 'analyzing'
                 job.current_agent = 'Brand Analyst'
@@ -120,7 +116,6 @@ def run_agent_pipeline(app, job_id):
                 db.session.commit()
 
                 brand_analysis = engine.analyze_brand(brand_kit)
-                # Store which LLM provider is active
                 job.llm_provider = 'cerebras' if engine._using_cerebras else 'groq'
                 db.session.commit()
                 job.brand_analysis = json.dumps(brand_analysis)
@@ -134,17 +129,16 @@ def run_agent_pipeline(app, job_id):
                 job.status = 'planning'
                 job.current_agent = 'Content Strategist'
                 job.progress = 20
-                job.message = f'Planning {target_count} content pieces...'
+                job.message = f'Planning {job.target_count} content pieces...'
                 db.session.commit()
 
+                content_types = json.loads(job.content_types) if job.content_types else None
                 content_plan = engine.plan_content(
                     brand_analysis, brand_kit,
-                    target_count=target_count,
-                    content_types=content_types_pre
+                    target_count=job.target_count,
+                    content_types=content_types
                 )
-                # LLMs ignore exact counts — trim to user's requested target
-                if isinstance(content_plan, list) and len(content_plan) > target_count:
-                    content_plan = content_plan[:target_count]
+                content_plan = content_plan[:job.target_count]
                 job.content_plan = json.dumps(content_plan)
                 job.progress = 30
                 db.session.commit()
@@ -159,7 +153,6 @@ def run_agent_pipeline(app, job_id):
                 job.message = f'Crafting {len(content_plan)} prompts...'
                 db.session.commit()
 
-                # Pass reference image path to engine for Gemini bot
                 if job.reference_image:
                     ref_abs = os.path.join(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -172,8 +165,8 @@ def run_agent_pipeline(app, job_id):
                 job.progress = 40
                 db.session.commit()
 
-            if not _check_job_control(job, db):
-                return
+                if not _check_job_control(job, db):
+                    return
 
             # ── Step 4: Image Generation via Flow Bot ──
             job.status = 'generating'
@@ -247,8 +240,8 @@ def run_agent_pipeline(app, job_id):
                 # Use first prompt in batch (Flow creates variations)
                 prompt_item = batch[0]
                 prompt_text = prompt_item.get('prompt', '') if isinstance(prompt_item, dict) else str(prompt_item)
-                width = prompt_item.get('width', 1024) if isinstance(prompt_item, dict) else 1024
-                height = prompt_item.get('height', 1024) if isinstance(prompt_item, dict) else 1024
+                width = int(prompt_item.get('width', 1024)) if isinstance(prompt_item, dict) else 1024
+                height = int(prompt_item.get('height', 1024)) if isinstance(prompt_item, dict) else 1024
 
                 # Aspect ratio: user override or from content plan
                 if hasattr(job, 'aspect_ratio') and job.aspect_ratio and job.aspect_ratio != 'mixed':
