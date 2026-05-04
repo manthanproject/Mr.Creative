@@ -20,10 +20,10 @@
     .pl-filter.active { background: rgba(193,205,125,0.15); border-color: #c1cd7d; color: #c1cd7d; }
 
     /* Search */
-    .pl-search { width: 100%; padding: 0.65rem 1rem 0.65rem 2.5rem; border-radius: 12px; border: 1px solid #1e1e1e; background: #0a0a0a; color: #e5e3d9; font-size: 0.85rem; margin-bottom: 1.25rem; transition: border-color 0.2s; }
+    .pl-search { width: 100%; padding: 0.65rem 1rem 0.65rem 2.5rem; border-radius: 12px; border: 1px solid #1e1e1e; background: #0a0a0a; color: #e5e3d9; font-size: 0.85rem; transition: border-color 0.2s; box-sizing: border-box; height: 42px; }
     .pl-search:focus { outline: none; border-color: #c1cd7d; }
     .pl-search-wrap { position: relative; }
-    .pl-search-icon { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #919282; font-size: 0.9rem; pointer-events: none; }
+    .pl-search-icon { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #919282; font-size: 0.85rem; pointer-events: none; line-height: 1; display: flex; align-items: center; }
 
     /* Category sections */
     .pl-category { margin-bottom: 2rem; }
@@ -82,10 +82,10 @@
 <!-- Search + Add -->
 <div style="display:flex; gap:10px; align-items:center; margin-bottom:1.25rem;">
     <div class="pl-search-wrap" style="position:relative; flex:1;">
-        <span class="pl-search-icon" style="position:absolute; left:0.85rem; top:50%; transform:translateY(-50%); color:#919282; font-size:0.85rem; pointer-events:none; line-height:1;">🔍</span>
+        <span class="pl-search-icon">⌕</span>
         <input type="text" class="pl-search" id="plSearch" placeholder="Search prompts..." oninput="filterPrompts()" style="width:100%; padding:0.65rem 1rem 0.65rem 2.5rem; border-radius:12px; border:1px solid #1e1e1e; background:#0a0a0a; color:#e5e3d9; font-size:0.85rem;">
     </div>
-    <button class="pl-btn pl-btn-primary" style="padding:0.65rem 1.25rem; font-size:0.8rem; white-space:nowrap; border-radius:12px;" onclick="toggleAddPrompt()">+ Add Prompt</button>
+    <button class="pl-btn pl-btn-primary" style="padding:0 1.25rem; font-size:0.8rem; white-space:nowrap; border-radius:12px; height:42px;" onclick="toggleAddPrompt()">+ Add Prompt</button>
 </div>
 
 <!-- Add Prompt Panel -->
