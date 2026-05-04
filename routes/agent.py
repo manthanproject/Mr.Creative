@@ -54,7 +54,7 @@ def create_brand_kit():
     return jsonify({'success': True, 'id': kit.id, 'name': kit.name})
 
 
-@agent_bp.route('/brand-kit/<kit_id>')
+@agent_bp.route('/brand-kit/<int:kit_id>', methods=['GET'])
 @login_required
 def get_brand_kit(kit_id):
     kit = BrandKit.query.filter_by(id=kit_id, user_id=current_user.id).first()
