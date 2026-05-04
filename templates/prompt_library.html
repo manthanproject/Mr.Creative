@@ -80,9 +80,31 @@
 </div>
 
 <!-- Search -->
-<div class="pl-search-wrap">
+<div class="pl-search-wrap" style="position: relative;">
     <span class="pl-search-icon">🔍</span>
-    <input type="text" class="pl-search" id="plSearch" placeholder="Search prompts..." oninput="filterPrompts()">
+    <input type="text" class="pl-search" id="plSearch" placeholder="Search prompts..." oninput="filterPrompts()" style="padding-right: 130px;">
+    <button class="pl-btn pl-btn-primary" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); padding:0.5rem 1rem; font-size:0.8rem;" onclick="toggleAddPrompt()">+ Add Prompt</button>
+</div>
+
+<!-- Add Prompt Panel -->
+<div id="addPromptPanel" style="display:none; background:#0a0a0a; border:1px solid #1e1e1e; border-radius:16px; padding:1.25rem; margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3 style="color:#e5e3d9; font-size:0.95rem; margin:0;">✨ Add Custom Prompt</h3>
+        <button class="pl-btn" onclick="toggleAddPrompt()">✕</button>
+    </div>
+    <textarea id="newPromptText" rows="3" placeholder="Write your prompt here..." style="width:100%; padding:0.75rem; border-radius:12px; border:1px solid #1e1e1e; background:#141414; color:#e5e3d9; font-size:0.85rem; resize:vertical; margin-bottom:0.75rem;"></textarea>
+    <div style="display:flex; gap:8px; align-items:center;">
+        <select id="newPromptCategory" style="padding:0.5rem 0.75rem; border-radius:10px; border:1px solid #1e1e1e; background:#141414; color:#e5e3d9; font-size:0.8rem;">
+            <option value="a_plus">📊 A Plus</option>
+            <option value="social_post">📱 Social Post</option>
+            <option value="banner">🖼 Banner</option>
+            <option value="lifestyle">🌿 Lifestyle</option>
+            <option value="ad_creative">📣 Ad Creative</option>
+            <option value="model_photography">👤 Model Photography</option>
+            <option value="custom">⭐ Custom</option>
+        </select>
+        <button class="pl-btn pl-btn-primary" style="padding:0.5rem 1.25rem;" onclick="saveCustomPrompt()">💾 Save Prompt</button>
+    </div>
 </div>
 
 <!-- Category filter pills -->
@@ -119,6 +141,9 @@
                 <button class="pl-btn" onclick="copyPrompt(this)" data-text="{{ prompt.text }}">📋 Copy</button>
                 <button class="pl-btn" onclick="useInFlow('{{ prompt.text|e }}')">🎨 Use in Flow</button>
                 <button class="pl-btn pl-btn-primary" onclick="useInAgent('{{ prompt.text|e }}')">🤖 Agent Studio</button>
+                {% if prompt.is_custom %}
+                <button class="pl-btn" onclick="deleteCustomPrompt('{{ prompt.id }}')" style="color:#f87171; margin-left:auto;">🗑</button>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
@@ -194,6 +219,42 @@ function useInFlow(prompt) {
 function useInAgent(prompt) {
     sessionStorage.setItem('prefill_prompt', prompt);
     window.location.href = '/agent/';
+}
+
+function toggleAddPrompt() {
+    var panel = document.getElementById('addPromptPanel');
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    if (panel.style.display !== 'none') document.getElementById('newPromptText').focus();
+}
+
+async function saveCustomPrompt() {
+    var text = document.getElementById('newPromptText').value.trim();
+    var category = document.getElementById('newPromptCategory').value;
+    if (!text) { showToast('Write a prompt first', 'warning'); return; }
+
+    var res = await fetch('/prompts/library/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, category: category })
+    });
+    var data = await res.json();
+    if (data.success) {
+        showToast('Prompt saved!', 'success');
+        document.getElementById('newPromptText').value = '';
+        location.reload();
+    } else {
+        showToast(data.error || 'Failed to save', 'error');
+    }
+}
+
+async function deleteCustomPrompt(id) {
+    if (!await showConfirm('Delete this prompt?')) return;
+    var res = await fetch('/prompts/library/' + id + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        showToast('Prompt deleted', 'success');
+        location.reload();
+    }
 }
 </script>
 {% endblock %}

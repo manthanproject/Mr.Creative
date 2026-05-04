@@ -30,12 +30,69 @@ def library():
             'key': key,
             'name': config.get('name', key.replace('_', ' ').title()),
             'icon': icons.get(key, '📝'),
-            'prompts': [{'text': p, 'preview': None} for p in prompts],
+            'prompts': [{'text': p, 'preview': None, 'is_custom': False} for p in prompts],
         }
         categories.append(cat)
         total += len(prompts)
 
+    # Add user's custom prompts
+    custom_prompts = Prompt.query.filter_by(user_id=current_user.id).order_by(Prompt.created_at.desc()).all()
+    if custom_prompts:
+        custom_by_type: dict = {}
+        for p in custom_prompts:
+            ptype = p.prompt_type or 'custom'
+            if ptype not in custom_by_type:
+                custom_by_type[ptype] = []
+            custom_by_type[ptype].append(
+                {'text': p.text, 'preview': None, 'id': p.id, 'is_custom': True}
+            )
+
+        for ptype, items in custom_by_type.items():
+            existing = next((c for c in categories if c['key'] == ptype), None)
+            if existing:
+                for p in items:
+                    existing['prompts'].append(p)
+            else:
+                categories.append({
+                    'key': ptype,
+                    'name': ptype.replace('_', ' ').title(),
+                    'icon': icons.get(ptype, '⭐'),
+                    'prompts': items,
+                })
+            total += len(items)
+
     return render_template('prompt_library.html', categories=categories, total_prompts=total)
+
+
+@prompts_bp.route('/library/add', methods=['POST'])
+@login_required
+def library_add():
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()
+    category = data.get('category') or 'custom'
+    if not text:
+        return jsonify({'error': 'Prompt text required'}), 400
+    prompt = Prompt(
+        user_id=current_user.id,
+        text=text,
+        prompt_type=category,
+        is_approved=True,
+        status='approved',
+    )
+    db.session.add(prompt)
+    db.session.commit()
+    return jsonify({'success': True, 'id': prompt.id})
+
+
+@prompts_bp.route('/library/<prompt_id>/delete', methods=['POST'])
+@login_required
+def library_delete(prompt_id):
+    prompt = Prompt.query.filter_by(id=prompt_id, user_id=current_user.id).first()
+    if not prompt:
+        return jsonify({'error': 'Not found'}), 404
+    db.session.delete(prompt)
+    db.session.commit()
+    return jsonify({'success': True})
 
 
 @prompts_bp.route('/')
