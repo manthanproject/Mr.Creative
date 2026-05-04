@@ -61,6 +61,9 @@ def run_agent_pipeline(app, job_id):
         pollinations = PollinationsAPI()
 
         try:
+            # Initialize so later references are always bound regardless of branch taken
+            brand_analysis = {}
+
             # ── Clamp target count ──
             job.target_count = max(1, min(25, job.target_count or 5))
 

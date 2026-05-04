@@ -299,7 +299,7 @@ def build_prompt(content_type, brand_info=None, index=0):
     seed = hash(f'{content_type}_{index}') & 0xFFFFFFFF
     rng = random.Random(seed)
 
-    config = CONTENT_TYPE_CONFIG.get(content_type, CONTENT_TYPE_CONFIG.get('social_post'))
+    config = CONTENT_TYPE_CONFIG.get(content_type, CONTENT_TYPE_CONFIG.get('social_post')) or {}
 
     # Use expert prompts if available (preferred — these are complete, self-contained)
     expert_prompts = config.get('expert_prompts', [])

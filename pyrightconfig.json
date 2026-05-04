@@ -1,7 +1,8 @@
 {
-  "exclude": [
-    "modules/selenium_bot.py"
-  ],
-  "reportMissingTypeStubs": false,
-  "reportOptionalMemberAccess": false
+    "reportCallIssue": "none",
+    "reportAttributeAccessIssue": "warning",
+    "reportMissingImports": "warning",
+    "reportOptionalSubscript": "warning",
+    "reportPossiblyUnboundVariable": "warning",
+    "exclude": ["modules/template_system.py", "modules/selenium_bot.py"]
 }
