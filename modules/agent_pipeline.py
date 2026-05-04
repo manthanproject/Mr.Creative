@@ -270,7 +270,7 @@ def run_agent_pipeline(app, job_id):
                             output_path=rel_path,
                             pomelli_feature='agent',
                             status='completed',
-                            tags=(plan_item.get('title', '') + ' | ' + prompt_text[:100]),
+                            tags=(str(plan_item.get('title', '')) + ' | ' + str(prompt_text)[:100]),
                         )
                         db.session.add(gen)
                         db.session.commit()
@@ -280,8 +280,8 @@ def run_agent_pipeline(app, job_id):
                             'filename': os.path.basename(filepath),
                             'path': rel_path,
                             'engine': 'flow',
-                            'title': plan_item.get('title', f'Image {plan_idx+1}'),
-                            'type': plan_item.get('type', 'unknown'),
+                            'title': str(plan_item.get('title', f'Image {plan_idx+1}')),
+                            'type': str(plan_item.get('type', 'unknown')),
                         })
 
                     print(f"[Pipeline] Batch {batch_num+1} done: {len(files)} images")

@@ -73,7 +73,7 @@ def generate():
         'collection_id': collection_id,
     }
 
-    flask_app = current_app._get_current_object()
+    flask_app = current_app._get_current_object()  # type: ignore[attr-defined]
 
     thread = threading.Thread(
         target=_run_flow_bot,

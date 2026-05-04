@@ -313,7 +313,7 @@ def build_prompt(content_type, brand_info=None, index=0):
         mood = get_mood(content_type, seed + 3)
         scenario = get_scenario(content_type, seed + 4)
 
-        template = config['prompt_template']
+        template = str(config.get('prompt_template', ''))
         prompt = template.format(
             scenario=scenario,
             camera_prompt=camera.get('prompt', ''),

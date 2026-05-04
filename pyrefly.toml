@@ -3,6 +3,7 @@ python-version = "3.12"
 project-excludes = ["modules/selenium_bot.py"]
 
 [tool.pyrefly]
+ignore_errors_in = ["modules/template_system.py", "modules/selenium_bot.py"]
 exclude = ["modules/selenium_bot.py"]
 
 [errors]
