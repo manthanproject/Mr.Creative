@@ -734,17 +734,16 @@ class FlowBot:
         return all_files
 
     def upload_reference_image(self, image_path):
-        """Upload a reference image via Flow's + button → Upload image → file explorer."""
+        """Upload reference image: click + → Upload image → native file dialog → pyautogui."""
         if not image_path or not os.path.exists(image_path):
-            self._update_status('entering_prompt', 'No reference image to upload')
             return False
 
         abs_path = os.path.abspath(image_path)
         self._update_status('entering_prompt', f'Uploading reference: {os.path.basename(abs_path)}')
 
         try:
-            # Step 1: Click the "+" button (text contains "add_2", bottom area, small 32x32)
-            clicked = self.driver.execute_script("""
+            # Step 1: Click the + button
+            plus_btn = self.driver.execute_script("""
                 var btns = document.querySelectorAll('button');
                 for (var b of btns) {
                     if (!b.offsetParent) continue;
@@ -757,206 +756,81 @@ class FlowBot:
                 }
                 return 'not_found';
             """)
-            self._update_status('entering_prompt', f'Plus button: {clicked}')
+            print(f"[FlowBot] Plus button: {plus_btn}")
+            if plus_btn == 'not_found':
+                return False
             time.sleep(2)
 
-            # Check for file input RIGHT AFTER + button (before clicking anything else)
-            has_input_after_plus = self.driver.execute_script("""
-                var inp = document.querySelector('input[type="file"]');
-                return inp ? true : false;
-            """)
-            if has_input_after_plus:
-                self.driver.execute_script("""
-                    var inp = document.querySelector('input[type="file"]');
-                    inp.style.display = 'block';
-                """)
-                time.sleep(0.5)
-                file_input = self.driver.find_element('css selector', 'input[type="file"]')
-                file_input.send_keys(abs_path)
-                print(f"[FlowBot] Uploaded via file input (after + button)")
-                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(3)
-                self.driver.execute_script("document.body.click();")
-                time.sleep(1)
-                self._update_status('entering_prompt', 'Reference image uploaded!')
-                return True
-
-            # Step 2: Click "Upload image" option (div with class containing sc-f4d15a74)
-            clicked = self.driver.execute_script("""
-                var els = document.querySelectorAll('div[class*="sc-f4d15a74"]');
+            # Step 2: Click "Upload image" option
+            upload_opt = self.driver.execute_script("""
+                var els = document.querySelectorAll('div, button, span');
                 for (var el of els) {
                     if (!el.offsetParent) continue;
                     var txt = el.textContent.trim();
-                    if (txt === 'Upload image') {
+                    if (txt === 'Upload image' && el.children.length === 0) {
                         el.click();
                         return 'clicked';
                     }
                 }
-                // Fallback: any visible element with exact text
-                var all = document.querySelectorAll('div, button, span');
-                for (var el of all) {
-                    if (!el.offsetParent) continue;
-                    if (el.textContent.trim() === 'Upload image' && el.children.length === 0) {
-                        el.click();
-                        return 'clicked_fallback';
-                    }
-                }
                 return 'not_found';
             """)
-            self._update_status('entering_prompt', f'Upload image: {clicked}')
+            print(f"[FlowBot] Upload image option: {upload_opt}")
             time.sleep(2)
 
-            # Step 3: Handle "Notice" consent dialog — click "I agree"
-            for _ in range(3):
-                agreed = self.driver.execute_script("""
-                    var btns = document.querySelectorAll('button');
-                    for (var b of btns) {
-                        if (!b.offsetParent) continue;
-                        var txt = b.textContent.trim();
-                        if (txt === 'I agree' || txt === 'Accept' || txt === 'OK') {
-                            b.click();
-                            return 'agreed';
-                        }
-                    }
-                    return 'no_dialog';
-                """)
-                if agreed == 'agreed':
-                    self._update_status('entering_prompt', 'Accepted notice dialog')
-                    time.sleep(2)
-                    break
-                time.sleep(1)
-
-            # Step 3b: Flow now has an in-app file picker panel.
-            # Click the "Upload image" button/link at the BOTTOM of this panel
-            # to open the native file dialog (it's different from the menu "Upload image")
-            time.sleep(1)
-            # Try file input FIRST (most reliable, skips all UI clicking)
-            has_input_early = self.driver.execute_script("""
-                var inp = document.querySelector('input[type="file"]');
-                return inp ? true : false;
+            # Step 3: Handle consent dialog if it appears
+            self.driver.execute_script("""
+                var btns = document.querySelectorAll('button');
+                for (var b of btns) {
+                    if (!b.offsetParent) continue;
+                    var txt = b.textContent.trim();
+                    if (txt === 'I agree' || txt === 'Accept') { b.click(); break; }
+                }
             """)
-            if has_input_early:
-                self.driver.execute_script("""
-                    var inp = document.querySelector('input[type="file"]');
-                    inp.style.display = 'block';
-                    inp.style.opacity = '1';
-                    inp.style.position = 'fixed';
-                    inp.style.top = '0';
-                    inp.style.left = '0';
-                    inp.style.zIndex = '99999';
-                """)
-                time.sleep(0.5)
-                file_input = self.driver.find_element('css selector', 'input[type="file"]')
-                file_input.send_keys(abs_path)
-                print(f"[FlowBot] Uploaded via file input element (early)")
-                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(3)
+            time.sleep(1)
 
-                # Close panel and verify
-                self.driver.execute_script("document.body.click();")
-                time.sleep(1)
-
-                has_ref = self.driver.execute_script("""
-                    var imgs = document.querySelectorAll('img');
-                    for (var img of imgs) {
-                        var r = img.getBoundingClientRect();
-                        if (r.y > window.innerHeight - 250 && r.width > 30 && r.width < 200) return true;
-                    }
-                    return false;
-                """)
-                if has_ref:
-                    self._update_status('entering_prompt', 'Reference image uploaded!')
-                    return True
-                print("[FlowBot] File input upload may have failed, continuing anyway")
-                self._update_status('entering_prompt', 'Reference image uploaded!')
-                return True
-
-            clicked_upload_panel = self.driver.execute_script("""
-                // Look for the Upload image button/link at the bottom of the panel
+            # Step 4: Click the bottom "Upload image" button in the panel to open file dialog
+            self.driver.execute_script("""
                 var els = document.querySelectorAll('button, div, a, span');
                 var candidates = [];
                 for (var el of els) {
                     if (!el.offsetParent) continue;
                     var txt = el.textContent.trim();
                     var r = el.getBoundingClientRect();
-                    // The bottom "Upload image" button is lower in the viewport
                     if (txt === 'Upload image' && r.y > 400) {
                         candidates.push({el: el, y: r.y});
                     }
                 }
-                // Click the lowest one (the one at the bottom of the panel)
                 if (candidates.length > 0) {
                     candidates.sort(function(a,b) { return b.y - a.y; });
                     candidates[0].el.click();
-                    return 'clicked_panel_upload';
                 }
-                // Also try file input directly
-                var inp = document.querySelector('input[type="file"]');
-                if (inp) {
-                    return 'has_file_input';
-                }
-                return 'not_found';
             """)
-            print(f"[FlowBot] Panel upload button: {clicked_upload_panel}")
             time.sleep(3)
 
-            # Step 3c: Try to use hidden file input if available (more reliable than pyautogui)
-            has_input = self.driver.execute_script("""
-                var inp = document.querySelector('input[type="file"]');
-                return inp ? true : false;
-            """)
-            if has_input:
-                self.driver.execute_script("""
-                    var inp = document.querySelector('input[type="file"]');
-                    inp.style.display = 'block';
-                    inp.style.opacity = '1';
-                    inp.style.position = 'fixed';
-                    inp.style.top = '0';
-                    inp.style.left = '0';
-                    inp.style.zIndex = '99999';
-                """)
-                time.sleep(0.5)
-                file_input = self.driver.find_element('css selector', 'input[type="file"]')
-                file_input.send_keys(abs_path)
-                print(f"[FlowBot] Uploaded via file input element")
-                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(3)
-            else:
-                # Step 4: Fallback — File explorer opens — paste path via pyautogui
-                import pyautogui
-                import subprocess
-                time.sleep(3)
-                subprocess.run(['clip'], input=abs_path.encode(), check=True)
-                pyautogui.hotkey('ctrl', 'v')
-                time.sleep(0.5)
-                pyautogui.press('enter')
-                self._update_status('entering_prompt', f'Uploading: {os.path.basename(abs_path)}')
-                time.sleep(3)
+            # Step 5: Native file dialog — paste path and press Enter
+            import pyautogui
+            import subprocess
+            subprocess.run(['clip'], input=abs_path.encode(), check=True)
+            pyautogui.hotkey('ctrl', 'a')
+            time.sleep(0.3)
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(1)
+            pyautogui.press('enter')
+            print(f"[FlowBot] File selected via dialog: {os.path.basename(abs_path)}")
+            time.sleep(5)
 
-            # Step 5: Close the image picker panel if still open (click outside or press Escape)
-            self.driver.execute_script("document.body.click();")
+            # Step 6: Close the panel
+            from selenium.webdriver.common.keys import Keys
+            ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
             time.sleep(1)
 
-            # Verify image appeared in prompt area
-            has_image = self.driver.execute_script("""
-                var imgs = document.querySelectorAll('img[src*="blob:"], img[src*="getMediaUrlRedirect"], img[src*="googleusercontent"]');
-                for (var img of imgs) {
-                    var r = img.getBoundingClientRect();
-                    if (r.width > 30 && r.height > 30 && r.y > window.innerHeight - 300) {
-                        return true;
-                    }
-                }
-                return false;
-            """)
-            if has_image:
-                self._update_status('entering_prompt', 'Reference image uploaded!')
-            else:
-                self._update_status('entering_prompt', 'Image may not have attached — proceeding')
-
+            self._update_status('entering_prompt', 'Reference image uploaded!')
             return True
 
         except Exception as e:
-            self._update_status('entering_prompt', f'Image upload error: {str(e)[:60]}')
+            print(f"[FlowBot] Upload error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     # ══════════════════════════════════════
