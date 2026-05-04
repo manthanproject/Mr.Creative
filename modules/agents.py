@@ -28,6 +28,7 @@ class AgentEngine:
             except ImportError:
                 print("[Agent] cerebras-cloud-sdk not installed — pip install cerebras-cloud-sdk")
         self._using_cerebras = False
+        self._reference_image_path: str | None = None
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7, max_tokens=2000):
         """Call Groq LLM → on 429, switch to Cerebras for rest of session."""

@@ -204,7 +204,7 @@ def launch_job():
 
     # Run pipeline in background thread
     from modules.agent_pipeline import run_agent_pipeline
-    flask_app = current_app._get_current_object()
+    flask_app = current_app
     t = threading.Thread(target=run_agent_pipeline, args=(flask_app, job.id), daemon=True)
     t.start()
 

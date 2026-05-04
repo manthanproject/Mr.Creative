@@ -24,7 +24,7 @@ class GeminiEngine:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return response.choices[0].message.content.strip()
+        return (response.choices[0].message.content or '').strip()
 
     def _parse_numbered_list(self, text):
         """Parse a numbered list response into clean strings."""

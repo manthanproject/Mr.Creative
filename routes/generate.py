@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from models import db, Prompt, Generation, Collection, JobQueue
 from datetime import datetime
+from typing import Any
 import os
 import threading
 import json
@@ -12,7 +13,7 @@ import re
 generate_bp = Blueprint('generate', __name__)
 
 # Global bot status for real-time updates
-_bot_status = {}
+_bot_status: dict[str, dict[str, Any]] = {}
 
 
 def cleanup_stale_jobs(app):
@@ -300,6 +301,12 @@ def run_bot_in_background(app, prompt_text, collection_id, user_id, job_id,
             }
 
             bot = _get_or_create_bot(config)
+            if bot is None:
+                job.status = 'failed'
+                job.error_message = 'Bot not initialized'
+                update_bot_status(job_id, 'error', 'Bot not initialized', -1)
+                db.session.commit()
+                return
             bot.config = config
             bot._current_job_id = job_id
             bot._pending_ideas = []
@@ -385,6 +392,12 @@ def run_photoshoot_in_background(app, image_path, templates, photoshoot_mode,
             }
 
             bot = _get_or_create_bot(config)
+            if bot is None:
+                job.status = 'failed'
+                job.error_message = 'Bot not initialized'
+                update_bot_status(job_id, 'error', 'Bot not initialized', -1)
+                db.session.commit()
+                return
             bot.config = config
             bot._current_job_id = job_id
             _hook_bot_status(bot, job_id)
@@ -495,7 +508,7 @@ def launch():
 
     update_bot_status(job.id, 'queued', 'Starting bot...', 0)
 
-    app = current_app._get_current_object()
+    app = current_app
     thread = threading.Thread(
         target=run_bot_in_background,
         args=(app, prompt_text, collection_id, current_user.id, job.id,
@@ -538,13 +551,13 @@ def upload_and_launch():
     except (json.JSONDecodeError, TypeError):
         templates = []
 
-    upload_dir = os.path.join(current_app.static_folder, 'uploads', 'photoshoot')
+    upload_dir = os.path.join(current_app.static_folder or 'static', 'uploads', 'photoshoot')
     os.makedirs(upload_dir, exist_ok=True)
 
     from werkzeug.utils import secure_filename
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     saved_path = None
-    if has_image:
+    if image_file is not None and image_file.filename:
         safe_name = secure_filename(image_file.filename)
         saved_filename = f"{timestamp}_{safe_name}"
         saved_path = os.path.join(upload_dir, saved_filename)
@@ -581,7 +594,7 @@ def upload_and_launch():
     db.session.add(job)
     db.session.commit()
 
-    app = current_app._get_current_object()
+    app = current_app
 
     if photoshoot_mode == 'campaign':
         # Campaign with image — use campaign bot

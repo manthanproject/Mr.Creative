@@ -59,7 +59,7 @@ def create():
         saved_image_path = None
         if image_file and image_file.filename:
             from werkzeug.utils import secure_filename
-            upload_dir = os.path.join(current_app.static_folder, 'uploads', 'scheduled')
+            upload_dir = os.path.join(current_app.static_folder or 'static', 'uploads', 'scheduled')
             os.makedirs(upload_dir, exist_ok=True)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             safe_name = secure_filename(image_file.filename)
@@ -259,7 +259,7 @@ def run_now(job_id):
         templates = []
 
     import threading
-    app = current_app._get_current_object()
+    app = current_app
 
     if job.pomelli_feature == 'photoshoot':
         thread = threading.Thread(

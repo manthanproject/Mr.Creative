@@ -127,7 +127,7 @@ class FlowBot:
             self.driver.execute_script("document.body.click();")
             time.sleep(1)
 
-            if logged_email and self.expected_email.lower() == logged_email.lower():
+            if logged_email and (self.expected_email or '').lower() == logged_email.lower():
                 self._update_status('navigating', 'Correct account already active!')
                 return
 
@@ -169,7 +169,7 @@ class FlowBot:
                         var email = (a.getAttribute('data-email') || a.getAttribute('data-identifier') || '').toLowerCase();
                         if (email === target) { a.click(); return; }
                     }
-                """, self.expected_email.lower())
+                """, (self.expected_email or '').lower())
                 for _ in range(20):
                     time.sleep(2)
                     if self._is_on_flow():

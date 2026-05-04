@@ -5,7 +5,7 @@ from modules.collection_mgr import (
     save_upload_to_collection, export_collection_as_zip,
     get_collection_files, allowed_file
 )
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 
 collections_bp = Blueprint('collections', __name__)
@@ -86,13 +86,13 @@ def upload(collection_id):
                     pomelli_feature='manual',
                     status='completed',
                     file_size=info['file_size'],
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(UTC),
                 )
                 db.session.add(gen)
                 uploaded.append(info['filename'])
 
     # Update collection timestamp
-    collection.updated_at = datetime.utcnow()
+    collection.updated_at = datetime.now(UTC)
     db.session.commit()
 
     if uploaded:

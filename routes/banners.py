@@ -73,7 +73,7 @@ def generate():
         'collection_id': collection_id,
     }
 
-    flask_app = current_app._get_current_object()
+    flask_app = current_app
 
     thread = threading.Thread(
         target=_run_flow_bot,
@@ -117,6 +117,7 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
     from modules.flow_bot import FlowBot
 
     job = _banner_jobs[job_id]
+    driver = None
 
     try:
         # Auto-launch Flow Chrome if not running
@@ -191,7 +192,10 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
         # Move downloaded files to collection output dir and save to DB
         with flask_app.app_context():
             saved = []
-            for filepath in result.get('downloaded_files', []):
+            downloaded = result.get('downloaded_files', [])
+            if not isinstance(downloaded, list):
+                downloaded = []
+            for filepath in downloaded:
                 if os.path.exists(filepath):
                     filename = os.path.basename(filepath)
                     dest = os.path.join(output_dir, filename)
@@ -233,11 +237,12 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
         job['errors'] = [str(e)]
     finally:
         # Quit this ChromeDriver session (not Chrome itself — it stays alive on port 9222)
-        try:
-            driver.quit()
-            print("[FlowBot] ChromeDriver session closed — Chrome stays alive for next job")
-        except Exception:
-            pass
+        if driver is not None:
+            try:
+                driver.quit()
+                print("[FlowBot] ChromeDriver session closed — Chrome stays alive for next job")
+            except Exception:
+                pass
 
 
 @banners_bp.route('/flow-accounts')

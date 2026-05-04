@@ -6,7 +6,10 @@ Model: FLUX.1-schnell via hf-inference provider
 import os
 import io
 import datetime
-from huggingface_hub import InferenceClient
+try:
+    from huggingface_hub import InferenceClient  # type: ignore[import-not-found]
+except ImportError:
+    InferenceClient = None  # type: ignore[assignment,misc]
 
 ASPECT_RATIOS = {
     'story':     {'label': 'Story (9:16)',     'width': 768,  'height': 1344},

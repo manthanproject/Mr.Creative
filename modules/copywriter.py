@@ -50,7 +50,7 @@ class Copywriter:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            return response.choices[0].message.content.strip()
+            return (response.choices[0].message.content or '').strip()
         except Exception as e:
             err = str(e)
             if ('429' in err or 'rate_limit' in err) and self.cerebras_client and not self._using_cerebras:
