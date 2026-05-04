@@ -420,7 +420,7 @@ async function createPost(mode) {
 
 // ═══ POST NOW ═══
 async function postNow(postId) {
-    if (!confirm('Post this pin to Pinterest now?')) return;
+    if (!await showConfirm('Post this pin to Pinterest now?')) return;
     var el = document.getElementById('post-' + postId);
     try {
         var res = await fetch('/social/post-now/' + postId, { method: 'POST' });
@@ -435,7 +435,7 @@ async function postNow(postId) {
 
 // ═══ DELETE POST ═══
 async function deletePost(postId) {
-    if (!confirm('Delete this post?')) return;
+    if (!await showConfirm('Delete this post?')) return;
     try {
         var res = await fetch('/social/delete/' + postId, { method: 'POST' });
         var data = await res.json();

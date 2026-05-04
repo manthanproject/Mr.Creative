@@ -371,7 +371,7 @@ async function flowSaveSwitch() {
 }
 
 async function flowDeleteAccount(email) {
-    if (!confirm('Remove ' + email + '?')) return;
+    if (!await showConfirm('Remove ' + email + '?')) return;
     try {
         var res = await fetch('/banners/flow-delete-account', {
             method: 'POST',
@@ -439,7 +439,7 @@ async function pauseBannerJob() {
 
 async function stopBannerJob() {
     if (!currentJobId) return;
-    if (!confirm('Stop this job?')) return;
+    if (!await showConfirm('Stop this job?')) return;
     var res = await fetch('/banners/job/' + currentJobId + '/stop', { method: 'POST' });
     var data = await res.json();
     if (data.success) {
@@ -454,7 +454,7 @@ async function stopBannerJob() {
 
 async function deleteBannerJob() {
     if (!currentJobId) return;
-    if (!confirm('Delete this job?')) return;
+    if (!await showConfirm('Delete this job?')) return;
     var res = await fetch('/banners/job/' + currentJobId + '/delete', { method: 'POST' });
     var data = await res.json();
     if (data.success) {

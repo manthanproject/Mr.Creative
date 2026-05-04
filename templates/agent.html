@@ -327,7 +327,7 @@
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <span style="font-size: 0.68rem; color: var(--ag-text-muted);">{{ jobs|length }} jobs</span>
                     {% if jobs %}
-                    <form action="{{ url_for('agent.clear_history') }}" method="POST" style="margin:0;" onsubmit="return confirm('Clear all job history?')">
+                    <form id="clearHistoryForm" action="{{ url_for('agent.clear_history') }}" method="POST" style="margin:0;">
                         <button type="submit" style="background: transparent; border: 1px solid rgba(255,80,80,0.3); color: #ff6b6b; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.65rem; cursor: pointer;">🗑 Clear</button>
                     </form>
                     {% endif %}
@@ -449,8 +449,8 @@ function selectKit(el, kitId) {
     selectedKitId = kitId;
 }
 
-function deleteBrandKit(id) {
-    if (!confirm('Delete this brand kit?')) return;
+async function deleteBrandKit(id) {
+    if (!await showConfirm('Delete this brand kit?')) return;
     fetch('/agent/brand-kit/' + id + '/delete', { method: 'POST' })
         .then(function(r) { return r.json(); })
         .then(function(d) { if (d.success) location.reload(); else showToast(d.error || 'Delete failed', 'error'); })
@@ -664,7 +664,7 @@ async function pauseJob() {
 
 async function stopJob() {
     if (!currentJobId) return;
-    if (!confirm('Stop this job? Images generated so far will be kept.')) return;
+    if (!await showConfirm('Stop this job? Images generated so far will be kept.')) return;
     var res = await fetch('/agent/job/' + currentJobId + '/stop', { method: 'POST' });
     var data = await res.json();
     if (data.success) {
@@ -683,7 +683,7 @@ async function stopJob() {
 }
 
 async function deleteJob(jobId) {
-    if (!confirm('Delete this job?')) return;
+    if (!await showConfirm('Delete this job?')) return;
     var res = await fetch('/agent/job/' + jobId + '/delete', { method: 'POST' });
     var data = await res.json();
     if (data.success) {
@@ -691,6 +691,14 @@ async function deleteJob(jobId) {
         location.reload();
     }
 }
+
+(function() {
+    var f = document.getElementById('clearHistoryForm');
+    if (f) f.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (await showConfirm('Clear all job history?')) this.submit();
+    });
+})();
 
 async function genMockups() {
     if (!currentJobId) return;
