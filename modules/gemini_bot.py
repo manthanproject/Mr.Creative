@@ -74,82 +74,151 @@ class GeminiBot:
             time.sleep(3)
         print("[GeminiBot] On Gemini chat page")
 
+    def _bring_chrome_to_front(self):
+        """Bring Chrome window to foreground before pyautogui actions."""
+        try:
+            self.driver.switch_to.window(self.driver.current_window_handle)
+            time.sleep(0.3)
+            # Also maximize to ensure it's visible
+            self.driver.execute_script("window.focus();")
+            time.sleep(0.3)
+        except Exception:
+            pass
+
     def _upload_image(self, image_path):
-        """Upload image to Gemini — make hidden button visible, click via Selenium, drive native file dialog."""
+        """Upload image to Gemini via visible UI: + button → Upload files → native dialog.
+        Hidden buttons don't work for triggering native file dialogs."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
             print(f"[GeminiBot] Image not found: {abs_path}")
             return False
 
         try:
-            # Make the hidden button visible so Selenium can interact with it
-            self.driver.execute_script("""
-                var btn = document.querySelector('button.hidden-local-file-image-selector-button');
-                if (btn) {
-                    btn.removeAttribute('aria-hidden');
-                    btn.style.position = 'fixed';
-                    btn.style.top = '0';
-                    btn.style.left = '0';
-                    btn.style.display = 'block';
-                    btn.style.opacity = '1';
-                    btn.style.zIndex = '999999';
-                    btn.style.width = '50px';
-                    btn.style.height = '50px';
+            # Step 1: Find and click the + button (visible, near input area at bottom)
+            # The + button is a mat-icon button in the input toolbar, no text/aria-label
+            # Strategy: find the ql-editor, then find clickable elements near it
+            clicked_plus = self.driver.execute_script("""
+                // Find the input toolbar area — scan all buttons for the + icon
+                var editor = document.querySelector('div.ql-editor');
+                if (!editor) return 'no_editor';
+                
+                // The + button is in the same parent container as the editor
+                // Walk up to find the input area wrapper
+                var container = editor;
+                for (var i = 0; i < 10; i++) {
+                    container = container.parentElement;
+                    if (!container) break;
+                    // Look for buttons inside this container
+                    var btns = container.querySelectorAll('button, [role="button"]');
+                    for (var b of btns) {
+                        if (!b.offsetParent) continue;
+                        var r = b.getBoundingClientRect();
+                        // The + button is small (< 60px), near the bottom, and leftmost
+                        if (r.width < 60 && r.height < 60 && r.x < 200) {
+                            // Check if it has a mat-icon or svg child (icon button)
+                            var hasIcon = b.querySelector('mat-icon, svg, gem-icon');
+                            if (hasIcon) {
+                                b.click();
+                                return 'clicked_plus_at_' + Math.round(r.x) + ',' + Math.round(r.y);
+                            }
+                        }
+                    }
                 }
+                
+                // Fallback: click any button with add/plus-like characteristics
+                var allBtns = document.querySelectorAll('button');
+                for (var b of allBtns) {
+                    if (!b.offsetParent) continue;
+                    var r = b.getBoundingClientRect();
+                    if (r.y > window.innerHeight - 200 && r.x < 150 && r.width < 60) {
+                        b.click();
+                        return 'clicked_bottom_left_btn_at_' + Math.round(r.x) + ',' + Math.round(r.y);
+                    }
+                }
+                
+                return 'not_found';
             """)
-            time.sleep(0.5)
+            print(f"[GeminiBot] Plus button: {clicked_plus}")
+            
+            if clicked_plus == 'not_found' or clicked_plus == 'no_editor':
+                print("[GeminiBot] Could not find + button — trying ActionChains click at editor position")
+                # Click slightly below and left of the editor
+                editor = self.driver.find_element(By.CSS_SELECTOR, 'div.ql-editor')
+                from selenium.webdriver.common.action_chains import ActionChains
+                actions = ActionChains(self.driver)
+                # The + is about 50px below and 300px to the left of editor center
+                actions.move_to_element_with_offset(editor, -350, 50)
+                actions.click()
+                actions.perform()
+                print("[GeminiBot] Clicked at estimated + button position")
+            
+            time.sleep(2)
 
-            # Use Selenium .click() — JS click can't trigger native file dialogs
-            btn = self.driver.find_element(By.CSS_SELECTOR, 'button.hidden-local-file-image-selector-button')
-            btn.click()
-            print("[GeminiBot] Clicked hidden image selector button via Selenium")
+            # Step 2: Click "Upload files" from the dropdown menu
+            clicked_upload = self.driver.execute_script("""
+                // Look for Upload files menu item
+                var items = document.querySelectorAll('button, [role="menuitem"], [role="option"], .mat-mdc-list-item');
+                for (var item of items) {
+                    if (!item.offsetParent) continue;
+                    var label = item.getAttribute('aria-label') || '';
+                    var text = (item.textContent || '').trim();
+                    if (label.includes('Upload files') || text === 'Upload files' || text.startsWith('Upload files')) {
+                        item.click();
+                        return 'clicked_upload_files';
+                    }
+                }
+                return 'not_found';
+            """)
+            print(f"[GeminiBot] Upload files menu: {clicked_upload}")
+            
+            if clicked_upload == 'not_found':
+                print("[GeminiBot] Upload files not found in menu — file dialog may not open")
+                return False
+            
             time.sleep(3)  # Wait for native file dialog to open
 
-            # Drive the native file dialog with pyautogui + clipboard
+            # Step 3: Native file dialog is now open and auto-focused on Windows
             import pyautogui
             import subprocess
-            pyautogui.hotkey('ctrl', 'a')  # Select existing filename text
-            time.sleep(0.3)
+            # Paste path via clipboard (most reliable for any path)
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            time.sleep(0.5)
+            pyautogui.hotkey('ctrl', 'a')
+            time.sleep(0.3)
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.5)
+            time.sleep(1)
             pyautogui.press('enter')
-            print(f"[GeminiBot] File path pasted via pyautogui: {os.path.basename(abs_path)}")
-            time.sleep(8)  # Wait for upload
+            print(f"[GeminiBot] File selected in dialog: {os.path.basename(abs_path)}")
 
-            # Hide the button again
-            self.driver.execute_script("""
-                var btn = document.querySelector('button.hidden-local-file-image-selector-button');
-                if (btn) {
-                    btn.style.position = '';
-                    btn.style.top = '';
-                    btn.style.left = '';
-                    btn.style.display = '';
-                    btn.style.opacity = '';
-                    btn.style.zIndex = '';
-                    btn.style.width = '';
-                    btn.style.height = '';
+            # Step 4: Wait for upload to complete
+            time.sleep(8)
+
+            # Step 5: Verify thumbnail appeared in chat input
+            has_thumb = self.driver.execute_script("""
+                // Check for image thumbnail near the input area
+                var imgs = document.querySelectorAll('img');
+                for (var img of imgs) {
+                    var r = img.getBoundingClientRect();
+                    if (r.y > window.innerHeight - 350 && r.width > 30 && r.width < 200) return true;
                 }
-            """)
-
-            # Verify thumbnail appeared near bottom of page
-            has_thumbnail = self.driver.execute_script("""
-                var nodes = document.querySelectorAll('img, .upload-card');
-                for (var n of nodes) {
-                    var r = n.getBoundingClientRect();
-                    if (r.y > window.innerHeight - 300 && r.width > 20 && r.width < 250) return true;
+                // Check for upload card elements
+                var cards = document.querySelectorAll('[class*="upload-card"], [class*="image-card"], [class*="attachment"]');
+                for (var c of cards) {
+                    if (c.offsetParent) return true;
                 }
                 return false;
             """)
-            if has_thumbnail:
-                print("[GeminiBot] ✓ Thumbnail confirmed — image uploaded")
+            
+            if has_thumb:
+                print("[GeminiBot] Image thumbnail confirmed!")
             else:
-                print("[GeminiBot] ⚠️ Thumbnail not detected, but proceeding")
+                print("[GeminiBot] WARNING: No thumbnail found — image may not have uploaded")
+
             return True
 
         except Exception as e:
             print(f"[GeminiBot] Image upload error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _type_prompt(self, text):
@@ -305,13 +374,6 @@ class GeminiBot:
             cleaned = re.sub(r'^(?:Prompt\s*)?\d+[\.\)\:\-]\s*', '', cleaned).strip()
             cleaned = re.sub(r'^[\-\•\*]\s+', '', cleaned).strip()
 
-            # Strip enclosing quotes (ASCII or smart)
-            if len(cleaned) >= 2 and (
-                (cleaned[0] == '"' and cleaned[-1] == '"') or
-                (cleaned[0] == '“' and cleaned[-1] == '”')
-            ):
-                cleaned = cleaned[1:-1].strip()
-
             # Skip headers and meta-text
             if cleaned.startswith(('# ', '## ', '### ', '---')):
                 if current_prompt and len(current_prompt) > 30:
@@ -326,6 +388,11 @@ class GeminiBot:
                 continue
 
             if cleaned:
+                # Strip surrounding quotes (Gemini often wraps prompts in "...")
+                if (cleaned.startswith('"') and cleaned.endswith('"')) or \
+                   (cleaned.startswith('"') and cleaned.endswith('"')):
+                    cleaned = cleaned[1:-1].strip()
+
                 if current_prompt:
                     current_prompt += ' ' + cleaned
                 else:
