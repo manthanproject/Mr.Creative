@@ -331,7 +331,7 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="empty-state animate-fade-up delay-1">
+<div class="empty-state">
     <div class="empty-icon">◫</div>
     <h3>No collections yet</h3>
     <p>Create your first collection to organize generated creatives</p>
@@ -586,7 +586,7 @@ async function bulkDeleteSelected() {
                 if (allCollectionIds.length === 0) {
                     var grid = document.getElementById('collectionsGrid');
                     if (grid) {
-                        grid.outerHTML = '<div class="empty-state animate-fade-up delay-1">' +
+                        grid.outerHTML = '<div class="empty-state">' +
                             '<div class="empty-icon">◫</div>' +
                             '<h3>No collections yet</h3>' +
                             '<p>Create your first collection to organize generated creatives</p>' +
