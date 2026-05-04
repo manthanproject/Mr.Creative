@@ -1126,6 +1126,14 @@ class PomelliBot:
                     self._update_status(PomelliBotStatus.NAVIGATING, 'Already on editor page — skipping mode card')
                     return
 
+            # Debug: what's actually on this page?
+            page_url = self.driver.current_url
+            page_title = self.driver.title
+            body_text = self.driver.execute_script("return document.body?.innerText?.substring(0, 300) || 'empty'")
+            self._update_status(PomelliBotStatus.NAVIGATING, f'Page: {page_url}')
+            print(f"[PomelliBot] DEBUG url={page_url} title={page_title}")
+            print(f"[PomelliBot] DEBUG body={body_text[:200]}")
+
             # Poll for mode cards on landing page (up to 15s)
             for tick in range(15):
                 time.sleep(1)
