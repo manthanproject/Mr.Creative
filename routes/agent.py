@@ -176,12 +176,30 @@ def upload_logo():
 def launch_job():
     data = request.get_json() or {}
     kit_id = data.get('brand_kit_id', '').strip()
-    if not kit_id:
-        return jsonify({'error': 'Select a brand kit'}), 400
 
-    kit = BrandKit.query.filter_by(id=kit_id, user_id=current_user.id).first()
-    if not kit:
-        return jsonify({'error': 'Brand kit not found'}), 404
+    if kit_id:
+        kit = BrandKit.query.filter_by(id=kit_id, user_id=current_user.id).first()
+        if not kit:
+            return jsonify({'error': 'Brand kit not found'}), 404
+    else:
+        # No brand kit selected — create a neutral default so the pipeline can run
+        kit = BrandKit(
+            user_id=current_user.id,
+            name='Product',
+            description='',
+            product_category='',
+            target_audience='',
+            tone='professional',
+            font_style='modern',
+            primary_color='#1a1a2e',
+            secondary_color='#e94560',
+            accent_color='#0f3460',
+            heading_font='Poppins',
+            body_font='Inter',
+        )
+        db.session.add(kit)
+        db.session.commit()
+        kit_id = kit.id
 
     target_count = data.get('target_count', 20)
     content_types = data.get('content_types', ['social_post', 'banner', 'a_plus', 'lifestyle', 'ad_creative'])

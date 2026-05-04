@@ -474,7 +474,7 @@ async function saveBrandKit() {
 }
 
 async function launchAgent() {
-    if (!selectedKitId) { alert('Select a brand kit first'); return; }
+    // Brand kit is optional — backend creates a neutral default if none selected.
 
     var types = [];
     document.querySelectorAll('.ag-pill.active').forEach(function(p) {
