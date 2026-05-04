@@ -81,6 +81,22 @@ class AgentEngine:
                         return json.loads(text[start:end+1])
                     except json.JSONDecodeError:
                         continue
+            # Attempt to repair truncated JSON arrays
+            if '[' in text:
+                # Find the array start
+                arr_start = text.index('[')
+                partial = text[arr_start:]
+                # Find the last complete object (ends with })
+                last_brace = partial.rfind('}')
+                if last_brace > 0:
+                    repaired = partial[:last_brace + 1] + ']'
+                    try:
+                        parsed = json.loads(repaired)
+                        if isinstance(parsed, list) and len(parsed) > 0:
+                            print(f"[Agent] Repaired truncated JSON: {len(parsed)} items recovered")
+                            return parsed
+                    except json.JSONDecodeError:
+                        pass
             print(f"[Agent] Failed to parse JSON: {text[:200]}")
             return None
 
@@ -221,7 +237,7 @@ For A+ content specifically: each piece should have a DIFFERENT subtype (hero_ba
 Use "flow" engine for ALL pieces (reference image is provided)."""
 
         print(f"[Agent 2] Content Strategist: Planning {target_count} pieces...")
-        result = self._call_llm(system, user, temperature=0.7, max_tokens=4000)
+        result = self._call_llm(system, user, temperature=0.7, max_tokens=8000)
         parsed = self._parse_json(result)
         if parsed and isinstance(parsed, list):
             print(f"[Agent 2] Content plan ready: {len(parsed)} pieces planned!")
