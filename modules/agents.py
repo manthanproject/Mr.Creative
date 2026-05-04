@@ -332,9 +332,6 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
             print(f"[Agent 3] Prompts ready: {len(parsed)} crafted!")
         return parsed or []
 
-    # ═══════════════════════════════════════════
-    # AGENT 6: Quality Reviewer
-    # ═══════════════════════════════════════════
     def _craft_aplus_prompts_direct(self, content_plan, brand_analysis, brand_kit):
         """Build A+ prompts directly from expert templates.
         Generic prompts work best — Flow gets product details from reference image."""
@@ -363,6 +360,9 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
         print(f"[Agent 3] A+ prompts built directly: {len(prompts)} (no LLM rewriting)")
         return prompts
 
+    # ═══════════════════════════════════════════
+    # AGENT 6: Quality Reviewer
+    # ═══════════════════════════════════════════
     def review_results(self, content_plan, results, brand_analysis):
         """Review generated images and flag any that need regeneration."""
         # For now, auto-approve all — can add vision model later
