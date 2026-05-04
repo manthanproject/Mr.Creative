@@ -105,12 +105,14 @@ class GeminiBot:
             # Step 2: Wait for menu to appear
             time.sleep(2)
 
-            # Step 3: JS click "Upload files" from the dropdown
-            clicked_upload = drv.execute_script("""
-                var btn = document.querySelector('button[aria-label*="Upload files"]');
-                if (btn) { btn.click(); return 'clicked'; }
-                return 'not_found';
-            """)
+            # Step 3: Click "Upload files" using Selenium WebElement.click()
+            # JS click can't trigger native file dialogs — Selenium click can
+            try:
+                upload_btn = drv.find_element(By.CSS_SELECTOR, 'button[aria-label*="Upload files"]')
+                upload_btn.click()
+                clicked_upload = 'selenium_clicked'
+            except Exception:
+                clicked_upload = 'not_found'
             print(f"[GeminiBot] Upload files: {clicked_upload}")
             if clicked_upload == 'not_found':
                 # Close the menu before returning
@@ -419,8 +421,9 @@ class GeminiBot:
         type_desc = type_labels.get(content_type, type_labels['social_post'])
 
         return (
-            f"Look at this product image. Write exactly {prompt_count} unique prompts "
-            f"for Google Flow (an AI image generator that uses this product photo as reference)."
+            f"IMPORTANT: Respond with TEXT ONLY. Do NOT generate or create any images. "
+            f"I need you to WRITE {prompt_count} text prompts (plain text descriptions) "
+            f"that I will later paste into an AI image generator called Flow."
             f"\n\nContent type: {type_desc}"
             f"\n\nRules:"
             f"\n- NO brand names or trademarked names — describe the product visually instead"
