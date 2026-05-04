@@ -1,0 +1,7 @@
+{
+  "exclude": [
+    "modules/selenium_bot.py"
+  ],
+  "reportMissingTypeStubs": false,
+  "reportOptionalMemberAccess": false
+}

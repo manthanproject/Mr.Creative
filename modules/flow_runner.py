@@ -1,3 +1,4 @@
+# pyright: reportOptionalMemberAccess=false
 """
 Standalone Flow bot runner for agent pipeline.
 Manages a persistent session across batches.

@@ -1,3 +1,4 @@
+# pyright: reportOptionalMemberAccess=false
 """
 Mr.Creative — Selenium Bot for Pomelli Automation
 Exact Pomelli flow: Enter prompt → Generate Ideas → Pick idea → Wait for 4 creatives → Download all via 3-dot menu

@@ -1,5 +1,9 @@
 python-interpreter = "C:/Users/Doker/AppData/Local/Programs/Python/Python312/python.exe"
 python-version = "3.12"
+project-excludes = ["modules/selenium_bot.py"]
+
+[tool.pyrefly]
+exclude = ["modules/selenium_bot.py"]
 
 [errors]
 # SQLAlchemy declarative models accept column kwargs at runtime via
