@@ -205,6 +205,9 @@
         outline: 2px solid #c1cd7d;
         outline-offset: -2px;
         box-shadow: 0 0 0 4px rgba(193, 205, 125, 0.15);
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
 
     .collection-card.selected .collection-cover::after {
@@ -427,9 +430,9 @@ function handleCardClick(event, id, url) {
         event.preventDefault();
         event.stopPropagation();
         toggleCardSelect(id);
-    } else {
-        window.location = url;
+        return false;
     }
+    window.location.href = url;
 }
 
 function toggleCardSelect(id) {
