@@ -872,16 +872,16 @@ class FlowBot:
                 if image_path:
                     self.upload_reference_image(image_path)
 
-                # Count existing images AFTER upload so reference image is included
-                count_before = self.count_images()
-                project_url = self.driver.current_url
-
             # Type prompt immediately (don't wait for image processing)
             self.type_prompt(prompt)
 
             # NOW wait for image processing to complete before clicking Create
             if image_path:
                 self._wait_for_image_processing()
+
+            # Count existing images AFTER reference is fully loaded so it's included
+            count_before = self.count_images()
+            project_url = self.driver.current_url
 
             if not self.click_create():
                 result['errors'].append('Could not click Create')
