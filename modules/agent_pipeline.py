@@ -204,28 +204,6 @@ def run_agent_pipeline(app, job_id):
             image_index = 0
             from modules.flow_runner import FlowSession
 
-            # Pre-clean reference image with rembg (transparent background)
-            if job.reference_image:
-                try:
-                    from modules.post_processor import PostProcessor
-                    pre_processor = PostProcessor(brand_kit)
-                    ref_abs = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'static', job.reference_image
-                    )
-                    cleaned = pre_processor.clean_reference_image(ref_abs)
-                    if cleaned != ref_abs:
-                        # Update job reference to cleaned version
-                        clean_rel = os.path.relpath(
-                            cleaned,
-                            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
-                        ).replace('\\', '/')
-                        job.reference_image = clean_rel
-                        db.session.commit()
-                        print(f"[Pipeline] Reference image cleaned with rembg")
-                except Exception as e:
-                    print(f"[Pipeline] rembg pre-clean skipped: {e}")
-
             session = FlowSession()
             if not session.start():
                 raise RuntimeError('Could not start Flow session')

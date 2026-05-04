@@ -974,6 +974,25 @@ class FlowBot:
                 # Upload reference image if provided
                 if image_path:
                     self.upload_reference_image(image_path)
+                    # Wait for Flow to fully process the uploaded image
+                    self._update_status('entering_prompt', 'Waiting for image to process...')
+                    time.sleep(5)
+                    # Verify thumbnail is visible in prompt area
+                    for attempt in range(6):
+                        has_thumb = self.driver.execute_script("""
+                            var imgs = document.querySelectorAll('img');
+                            for (var img of imgs) {
+                                var r = img.getBoundingClientRect();
+                                if (r.y > window.innerHeight - 300 && r.width > 30 && r.width < 300 && r.height > 30) return true;
+                            }
+                            return false;
+                        """)
+                        if has_thumb:
+                            self._update_status('entering_prompt', 'Reference image ready!')
+                            break
+                        time.sleep(3)
+                    else:
+                        self._update_status('entering_prompt', 'WARNING: Image thumbnail not confirmed')
 
                 # Count existing images AFTER upload so reference image is included
                 count_before = self.count_images()
