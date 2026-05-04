@@ -80,21 +80,21 @@ CONTENT_TYPE_CONFIG = {
         'scenarios': [],
         'prompt_template': '{scenario}',
         'expert_prompts': [
-            'Amazon A+ product listing design. Product bottle centered on white background. Bold heading text at top with the product name. Three bullet points below with checkmark icons listing key product benefits. Brand logo at top left. Award badge at top right. Clean, modern, professional e-commerce infographic design layout.',
+            'Amazon A+ product listing infographic. Hero shot with the product centered on a clean white background. Large bold heading at the top, three bullet points below with checkmark icons describing benefits, circular award badge in the top corner. Clean modern e-commerce design with soft glow.',
 
-            'Professional Amazon product listing infographic with 4 panels in a 2x2 grid layout. Top-left: product hero shot on white background with brand name. Top-right: HOW TO USE with 3 numbered steps and icons. Bottom-left: before and after comparison split image. Bottom-right: 5 key benefits listed with small icons. Clean design, modern e-commerce layout.',
+            'Amazon A+ product listing infographic with a 2x2 grid layout. Top-left panel: product hero shot on a clean background. Top-right panel: HOW TO USE with three numbered steps and small icons. Bottom-left panel: before and after split-image comparison. Bottom-right panel: five short benefit lines with small icons. Clean modern e-commerce design.',
 
-            'Amazon A+ content image showing the product held in a hand against a solid color branded background demonstrating size. Large bold headline text above with the main benefit. Three lines of supporting text below. Certification badge in corner. Clean commercial product listing design.',
+            'Amazon A+ content infographic showing the product held in a hand against a solid neutral background to demonstrate size. Large bold headline text above and three lines of supporting text below. Small certification badge in the corner. Clean commercial product listing design.',
 
-            'Amazon A+ comparison chart infographic. Clean table layout comparing this product versus generic alternatives. Rows showing features with checkmarks and X marks. Product column highlighted with brand color. Product image at top. Bold heading WHY CHOOSE US. Professional data-driven design.',
+            'Amazon A+ comparison chart infographic. Clean two-column table layout comparing the product against a generic alternative. Rows of features with checkmark icons in the product column and X icons in the alternative column. Product hero shot at the top. Bold heading WHY CHOOSE US. Professional data-driven design.',
 
-            'Amazon A+ product listing hero banner. Wide format with product on the right side. Bold heading on the left with product name and key claim. Three benefit icons with short descriptions below the heading. Brand logo at top. Award winning badge. Clean gradient background with brand colors. Professional e-commerce banner.',
+            'Amazon A+ hero banner infographic. Wide format with the product on the right side. Bold headline on the left with three benefit icons and short descriptions below. Subtle award badge at the top. Clean gradient background. Professional e-commerce banner design.',
 
-            'Amazon A+ how to use infographic. Product image on the left. Three numbered steps on the right with simple icons and short instruction text for each step. Bold heading HOW TO USE at top. Clean white background with brand color accents. Professional step by step guide layout.',
+            'Amazon A+ how-to-use infographic. Product hero shot on the left. Three numbered steps on the right, each with a simple icon and one short instruction line. Bold HOW TO USE heading at the top. Clean white background. Professional step-by-step guide layout.',
 
-            'Amazon A+ feature benefits grid. Six benefit tiles in a 2x3 grid. Each tile has a simple icon, bold feature name, and one line description. Product image centered above or beside the grid. Brand colors for icons and borders. Clean informational scannable layout for product listing page.',
+            'Amazon A+ feature benefits grid infographic. Six benefit tiles arranged in a 2x3 grid. Each tile shows a simple icon, a short feature label, and a one-line description. Product hero shot centered above or beside the grid. Clean informational scannable layout.',
 
-            'Amazon A+ full page product listing infographic combining multiple sections. Top section: product hero with brand name and bold headline. Middle section: 3 key benefits with icons in a horizontal row. Bottom section: before and after comparison side by side. Brand logo and certification badges included. Professional designed for Amazon layout.',
+            'Amazon A+ full-page product listing infographic combining multiple sections. Top section: product hero with a bold headline. Middle section: three key benefits with icons arranged in a horizontal row. Bottom section: before and after comparison side by side. Subtle certification badge. Clean professional Amazon listing layout.',
         ],
     },
     'social_post': {
