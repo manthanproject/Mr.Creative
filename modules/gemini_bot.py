@@ -13,6 +13,7 @@ import os
 import time
 import json
 import math
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -73,58 +74,78 @@ class GeminiBot:
             time.sleep(3)
         print("[GeminiBot] On Gemini chat page")
 
-    def _bring_chrome_to_front(self):
-        """Bring Chrome window to foreground before pyautogui actions."""
-        try:
-            self.driver.switch_to.window(self.driver.current_window_handle)
-            time.sleep(0.3)
-            # Also maximize to ensure it's visible
-            self.driver.execute_script("window.focus();")
-            time.sleep(0.3)
-        except Exception:
-            pass
-
     def _upload_image(self, image_path):
-        """Upload image to Gemini — click hidden button to create file input, then send_keys."""
+        """Upload image to Gemini — make hidden button visible, click via Selenium, drive native file dialog."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
             print(f"[GeminiBot] Image not found: {abs_path}")
             return False
 
         try:
-            # Click the hidden file image selector button — this creates a file input
+            # Make the hidden button visible so Selenium can interact with it
             self.driver.execute_script("""
                 var btn = document.querySelector('button.hidden-local-file-image-selector-button');
                 if (btn) {
                     btn.removeAttribute('aria-hidden');
-                    btn.click();
+                    btn.style.position = 'fixed';
+                    btn.style.top = '0';
+                    btn.style.left = '0';
+                    btn.style.display = 'block';
+                    btn.style.opacity = '1';
+                    btn.style.zIndex = '999999';
+                    btn.style.width = '50px';
+                    btn.style.height = '50px';
                 }
             """)
-            print("[GeminiBot] Hidden image selector button clicked")
-            time.sleep(2)
+            time.sleep(0.5)
 
-            # Now look for the file input that was created by the button click
-            file_inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-            if file_inputs:
-                # Use send_keys on file input (same as Flow bot — no native dialog needed)
-                file_input = file_inputs[-1]  # Use the last one (most recently created)
-                file_input.send_keys(abs_path)
-                print(f"[GeminiBot] Image sent via file input: {os.path.basename(abs_path)}")
-                time.sleep(5)
-                return True
+            # Use Selenium .click() — JS click can't trigger native file dialogs
+            btn = self.driver.find_element(By.CSS_SELECTOR, 'button.hidden-local-file-image-selector-button')
+            btn.click()
+            print("[GeminiBot] Clicked hidden image selector button via Selenium")
+            time.sleep(3)  # Wait for native file dialog to open
 
-            # Fallback: try pyautogui for native file dialog (needs window focus)
-            print("[GeminiBot] No file input found — trying pyautogui for native dialog")
-            self._bring_chrome_to_front()
+            # Drive the native file dialog with pyautogui + clipboard
             import pyautogui
             import subprocess
+            pyautogui.hotkey('ctrl', 'a')  # Select existing filename text
+            time.sleep(0.3)
             subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            time.sleep(1)
+            time.sleep(0.5)
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(0.5)
             pyautogui.press('enter')
             print(f"[GeminiBot] File path pasted via pyautogui: {os.path.basename(abs_path)}")
-            time.sleep(8)
+            time.sleep(8)  # Wait for upload
+
+            # Hide the button again
+            self.driver.execute_script("""
+                var btn = document.querySelector('button.hidden-local-file-image-selector-button');
+                if (btn) {
+                    btn.style.position = '';
+                    btn.style.top = '';
+                    btn.style.left = '';
+                    btn.style.display = '';
+                    btn.style.opacity = '';
+                    btn.style.zIndex = '';
+                    btn.style.width = '';
+                    btn.style.height = '';
+                }
+            """)
+
+            # Verify thumbnail appeared near bottom of page
+            has_thumbnail = self.driver.execute_script("""
+                var nodes = document.querySelectorAll('img, .upload-card');
+                for (var n of nodes) {
+                    var r = n.getBoundingClientRect();
+                    if (r.y > window.innerHeight - 300 && r.width > 20 && r.width < 250) return true;
+                }
+                return false;
+            """)
+            if has_thumbnail:
+                print("[GeminiBot] ✓ Thumbnail confirmed — image uploaded")
+            else:
+                print("[GeminiBot] ⚠️ Thumbnail not detected, but proceeding")
             return True
 
         except Exception as e:
@@ -281,9 +302,15 @@ class GeminiBot:
             cleaned = line.replace('**', '').replace('*', '').replace('`', '')
 
             # Remove numbered prefixes: "1.", "1)", "Prompt 1:", "- ", "• "
-            import re
             cleaned = re.sub(r'^(?:Prompt\s*)?\d+[\.\)\:\-]\s*', '', cleaned).strip()
             cleaned = re.sub(r'^[\-\•\*]\s+', '', cleaned).strip()
+
+            # Strip enclosing quotes (ASCII or smart)
+            if len(cleaned) >= 2 and (
+                (cleaned[0] == '"' and cleaned[-1] == '"') or
+                (cleaned[0] == '“' and cleaned[-1] == '”')
+            ):
+                cleaned = cleaned[1:-1].strip()
 
             # Skip headers and meta-text
             if cleaned.startswith(('# ', '## ', '### ', '---')):
