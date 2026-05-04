@@ -332,17 +332,8 @@ def build_prompt(content_type, brand_info=None, index=0):
             mood_prompt=mood.get('prompt', ''),
         )
 
-    # Inject brand info
-    if brand_info:
-        brand_context = []
-        if brand_info.get('name'):
-            brand_context.append(f"for {brand_info['name']}")
-        if brand_info.get('product_category'):
-            brand_context.append(f"{brand_info['product_category']} product")
-        if brand_info.get('tone'):
-            brand_context.append(f"{brand_info['tone']} brand tone")
-        if brand_context:
-            prompt += f" Brand context: {', '.join(brand_context)}."
+    # Brand info intentionally NOT injected — Flow uses the reference image for the
+    # real product. Adding brand context causes Flow to invent fake brand names/logos.
 
     photo_type = get_photo_type(content_type, seed + 5)
 
