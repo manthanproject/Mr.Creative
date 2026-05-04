@@ -1071,6 +1071,7 @@ class PomelliBot:
             self._ps_click_mode_card(photoshoot_mode)
 
             self._check_pause()
+            # Click Product Image edit button (first pencil icon)
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicking Product Image edit...')
             self._ps_click_edit_button('first')
             time.sleep(2)
@@ -1081,6 +1082,15 @@ class PomelliBot:
 
             if templates and photoshoot_mode == 'product':
                 self._check_pause()
+                # Wait for templates card to become enabled after image upload
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Waiting for Templates to enable...')
+                for _ in range(15):
+                    disabled_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient.disabled')
+                    if not disabled_cards:
+                        break
+                    time.sleep(1)
+                time.sleep(1)
+
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicking Templates edit...')
                 self._ps_click_edit_button('second')
                 time.sleep(2)
@@ -1088,7 +1098,7 @@ class PomelliBot:
                 self._ps_match_templates(templates)
 
             self._check_pause()
-            self._update_status(PomelliBotStatus.GENERATING, 'Clicking Create Photoshoot...')
+            self._update_status(PomelliBotStatus.GENERATING, 'Clicking Generate Photoshoot...')
             self._ps_click_create()
 
             self._check_pause()
@@ -1142,17 +1152,17 @@ class PomelliBot:
         raise RuntimeError('Could not navigate past landing page')
 
     def _ps_click_edit_button(self, which='first'):
-        """Intermediate page: exactly 2 buttons with class 'edit-button'."""
+        """Editor page: two pencil buttons with class containing 'edit'.
+        'first' = Product Image, 'second' = Templates."""
         for _ in range(15):
-            btns = [b for b in self.driver.find_elements(By.CSS_SELECTOR, 'button.edit-button') if b.is_displayed()]
+            btns = [b for b in self.driver.find_elements(By.CSS_SELECTOR,
+                'button.edit') if b.is_displayed()]
             idx = 0 if which == 'first' else 1
             if len(btns) > idx:
                 btn = btns[idx]
-                if 'disabled' in (btn.get_attribute('class') or ''):
-                    time.sleep(1)
-                    continue
-                ActionChains(self.driver).move_to_element(btn).pause(0.3).click().perform()
+                self.driver.execute_script("arguments[0].click();", btn)
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Clicked edit button ({which})')
+                time.sleep(2)
                 return
             time.sleep(1)
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Edit button "{which}" not found')
@@ -1333,20 +1343,24 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Looks Good not found')
 
     def _ps_click_create(self):
-        """Intermediate page: button with span.mdc-button__label = 'Create Photoshoot'."""
+        """Editor page: 'Generate Photoshoot' button."""
         for _ in range(20):
             try:
-                btn = self.driver.find_element(By.XPATH,
-                    '//span[@class="mdc-button__label" and contains(text(), "Create Photoshoot")]/ancestor::button')
-                if 'disabled' not in (btn.get_attribute('class') or ''):
-                    ActionChains(self.driver).move_to_element(btn).pause(0.3).click().perform()
-                    self._update_status(PomelliBotStatus.GENERATING, 'Clicked Create Photoshoot!')
-                    time.sleep(5)
-                    return
-            except NoSuchElementException:
+                btns = self.driver.find_elements(By.CSS_SELECTOR, 'button')
+                for btn in btns:
+                    txt = btn.text.strip()
+                    if 'Generate Photoshoot' in txt or 'Create Photoshoot' in txt:
+                        if btn.is_enabled() and btn.is_displayed():
+                            self.driver.execute_script("arguments[0].click();", btn)
+                            self._update_status(PomelliBotStatus.GENERATING, f'Clicked: {txt}')
+                            time.sleep(5)
+                            return
+                        else:
+                            self._update_status(PomelliBotStatus.GENERATING, 'Button found but disabled — waiting...')
+            except Exception:
                 pass
             time.sleep(1)
-        raise RuntimeError('Create Photoshoot stayed disabled')
+        raise RuntimeError('Generate Photoshoot button stayed disabled or not found')
 
     def _wait_for_creatives_to_load(self):
         """Results page: wait for all loading indicators to disappear."""
