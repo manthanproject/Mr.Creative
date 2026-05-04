@@ -70,16 +70,16 @@ class PomelliBot:
 
     def __init__(self, config):
         self.config = config
-        self.driver = None
+        self.driver: webdriver.Chrome | None = None
         self.status = PomelliBotStatus.IDLE
         self.status_message = ''
-        self.errors = []
+        self.errors: list[str] = []
         # Shared state for UI interaction
-        self._pending_ideas = []
-        self._selected_idea = None
-        self._pending_animate_cards = []
-        self._selected_animate_indices = None  # None = waiting, [] = skip, [0,1,...] = animate these
-        self._current_job_id = None
+        self._pending_ideas: list = []
+        self._selected_idea: int | None = None
+        self._pending_animate_cards: list = []
+        self._selected_animate_indices: list[int] | None = None  # None = waiting, [] = skip, [0,1,...] = animate these
+        self._current_job_id: str | None = None
         self._force_relogin = False  # Set by bot manager on account switch
         # Pause/Resume support
         import threading

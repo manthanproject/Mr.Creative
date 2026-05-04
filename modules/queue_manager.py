@@ -15,7 +15,7 @@ class QueueManager:
     def __init__(self, app):
         self.app = app
         self.is_processing = False
-        self.current_job = None
+        self.current_job: object | None = None
         self._lock = threading.Lock()
 
     def process_next_job(self):

@@ -145,7 +145,7 @@ class PostProcessor:
         self.accent = brand_kit.accent_color or '#C1CD7D'
         self.heading_font = brand_kit.heading_font or 'Poppins'
         self.body_font = brand_kit.body_font or 'Inter'
-        self._rembg_session = None
+        self._rembg_session: object | None = None
 
     # ═══════════════════════════════════════
     # Step 0: rembg Background Removal

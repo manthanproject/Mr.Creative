@@ -6,16 +6,20 @@ Manages a persistent session across batches.
 import os
 import shutil
 import time
+from typing import TYPE_CHECKING
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
+
+if TYPE_CHECKING:
+    from modules.flow_bot import FlowBot
 
 
 class FlowSession:
     """Keeps driver + bot alive across multiple batches."""
 
     def __init__(self):
-        self.driver = None
-        self.bot = None
+        self.driver: webdriver.Chrome | None = None
+        self.bot: 'FlowBot | None' = None
 
     def start(self):
         from modules.chrome_launcher import ensure_flow_chrome
