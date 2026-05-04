@@ -259,7 +259,7 @@ def run_now(job_id):
         templates = []
 
     import threading
-    app = current_app
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
 
     if job.pomelli_feature == 'photoshoot':
         thread = threading.Thread(
