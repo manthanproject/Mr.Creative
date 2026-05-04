@@ -407,67 +407,26 @@ class GeminiBot:
         brand_name: str = '',
         product_category: str = '',
     ) -> str:
-        """Build the instruction prompt for Gemini."""
-        type_instructions = {
-            'a_plus': (
-                'Amazon A+ product listing infographic designs. Each prompt should describe a DIFFERENT layout:\n'
-                '- Hero shot with bold heading, bullet points, and award badge\n'
-                '- Multi-panel grid (2x2) with how-to-use steps, before/after, benefits\n'
-                '- Comparison chart showing product vs generic alternatives with checkmarks\n'
-                '- Feature benefits grid with icons and short descriptions\n'
-                '- Product in hand showing real size with bold text overlay\n'
-                '- Full page infographic combining hero, steps, and results\n'
-                'These are DESIGNED INFOGRAPHIC IMAGES with text, icons, and data layouts — NOT just photography.'
-            ),
-            'social_post': (
-                'Instagram/Pinterest lifestyle social media posts. Each prompt should describe a DIFFERENT scene:\n'
-                '- Candid product usage at bathroom vanity with morning light\n'
-                '- Flat lay on bedsheets/marble with props (coffee, book, flowers)\n'
-                '- Shelfie on bathroom shelf with other products\n'
-                '- Product in cosmetic bag or daily carry context\n'
-                '- Evening routine with candles and warm lighting\n'
-                'Include specific camera (Canon, Sony, Fuji), lens, aperture, and lighting details.'
-            ),
-            'banner': (
-                'Website/ad hero banners with text-safe negative space. Each prompt should describe:\n'
-                '- Product on premium surface (marble, concrete, wood) with space for text\n'
-                '- Dramatic studio lighting with single spotlight\n'
-                '- Product floating with shadow on clean background\n'
-                '- Wide format with product on one side, text space on other\n'
-                'Include camera specs and studio lighting setup details.'
-            ),
-            'lifestyle': (
-                'Documentary-style editorial lifestyle photography. Each prompt should describe:\n'
-                '- Person using product in real-world setting (bathroom, kitchen, gym)\n'
-                '- Travel context (hotel, airport, on-the-go)\n'
-                '- Morning/evening routine moments\n'
-                '- Candid, unposed, authentic situations\n'
-                'Include camera (Fuji, Leica), natural lighting, and environmental details.'
-            ),
-            'ad_creative': (
-                'Bold, scroll-stopping Meta/Google ad creatives. Each prompt should describe:\n'
-                '- Dynamic splash/action shot with the product\n'
-                '- Neon rim lighting on dark reflective surface\n'
-                '- Bold color contrast backgrounds (electric pink, yellow, orange)\n'
-                '- Surreal/elevated product placement\n'
-                'Include dramatic lighting, high contrast, and commercial photography specs.'
-            ),
+        """Build a simple, generic instruction prompt for Gemini."""
+        type_labels = {
+            'a_plus': 'Amazon A+ product listing infographic designs (layouts with text, icons, benefit callouts, comparison grids, how-to-use panels)',
+            'social_post': 'Instagram/Pinterest lifestyle social media posts with real-world scenes and camera details',
+            'banner': 'website/ad hero banners with premium lighting and text-safe negative space',
+            'lifestyle': 'editorial lifestyle photography showing the product in real-world use',
+            'ad_creative': 'bold, scroll-stopping ad creatives with dramatic lighting and vivid colors',
         }
 
-        type_desc = type_instructions.get(content_type, type_instructions['social_post'])
+        type_desc = type_labels.get(content_type, type_labels['social_post'])
 
         return (
-            f"Look at this product image carefully. I need you to write exactly {prompt_count} "
-            f"unique prompts for Google Flow (an AI image generator that takes this product image as reference)."
+            f"Look at this product image. Write exactly {prompt_count} unique prompts "
+            f"for Google Flow (an AI image generator that uses this product photo as reference)."
             f"\n\nContent type: {type_desc}"
-            f"\n\nCRITICAL RULES:"
-            f"\n1. Do NOT use any brand names, trademarked names, or specific product names in the prompts "
-            f"— Flow will flag them as violations. Describe the product VISUALLY instead "
-            f'(e.g. "the serum bottle" not "The Ordinary Niacinamide").'
-            f"\n2. Each prompt must be a single paragraph, 2-4 sentences."
-            f"\n3. Flow already has the product image as reference — describe the SCENE, LAYOUT, and CONTEXT around it."
-            f"\n4. Make each prompt UNIQUE — different layout, angle, lighting, or scene."
-            f"\n5. Do NOT include any markdown formatting, bullet points, or numbering in the prompt text itself."
-            f"\n\nWrite exactly {prompt_count} prompts, each separated by a blank line. "
-            f"Just the prompt text, nothing else — no labels, no \"Prompt 1:\", no headers."
+            f"\n\nRules:"
+            f"\n- NO brand names or trademarked names — describe the product visually instead"
+            f"\n- Each prompt: one paragraph, 2-4 sentences"
+            f"\n- Flow already has the product image — describe the scene/layout/context around it"
+            f"\n- Each prompt must be unique — different angle, lighting, layout, or scene"
+            f"\n- No markdown, no bullet points, no numbering, no headers, no labels"
+            f"\n\nJust write {prompt_count} prompts separated by blank lines. Nothing else."
         )
