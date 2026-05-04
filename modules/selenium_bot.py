@@ -1060,6 +1060,17 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Photoshoot page...')
             self.driver.get(POMELLI_PHOTOSHOOT)
             time.sleep(3)
+
+            # Pomelli may redirect to Campaigns — click sidebar to reach Photoshoot
+            if 'photoshoot' not in self.driver.current_url.lower() or \
+               'Campaigns' in (self.driver.execute_script("return document.body?.innerText?.substring(0, 200)") or ''):
+                self._update_status(PomelliBotStatus.NAVIGATING, 'Redirected — clicking Photoshoot in sidebar...')
+                for link in self.driver.find_elements(By.CSS_SELECTOR, 'div.nav-item'):
+                    if 'Photoshoot' in link.text:
+                        self.driver.execute_script("arguments[0].click();", link)
+                        time.sleep(3)
+                        break
+
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
