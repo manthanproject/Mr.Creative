@@ -295,11 +295,15 @@ class GeminiBot:
 
             cleaned = line.replace('**', '').replace('*', '').replace('`', '')
 
-            # Remove numbered prefixes
-            cleaned = re.sub(r'^(?:Prompt\s*)?\d+[\.\)\:\-]\s*', '', cleaned).strip()
+            # Remove numbered prefixes: "Prompt 1:", "1.", "1)", "Prompt 1 (Layout:...)"
+            cleaned = re.sub(r'^(?:Prompt\s*)?\d+[\.\)\:\-\s]\s*', '', cleaned).strip()
             cleaned = re.sub(r'^[\-\•\*]\s+', '', cleaned).strip()
             # Remove sub-headers like "(Hero Shot Layout):"
             cleaned = re.sub(r'^\([^)]+\)\s*:?\s*', '', cleaned).strip()
+
+            # Skip lines that are just layout labels (nothing left after stripping)
+            if not cleaned:
+                continue
 
             if cleaned.startswith(('# ', '## ', '### ', '---')):
                 if current_prompt and len(current_prompt) > 30:
@@ -310,7 +314,7 @@ class GeminiBot:
             skip_starts = (
                 'Here are', 'Sure,', 'Sure!', "I'll", 'These are', 'Note:', 'Remember',
                 'Each prompt', 'Below are', 'Let me', 'Okay', "I've", 'The following',
-                "I don't see", 'It looks like', 'However,', 'If you',
+                "I don't see", 'It looks like', 'However,', 'If you', 'Prompt ',
             )
             if any(cleaned.startswith(s) for s in skip_starts):
                 continue
