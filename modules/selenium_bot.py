@@ -1194,8 +1194,20 @@ class PomelliBot:
         self._ps_click_looks_good()
 
     def _ps_match_templates(self, user_templates):
-        """Template page: SINGLE PASS — scan cards once, select/deselect immediately as found."""
+        """Template page: swap templates one-by-one to match user's selection.
+        Pomelli requires exactly 4 selected at all times.
+        Approach: deselect one unwanted → select one wanted (repeat)."""
         user_wants = set(t.strip() for t in user_templates[:4])
+
+        # Pad to 4 if user gave fewer (Pomelli requires exactly 4)
+        available_names = ['Studio', 'Floating', 'Ingredient', 'In Use', 'Contextual', 'Flatlay']
+        while len(user_wants) < 4:
+            for fallback in available_names:
+                if fallback not in user_wants:
+                    user_wants.add(fallback)
+                    break
+            else:
+                break
 
         # Wait for template picker to load
         for _ in range(10):
@@ -1204,92 +1216,96 @@ class PomelliBot:
             time.sleep(1)
         time.sleep(2)
 
-        def clean_name(text):
-            return text.replace('arrow_drop_down', '').replace('\n', ' ').strip()
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Want: {sorted(user_wants)}')
 
-        seasonal_names = {'Christmas', 'Easter', 'Halloween', "New Year's", "Valentine's Day", "Mother's Day", "Father's Day"}
-        user_seasonal = next((s for s in seasonal_names if s in user_wants), None)
-        selected_count = 0
-        max_select = len(user_wants)
+        def find_img_for_label(label_el):
+            """Walk backwards from label DIV to find its IMG sibling."""
+            return self.driver.execute_script("""
+                var el = arguments[0].previousElementSibling;
+                while (el) { if (el.tagName === 'IMG') return el; el = el.previousElementSibling; }
+                return null;
+            """, label_el)
 
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Want: {list(user_wants)}')
+        def get_selected_names():
+            """Read currently selected template names."""
+            names = []
+            for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected'):
+                name = lbl.text.strip()
+                if name:
+                    names.append(name)
+            return names
 
-        # SINGLE PASS — scan each card, act immediately
-        labels = self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large')
-        for lbl in labels:
-            try:
-                if lbl.rect['y'] > 580:
-                    continue
+        # ── Read current state ──
+        current = get_selected_names()
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Currently selected: {current}')
 
-                img = self.driver.execute_script("""
-                    var el = arguments[0].previousElementSibling;
-                    while (el) { if (el.tagName === 'IMG') return el; el = el.previousElementSibling; }
-                    return null;
-                """, lbl)
-                if not img:
-                    continue
+        to_deselect = [n for n in current if n not in user_wants]
+        to_select = [n for n in user_wants if n not in current]
 
-                # Hover to reveal name
-                ActionChains(self.driver).move_to_element(img).perform()
-                time.sleep(0.25)
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+            f'Swap plan: deselect {to_deselect}, select {to_select}')
 
-                name = clean_name(lbl.text)
-                if not name:
-                    continue
+        # ── Swap one-by-one: deselect unwanted → select wanted ──
+        for i in range(max(len(to_deselect), len(to_select))):
+            # Step A: Deselect one unwanted from the selected section (top)
+            if i < len(to_deselect):
+                target_name = to_deselect[i]
+                deselected = False
+                for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected'):
+                    if lbl.text.strip() == target_name:
+                        img = find_img_for_label(lbl)
+                        if img:
+                            self.driver.execute_script(
+                                "arguments[0].scrollIntoView({block:'center'});", img)
+                            time.sleep(0.3)
+                            ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
+                            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+                                f'Deselected: {target_name}')
+                            deselected = True
+                            time.sleep(0.8)
+                            break
+                if not deselected:
+                    print(f"[PomelliBot] Could not deselect: {target_name}")
 
-                is_selected = 'selected' in (lbl.get_attribute('class') or '')
+            # Step B: Select one wanted from the available pool (bottom)
+            if i < len(to_select):
+                target_name = to_select[i]
+                selected = False
+                # Re-query pool labels (DOM changed after deselect)
+                pool_labels = self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large')
+                for lbl in pool_labels:
+                    if 'selected' in (lbl.get_attribute('class') or ''):
+                        continue
+                    if lbl.text.strip() == target_name:
+                        img = find_img_for_label(lbl)
+                        if img:
+                            self.driver.execute_script(
+                                "arguments[0].scrollIntoView({block:'center'});", img)
+                            time.sleep(0.3)
+                            ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
+                            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+                                f'Selected: {target_name}')
+                            selected = True
+                            time.sleep(0.8)
+                            break
+                if not selected:
+                    print(f"[PomelliBot] Could not select: {target_name}")
 
-                # Skip seasonal cards here — handle separately below
-                if name in seasonal_names or name == 'Seasonal':
-                    if name in user_wants and not is_selected:
-                        pass  # Will handle in seasonal section
-                    elif name not in user_wants and is_selected and name not in {'Easter'}:
-                        ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Deselected: {name}')
-                        time.sleep(0.5)
-                    continue
+        # ── Verify final state ──
+        time.sleep(1)
+        final = get_selected_names()
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+            f'Templates final ({len(final)}): {final}')
 
-                # SMART LOGIC: act immediately on each card
-                if name in user_wants and not is_selected:
-                    # User wants this + not selected → SELECT
-                    ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                    selected_count += 1
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {name} ({selected_count}/{max_select})')
-                    time.sleep(0.5)
+        if len(final) != 4:
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+                f'WARNING: {len(final)} selected, Pomelli needs exactly 4!')
 
-                elif name not in user_wants and is_selected:
-                    # User doesn't want this + it's selected → DESELECT
-                    ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Deselected: {name}')
-                    time.sleep(0.5)
+        missing = user_wants - set(final)
+        if missing:
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+                f'WARNING: could not find: {missing}')
 
-                # else: already correct state, skip silently
-
-            except (StaleElementReferenceException, Exception) as e:
-                print(f"[PomelliBot] Template scan error: {str(e)[:50]}")
-                continue
-
-        # SEASONAL — handle separately if user picked a seasonal template
-        if user_seasonal:
-            try:
-                for sd in self.driver.find_elements(By.CSS_SELECTOR, 'div.seasonal-label'):
-                    if sd.rect['y'] < 580:
-                        ActionChains(self.driver).move_to_element(sd).pause(0.3).click().perform()
-                        self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Opened seasonal dropdown')
-                        time.sleep(2)
-                        menu_items = self.driver.find_elements(By.CSS_SELECTOR, 'button.mat-mdc-menu-item[role="menuitem"]')
-                        for item in menu_items:
-                            if item.is_displayed() and item.text.strip() == user_seasonal:
-                                item.click()
-                                selected_count += 1
-                                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected seasonal: {user_seasonal} ({selected_count}/{max_select})')
-                                time.sleep(1)
-                                break
-                        break
-            except Exception as e:
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Seasonal error: {str(e)[:50]}')
-
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Templates done — {selected_count} selected')
         self._ps_click_looks_good()
 
     def _ps_click_looks_good(self):
