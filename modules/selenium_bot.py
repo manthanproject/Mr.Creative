@@ -1109,11 +1109,13 @@ class PomelliBot:
         for attempt in range(3):
             time.sleep(2)
             try:
-                els = self.driver.find_elements(By.CSS_SELECTOR, 'div.title-medium.on-surface-variant')
+                els = self.driver.find_elements(By.CSS_SELECTOR, 'div.photoshoot-branch-button')
+                if not els:
+                    els = self.driver.find_elements(By.CSS_SELECTOR, 'div.title-medium.on-surface-variant')
                 for el in els:
                     if target in el.text:
                         ActionChains(self.driver).move_to_element(el).pause(0.5).click().perform()
-                        self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked: "{el.text}"')
+                        self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked: "{el.text[:30]}"')
                         break
             except Exception:
                 pass
