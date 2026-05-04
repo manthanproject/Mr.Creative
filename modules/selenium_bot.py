@@ -1103,30 +1103,50 @@ class PomelliBot:
             return False
 
     def _ps_click_mode_card(self, mode):
-        """Landing page: two DIV cards (class: title-medium on-surface-variant). NOT buttons."""
+        """Landing page: click 'Create a product photoshoot' or 'Generate or edit an image'."""
         target = 'Create a product' if mode == 'product' else 'Generate or edit'
 
         for attempt in range(3):
-            time.sleep(2)
+            time.sleep(3)
             try:
+                # Try primary selector
                 els = self.driver.find_elements(By.CSS_SELECTOR, 'div.photoshoot-branch-button')
                 if not els:
                     els = self.driver.find_elements(By.CSS_SELECTOR, 'div.title-medium.on-surface-variant')
-                for el in els:
-                    if target in el.text:
-                        ActionChains(self.driver).move_to_element(el).pause(0.5).click().perform()
-                        self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked: "{el.text[:30]}"')
-                        break
-            except Exception:
-                pass
+                if not els:
+                    # Broadest fallback — any clickable card on the landing page
+                    els = self.driver.find_elements(By.CSS_SELECTOR, '[class*="branch"], [class*="card-content"]')
 
-            for _ in range(10):
+                self._update_status(PomelliBotStatus.NAVIGATING, f'Found {len(els)} cards, looking for "{target}"')
+
+                for el in els:
+                    txt = el.text.strip()
+                    if target in txt:
+                        # JS click — more reliable on Angular elements
+                        self.driver.execute_script("arguments[0].click();", el)
+                        self._update_status(PomelliBotStatus.NAVIGATING, f'JS-clicked: "{txt[:40]}"')
+                        break
+                else:
+                    # Log what we DID find for debugging
+                    found_texts = [e.text.strip()[:30] for e in els[:5]]
+                    self._update_status(PomelliBotStatus.NAVIGATING, f'No match in: {found_texts}')
+            except Exception as e:
+                self._update_status(PomelliBotStatus.NAVIGATING, f'Click error: {str(e)[:50]}')
+
+            # Wait for editor page to load
+            for _ in range(15):
                 time.sleep(1)
-                editors = self.driver.find_elements(By.CSS_SELECTOR, 'app-photoshoot-ingredients-editor, app-interleaved-editor')
+                editors = self.driver.find_elements(By.CSS_SELECTOR,
+                    'app-photoshoot-ingredients-editor, app-interleaved-editor, app-product-image-picker')
                 if editors:
                     self._update_status(PomelliBotStatus.NAVIGATING, 'Editor page loaded!')
                     return
             self._update_status(PomelliBotStatus.NAVIGATING, f'Retry {attempt+1}/3...')
+
+            # Maybe page didn't load — retry navigation
+            self.driver.get(POMELLI_PHOTOSHOOT)
+            time.sleep(3)
+
         raise RuntimeError('Could not navigate past landing page')
 
     def _ps_click_edit_button(self, which='first'):
