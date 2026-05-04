@@ -1103,49 +1103,41 @@ class PomelliBot:
             return False
 
     def _ps_click_mode_card(self, mode):
-        """Landing page: click 'Create a product photoshoot' or 'Generate or edit an image'."""
+        """Landing page: click 'Create a product photoshoot' or 'Generate or edit an image'.
+        Polls for the exact target — no broad scanning."""
         target = 'Create a product' if mode == 'product' else 'Generate or edit'
 
         for attempt in range(3):
-            time.sleep(3)
-            try:
-                # Try primary selector
-                els = self.driver.find_elements(By.CSS_SELECTOR, 'div.photoshoot-branch-button')
-                if not els:
-                    els = self.driver.find_elements(By.CSS_SELECTOR, 'div.title-medium.on-surface-variant')
-                if not els:
-                    # Broadest fallback — any clickable card on the landing page
-                    els = self.driver.find_elements(By.CSS_SELECTOR, '[class*="branch"], [class*="card-content"]')
-
-                self._update_status(PomelliBotStatus.NAVIGATING, f'Found {len(els)} cards, looking for "{target}"')
-
-                for el in els:
-                    txt = el.text.strip()
-                    if target in txt:
-                        # JS click — more reliable on Angular elements
-                        self.driver.execute_script("arguments[0].click();", el)
-                        self._update_status(PomelliBotStatus.NAVIGATING, f'JS-clicked: "{txt[:40]}"')
-                        break
-                else:
-                    # Log what we DID find for debugging
-                    found_texts = [e.text.strip()[:30] for e in els[:5]]
-                    self._update_status(PomelliBotStatus.NAVIGATING, f'No match in: {found_texts}')
-            except Exception as e:
-                self._update_status(PomelliBotStatus.NAVIGATING, f'Click error: {str(e)[:50]}')
-
-            # Wait for editor page to load
-            for _ in range(15):
+            # Poll for the specific card (up to 20s)
+            for tick in range(20):
                 time.sleep(1)
-                editors = self.driver.find_elements(By.CSS_SELECTOR,
-                    'app-photoshoot-ingredients-editor, app-interleaved-editor, app-product-image-picker')
-                if editors:
-                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor page loaded!')
-                    return
-            self._update_status(PomelliBotStatus.NAVIGATING, f'Retry {attempt+1}/3...')
+                try:
+                    cards = self.driver.find_elements(By.CSS_SELECTOR, 'div.photoshoot-branch-button')
+                    for card in cards:
+                        if target in card.text:
+                            self.driver.execute_script("arguments[0].click();", card)
+                            self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked: {card.text.strip()[:40]}')
+                            # Wait for next page
+                            for _ in range(15):
+                                time.sleep(1)
+                                if self.driver.find_elements(By.CSS_SELECTOR,
+                                    'app-photoshoot-ingredients-editor, app-interleaved-editor'):
+                                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
+                                    return
+                            break
+                except Exception:
+                    pass
 
-            # Maybe page didn't load — retry navigation
-            self.driver.get(POMELLI_PHOTOSHOOT)
-            time.sleep(3)
+            # Retry: click sidebar Photoshoot link to reload
+            self._update_status(PomelliBotStatus.NAVIGATING, f'Retry {attempt+1}/3 — clicking sidebar...')
+            try:
+                sidebar = self.driver.find_element(By.CSS_SELECTOR, 'a[href*="photoshoot"], div.nav-group')
+                for link in self.driver.find_elements(By.CSS_SELECTOR, 'a'):
+                    if 'Photoshoot' in link.text:
+                        self.driver.execute_script("arguments[0].click();", link)
+                        break
+            except Exception:
+                self.driver.get(POMELLI_PHOTOSHOOT)
 
         raise RuntimeError('Could not navigate past landing page')
 
