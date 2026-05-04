@@ -232,23 +232,18 @@ Use "flow" engine for ALL pieces (reference image is provided)."""
     # ═══════════════════════════════════════════
     def craft_prompts(self, content_plan, brand_analysis, brand_kit):
         """Write optimized generation prompts for each content piece.
-        Priority: Gemini bot (vision) → expert prompts (A+) → LLM (other types)."""
+        Priority: expert prompts (A+) → LLM (other types)."""
 
         from modules.prompt_library import get_prompt_context_for_llm, build_prompt, CONTENT_TYPE_CONFIG
 
         content_types = list(set(item.get('type', 'social_post') for item in content_plan))
         all_aplus = all(item.get('type') == 'a_plus' for item in content_plan)
 
-        # Try Gemini bot first (best quality — has vision)
-        gemini_prompts = self._try_gemini_prompts(content_plan, brand_kit, content_types)
-        if gemini_prompts:
-            return gemini_prompts
-
-        # Fallback: expert prompts for A+ content (no LLM rewriting needed)
+        # Expert prompts for A+ content (no LLM rewriting needed)
         if all_aplus:
             return self._craft_aplus_prompts_direct(content_plan, brand_analysis, brand_kit)
 
-        # Fallback: LLM with prompt library
+        # LLM with prompt library (Groq/Cerebras)
 
         # Get content types from the plan
         content_types = list(set(item.get('type', 'social_post') for item in content_plan))
