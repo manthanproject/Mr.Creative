@@ -289,6 +289,14 @@ def run_agent_pipeline(app, job_id):
 
                     print(f"[Pipeline] Batch {batch_num+1} done: {len(files)} images")
 
+                    # Auto-save first image as prompt preview
+                    if files:
+                        from modules.prompt_previews import set_preview_if_missing
+                        first_rel = os.path.relpath(files[0],
+                            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+                        ).replace('\\', '/')
+                        set_preview_if_missing(prompt_text, first_rel)
+
                 except Exception as e:
                     print(f"[Pipeline] Batch {batch_num+1} failed: {e}")
                     import traceback

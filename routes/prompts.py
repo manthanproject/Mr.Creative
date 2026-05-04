@@ -63,7 +63,29 @@ def library():
                 })
             total += len(items)
 
+    from modules.prompt_previews import get_preview
+    # Attach preview images to prompts
+    for cat in categories:
+        for prompt in cat['prompts']:
+            if not prompt.get('preview'):
+                preview = get_preview(prompt['text'])
+                if preview:
+                    prompt['preview'] = '/static/' + preview
+
     return render_template('prompt_library.html', categories=categories, total_prompts=total)
+
+
+@prompts_bp.route('/library/set-preview', methods=['POST'])
+@login_required
+def set_prompt_preview():
+    data = request.get_json() or {}
+    prompt_text = data.get('prompt_text', '')
+    image_path = data.get('image_path', '')
+    if not prompt_text or not image_path:
+        return jsonify({'error': 'Missing data'}), 400
+    from modules.prompt_previews import set_preview
+    set_preview(prompt_text, image_path)
+    return jsonify({'success': True})
 
 
 @prompts_bp.route('/library/add', methods=['POST'])

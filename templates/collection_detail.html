@@ -135,6 +135,7 @@
     <video id="lightboxVideo" controls autoplay></video>
     <button id="lightboxClose" onclick="closeLightbox()">✕</button>
     <a id="lightboxDownload" download>⬇ Download</a>
+    <button id="lightboxSetPreview" onclick="event.stopPropagation(); setAsPromptPreview()" style="position:absolute; bottom:1.5rem; left:1.5rem; background:rgba(255,255,255,0.15); color:white; border:none; padding:0.5rem 1rem; border-radius:8px; font-size:0.85rem; cursor:pointer; transition:background 0.2s;">📌 Set as Prompt Preview</button>
     <button id="lightboxPrev" onclick="event.stopPropagation(); lightboxNav(-1)" style="position:absolute; left:20px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.15); border:none; color:white; font-size:2rem; padding:0.5rem 1rem; border-radius:12px; cursor:pointer; transition:background 0.2s;">‹</button>
     <button id="lightboxNext" onclick="event.stopPropagation(); lightboxNav(1)" style="position:absolute; right:80px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.15); border:none; color:white; font-size:2rem; padding:0.5rem 1rem; border-radius:12px; cursor:pointer; transition:background 0.2s;">›</button>
 </div>
@@ -272,6 +273,21 @@ function closeLightbox() {
     vid.pause();
     vid.src = '';
     lb.classList.remove('active');
+}
+
+async function setAsPromptPreview() {
+    var src = document.getElementById('lightboxImg').src;
+    var path = src.replace(window.location.origin + '/static/', '');
+    var promptText = prompt('Enter the prompt text this image was generated from:');
+    if (!promptText) return;
+    var res = await fetch('/prompts/library/set-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt_text: promptText, image_path: path })
+    });
+    var data = await res.json();
+    if (data.success) showToast('Preview set!', 'success');
+    else showToast(data.error || 'Failed', 'error');
 }
 
 function lightboxClick(event) {
