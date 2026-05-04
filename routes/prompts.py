@@ -51,7 +51,9 @@ def library():
             existing = next((c for c in categories if c['key'] == ptype), None)
             if existing:
                 for p in items:
-                    existing['prompts'].append(p)
+                    prompt_list = existing['prompts']
+                    if isinstance(prompt_list, list):
+                        prompt_list.append(p)
             else:
                 categories.append({
                     'key': ptype,
