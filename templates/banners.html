@@ -215,6 +215,11 @@
                             <div class="pm-step" data-step="generating">🎨 Generate</div>
                             <div class="pm-step" data-step="downloading">📥 Download</div>
                         </div>
+                        <div id="bannerJobControls" style="display: none; gap: 8px; margin-top: 0.5rem;">
+                            <button class="ag-btn ag-btn-ghost" id="bannerPauseBtn" onclick="pauseBannerJob()" style="flex: 1; font-size: 0.72rem;">⏸ Pause</button>
+                            <button class="ag-btn ag-btn-ghost" id="bannerStopBtn" onclick="stopBannerJob()" style="flex: 1; font-size: 0.72rem; border: 1px solid var(--ag-danger, #f87171); color: var(--ag-danger, #f87171);">⏹ Stop</button>
+                            <button class="ag-btn ag-btn-ghost" id="bannerDeleteBtn" onclick="deleteBannerJob()" style="flex: 1; font-size: 0.72rem;">🗑 Delete</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -419,6 +424,46 @@ function useQuickPrompt(btn) {
 }
 
 var currentJobId = null;
+var pollInterval = null;
+var bannerJobCancelled = false;
+
+async function pauseBannerJob() {
+    if (!currentJobId) return;
+    var res = await fetch('/banners/job/' + currentJobId + '/pause', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        var btn = document.getElementById('bannerPauseBtn');
+        btn.textContent = data.paused ? '▶️ Resume' : '⏸ Pause';
+    }
+}
+
+async function stopBannerJob() {
+    if (!currentJobId) return;
+    if (!confirm('Stop this job?')) return;
+    var res = await fetch('/banners/job/' + currentJobId + '/stop', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        bannerJobCancelled = true;
+        clearInterval(pollInterval);
+        document.getElementById('bannerStopBtn').disabled = true;
+        document.getElementById('bannerStopBtn').textContent = '⏹ Stopped';
+        document.getElementById('bannerPauseBtn').disabled = true;
+        showToast('Job stopped', 'info');
+    }
+}
+
+async function deleteBannerJob() {
+    if (!currentJobId) return;
+    if (!confirm('Delete this job?')) return;
+    var res = await fetch('/banners/job/' + currentJobId + '/delete', { method: 'POST' });
+    var data = await res.json();
+    if (data.success) {
+        bannerJobCancelled = true;
+        clearInterval(pollInterval);
+        showToast('Job deleted', 'success');
+        location.reload();
+    }
+}
 
 async function aiSuggestFlow() {
     var btn = document.getElementById('flowSuggestBtn');
@@ -561,6 +606,13 @@ async function generateBanners() {
 
         if (data.job_id) {
             currentJobId = data.job_id;
+            bannerJobCancelled = false;
+            var ctrls = document.getElementById('bannerJobControls');
+            ctrls.style.display = 'flex';
+            document.getElementById('bannerPauseBtn').disabled = false;
+            document.getElementById('bannerPauseBtn').textContent = '⏸ Pause';
+            document.getElementById('bannerStopBtn').disabled = false;
+            document.getElementById('bannerStopBtn').textContent = '⏹ Stop';
             pollJobStatus(data.job_id, data.collection_id);
         }
     } catch (err) {
@@ -587,6 +639,7 @@ var stepTitles = { connecting: 'Connecting', navigating: 'Navigating', settings:
 async function pollJobStatus(jobId, collectionId) {
     for (var i = 0; i < 120; i++) {
         await new Promise(r => setTimeout(r, 3000));
+        if (bannerJobCancelled) { document.getElementById('bannerJobControls').style.display = 'none'; return; }
         try {
             var resp = await fetch('/banners/status/' + jobId);
             var data = await resp.json();
@@ -633,6 +686,7 @@ async function pollJobStatus(jobId, collectionId) {
 
                 document.getElementById('generate-btn').disabled = false;
                 document.getElementById('generate-btn').textContent = '🎨 Generate Banners';
+                document.getElementById('bannerJobControls').style.display = 'none';
                 return;
             }
 
@@ -641,6 +695,7 @@ async function pollJobStatus(jobId, collectionId) {
                 showError(message);
                 document.getElementById('generate-btn').disabled = false;
                 document.getElementById('generate-btn').textContent = '🎨 Generate Banners';
+                document.getElementById('bannerJobControls').style.display = 'none';
                 return;
             }
 

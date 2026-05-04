@@ -93,6 +93,36 @@ def status(job_id):
     return jsonify(job)
 
 
+@banners_bp.route('/job/<job_id>/pause', methods=['POST'])
+@login_required
+def pause_banner_job(job_id):
+    job = _banner_jobs.get(job_id)
+    if not job:
+        return jsonify({'error': 'Not found'}), 404
+    job['paused'] = not job.get('paused', False)
+    return jsonify({'success': True, 'paused': job['paused']})
+
+
+@banners_bp.route('/job/<job_id>/stop', methods=['POST'])
+@login_required
+def stop_banner_job(job_id):
+    job = _banner_jobs.get(job_id)
+    if not job:
+        return jsonify({'error': 'Not found'}), 404
+    job['stopped'] = True
+    job['status'] = 'complete'
+    job['message'] = 'Stopped by user'
+    return jsonify({'success': True})
+
+
+@banners_bp.route('/job/<job_id>/delete', methods=['POST'])
+@login_required
+def delete_banner_job(job_id):
+    if job_id in _banner_jobs:
+        del _banner_jobs[job_id]
+    return jsonify({'success': True})
+
+
 @banners_bp.route('/active-job')
 @login_required
 def active_job():
