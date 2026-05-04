@@ -80,9 +80,9 @@ CONTENT_TYPE_CONFIG = {
         'scenarios': [],
         'prompt_template': '{scenario}',
         'expert_prompts': [
-            'Generate A+ product listing content for this product for Amazon.',
-            'Create A+ infographic content for this product for Flipkart.',
-            'Generate premium A+ product listing for this product for Shopify.',
+            'Generate A+ product listing content for this product.',
+            'Create A+ infographic content for this product.',
+            'Generate premium A+ product listing for this product.',
             'Create A+ product detail infographic for this product with features and specifications.',
             'Generate A+ content showing this product from multiple angles with key benefits.',
             'Create A+ product comparison infographic for this product.',
