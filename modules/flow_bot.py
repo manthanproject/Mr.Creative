@@ -868,9 +868,9 @@ class FlowBot:
                 # Settings
                 self.set_image_settings(aspect_ratio, count)
 
-                # Upload reference image if provided
-                if image_path:
-                    self.upload_reference_image(image_path)
+            # Upload reference image if provided (every batch — Flow forgets between runs)
+            if image_path:
+                self.upload_reference_image(image_path)
 
             # Type prompt immediately (don't wait for image processing)
             self.type_prompt(prompt)
