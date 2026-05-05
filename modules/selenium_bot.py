@@ -621,18 +621,19 @@ class PomelliBot:
     def generate_campaign(self, prompt_text, product_url=None, campaign_images=None, aspect_ratio=None):
         try:
             self._update_status(PomelliBotStatus.NAVIGATING, 'Going to Pomelli home...')
-            self.driver.get(POMELLI_HOME)
-            time.sleep(15)  # Angular needs 15s+ to bootstrap (same as photoshoot)
+            CAMPAIGN_URL = "https://labs.google.com/pomelli/campaigns"
+            self.driver.get(CAMPAIGN_URL)
+            time.sleep(15)  # Angular needs 15s+ to bootstrap
             # Check if redirected to Google login
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
-                self.driver.get(POMELLI_HOME)
+                self.driver.get(CAMPAIGN_URL)
                 time.sleep(5)
             self._check_pause()
 
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Entering prompt...')
-            textarea = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'textarea[placeholder*="Describe"]')))
+            textarea = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'textarea[placeholder*="Describe the campaign"]')))
             textarea.clear()
             self._type_slowly(textarea, prompt_text, delay=0.03)
             time.sleep(1)
@@ -661,17 +662,7 @@ class PomelliBot:
             # Select aspect ratio if specified
             try:
                 ar = aspect_ratio or 'story'
-                ar_map = {'story': 'Story (9:16)', 'square': 'Square (1:1)', 'feed': 'Feed (4:5)'}
-                ar_label = ar_map.get(ar, 'Story (9:16)')
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Setting aspect ratio: {ar_label}')
-                ar_btn = self.driver.find_element(By.XPATH, '//button[contains(., "Aspect Ratio")]')
-                ar_btn.click()
-                time.sleep(1)
-                option = WebDriverWait(self.driver, 5).until(
-                    EC.element_to_be_clickable((By.XPATH, f'//button[contains(., "{ar_label}")]')))
-                option.click()
-                time.sleep(0.5)
-                print(f"[PomelliBot] Aspect ratio set to: {ar_label}")
+                self._campaign_set_aspect_ratio(ar)
             except Exception as e:
                 print(f"[PomelliBot] Aspect ratio selection failed (continuing): {e}")
             self._update_status(PomelliBotStatus.GENERATING, 'Clicking Generate Ideas...')
@@ -1331,31 +1322,25 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Path entered: {os.path.basename(abs_path)}')
             time.sleep(10)
 
-        # Image is auto-selected after upload — just verify
-        try:
-            time.sleep(3)
-            thumbs = self.driver.find_elements(By.CSS_SELECTOR, 'img.thumbnail')
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{len(thumbs)} thumbnails found')
-
-            # Check if Looks Good is already enabled (image auto-selected)
-            looks_good_ready = False
-            for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
-                if 'Looks Good' in btn.text and btn.is_enabled():
-                    looks_good_ready = True
-                    break
-
-            if looks_good_ready:
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Image auto-selected!')
-            elif thumbs:
-                # Fallback: click first thumbnail if not auto-selected
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Not auto-selected — clicking first thumbnail')
-                self.driver.execute_script("arguments[0].click();", thumbs[0])
-                time.sleep(2)
-        except Exception as e:
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection error: {str(e)[:50]}')
-
-        # Click Looks Good
         if click_confirm:
+            # Image is auto-selected after upload — just verify (photoshoot only)
+            try:
+                time.sleep(3)
+                thumbs = self.driver.find_elements(By.CSS_SELECTOR, 'img.thumbnail')
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{len(thumbs)} thumbnails found')
+                looks_good_ready = False
+                for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                    if 'Looks Good' in btn.text and btn.is_enabled():
+                        looks_good_ready = True
+                        break
+                if looks_good_ready:
+                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Image auto-selected!')
+                elif thumbs:
+                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Not auto-selected — clicking first thumbnail')
+                    self.driver.execute_script("arguments[0].click();", thumbs[0])
+                    time.sleep(2)
+            except Exception as e:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection error: {str(e)[:50]}')
             self._ps_click_looks_good()
 
     def _ps_match_templates(self, user_templates):
