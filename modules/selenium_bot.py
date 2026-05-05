@@ -845,8 +845,12 @@ class PomelliBot:
             self._ps_upload_and_select(abs_path)
 
         except Exception as e:
+            import traceback
             self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                f'Image upload failed: {str(e)[:60]}')
+                f'Image upload failed: {type(e).__name__}: {str(e)[:80]}')
+            print(f"[PomelliBot] Image upload failed: {type(e).__name__}: {e}")
+            print(f"[PomelliBot] Full traceback:\n{traceback.format_exc()}")
+            raise
 
         # Always clean up
         self._dismiss_all_overlays()
@@ -1258,12 +1262,21 @@ class PomelliBot:
         # Works for both photoshoot (no dialog) and campaign (CDK dialog)
         search_root = self.driver
         panes = self.driver.find_elements(By.CSS_SELECTOR, ".cdk-overlay-pane")
-        visible_panes = [p for p in panes if p.is_displayed()]
-        if visible_panes:
-            search_root = visible_panes[-1]  # most recent visible dialog
-            print(f"[PomelliBot] [upload] Scoping to CDK dialog ({len(visible_panes)} visible)")
+        matched_pane = None
+        for pane in reversed(panes):
+            try:
+                if not pane.is_displayed():
+                    continue
+                pane.find_element(By.CSS_SELECTOR, "app-upload-image-button")
+                matched_pane = pane
+                break
+            except Exception:
+                continue
+        if matched_pane is not None:
+            search_root = matched_pane
+            print(f"[PomelliBot] [upload] Scoping to CDK dialog with upload component (of {len(panes)} panes)")
         else:
-            print("[PomelliBot] [upload] No dialog open, using page-level scope")
+            print(f"[PomelliBot] [upload] No matching dialog ({len(panes)} panes), using page-level scope")
 
         # Wait for upload page
         for _ in range(10):
