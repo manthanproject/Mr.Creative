@@ -841,17 +841,11 @@ class PomelliBot:
                     'app-resource-picker-dialog')))
             time.sleep(2)
 
-            # 3. Click Upload Images button to open file dialog
-            try:
-                upload_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR,
-                        'app-upload-image-button button')))
-                ActionChains(self.driver).move_to_element(upload_btn).pause(0.3).click().perform()
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
-                time.sleep(3)
-            except Exception:
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Upload button not found')
-                return
+            # 3. Click Upload Images button (JS click — ActionChains crashes on submit buttons)
+            upload_btn = self.driver.find_element(By.CSS_SELECTOR, 'app-upload-image-button button')
+            self.driver.execute_script("arguments[0].click();", upload_btn)
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
+            time.sleep(3)
 
             # 4. File dialog — paste path and Enter
             import pyautogui
