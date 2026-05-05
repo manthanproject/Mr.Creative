@@ -58,7 +58,7 @@ class FlowSession:
             prompt=prompt,
             aspect_ratio=flow_ar,
             count=min(count, 4),
-            image_path=reference_image if is_first else None,
+            image_path=reference_image,
             reuse_project=not is_first,
         )
 
