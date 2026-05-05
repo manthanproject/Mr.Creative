@@ -716,7 +716,9 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.COMPLETE, 'All 4 creatives generated!')
             return True
         except Exception as e:
-            self._update_status(PomelliBotStatus.ERROR, f'Generation failed: {str(e)}')
+            import traceback
+            print(f"[TRACEBACK] Generation failed:\n{traceback.format_exc()}")
+            self._update_status(PomelliBotStatus.ERROR, f'Generation failed: {type(e).__name__}: {e}')
             self.errors.append(str(e))
             return False
 
