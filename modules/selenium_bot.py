@@ -823,9 +823,15 @@ class PomelliBot:
 
         try:
             # 1. Click the Images button on campaign page
-            img_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR,
-                    'button[aria-label="Add image ingredient"]')))
+            img_btn = None
+            for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button.ingredient-button'):
+                if 'Images' in btn.text or 'image' in btn.text.lower():
+                    img_btn = btn
+                    break
+            if not img_btn:
+                img_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR,
+                        'button[aria-label="Add image ingredient"]')))
             ActionChains(self.driver).move_to_element(img_btn).pause(0.3).click().perform()
             time.sleep(3)
 
@@ -842,14 +848,21 @@ class PomelliBot:
             ActionChains(self.driver).move_to_element(upload_btn).pause(0.3).click().perform()
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
 
-            # 4. Handle file explorer dialog via pyautogui (same as photoshoot)
-            import pyautogui
-            import subprocess
-            time.sleep(2)
-            subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.5)
-            pyautogui.press('enter')
+            # 4. Upload via hidden file input (like Pomelli) or fallback to pyautogui
+            try:
+                file_input = self.driver.find_element(By.CSS_SELECTOR, 'app-upload-image-button input')
+                file_input.send_keys(abs_path)
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploaded via input: {os.path.basename(abs_path)}')
+            except Exception:
+                import pyautogui
+                import subprocess
+                time.sleep(2)
+                subprocess.run(['clip'], input=abs_path.encode(), check=True)
+                pyautogui.hotkey('ctrl', 'a')
+                time.sleep(0.3)
+                pyautogui.hotkey('ctrl', 'v')
+                time.sleep(1)
+                pyautogui.press('enter')
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploading: {os.path.basename(abs_path)}')
             time.sleep(10)  # Wait for upload to complete
 
@@ -1850,47 +1863,35 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ANIMATING,
             f'Found card, triggering Animate...')
 
-        # Use pure JS hover + click — no physical mouse movement to avoid triggering adjacent cards
-        anim_btn = self.driver.execute_script("""
-            var img = arguments[0];
-            // Dispatch hover events up the tree to reveal animate button
-            var el = img;
-            var cardEl = null;
-            for (var i = 0; i < 10; i++) {
-                if (!el.parentElement) break;
+        # Hover the card container and click its animate button
+        # Find the parent creative-card-container
+        card_container = self.driver.execute_script("""
+            var el = arguments[0];
+            while (el && el.parentElement) {
                 el = el.parentElement;
-                ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'].forEach(function(evt) {
-                    el.dispatchEvent(new MouseEvent(evt, {bubbles: true, cancelable: true}));
-                });
-                // Check if animate button appeared at each level
-                var btn = el.querySelector('button[aria-label="Animate"]');
-                if (btn) cardEl = el;
+                if (el.classList && el.classList.contains('creative-card-container')) return el;
             }
-            // Wait briefly for button to render
-            return cardEl;
+            return null;
         """, img_el)
-        time.sleep(2)
 
-        # Now find the animate button strictly within this card
+        if not card_container:
+            self._update_status(PomelliBotStatus.ANIMATING, 'Card container not found')
+            return
+
+        # Hover the card to reveal animate button
+        ActionChains(self.driver).move_to_element(card_container).pause(1).perform()
+        time.sleep(1)
+
+        # Click the animate button within THIS card container only
         clicked = self.driver.execute_script("""
-            var img = arguments[0];
-            var imgRect = img.getBoundingClientRect();
-            var el = img;
-            for (var i = 0; i < 10; i++) {
-                if (!el.parentElement) break;
-                el = el.parentElement;
-                var btn = el.querySelector('button[aria-label="Animate"]');
-                if (btn) {
-                    var btnRect = btn.getBoundingClientRect();
-                    // Verify button is within this card's horizontal bounds
-                    if (btnRect.left >= imgRect.left - 20 && btnRect.right <= imgRect.right + 20) {
-                        btn.click();
-                        return 'clicked';
-                    }
-                }
-            }
+            var container = arguments[0];
+            var btn = container.querySelector('button.animate-button');
+            if (btn) { btn.click(); return 'clicked'; }
+            // Fallback: aria-label
+            btn = container.querySelector('button[aria-label="Animate"]');
+            if (btn) { btn.click(); return 'clicked'; }
             return 'not_found';
-        """, img_el)
+        """, card_container)
 
         if clicked != 'clicked':
             self._update_status(PomelliBotStatus.ANIMATING,
