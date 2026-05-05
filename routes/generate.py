@@ -779,6 +779,10 @@ def saved_accounts():
     # Pomelli accounts — exclude known Flow-only accounts
     flow_only = {'crimsonbox69@gmail.com'}
     filtered = [a for a in accounts if a['email'].lower() not in flow_only]
+    emails_in_list = {a['email'] for a in filtered}
+    # Always include the active account
+    if active and active not in emails_in_list and active.lower() not in flow_only:
+        filtered.insert(0, {'email': active, 'password': ''})
     return jsonify({
         'accounts': [{'email': a['email'], 'active': a['email'] == active} for a in filtered],
         'active': active,
