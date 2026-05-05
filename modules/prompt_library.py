@@ -80,21 +80,7 @@ CONTENT_TYPE_CONFIG = {
         'scenarios': [],
         'prompt_template': '{scenario}',
         'expert_prompts': [
-            'A+ product listing infographic. Hero shot of the product centered on a clean white background with bold heading text above, three key benefit bullet points on the right side, and a quality badge in the corner. Professional e-commerce product photography with soft studio lighting.',
-
-            'A+ product features grid layout. The product displayed prominently on the left, with a 2x2 grid of feature callouts on the right side, each with an icon and short description. Clean modern design with subtle gradient background. Professional product photography.',
-
-            'A+ before and after comparison layout. Split image showing the problem on the left side and the solution with the product on the right side. Clear dividing line, bold text labels, dramatic lighting difference between the two halves.',
-
-            'A+ how-to-use step by step guide. The product in the center with 3 numbered steps arranged around it showing the application process. Each step has a small circular image and instruction text. Clean infographic layout on white background.',
-
-            'A+ product ingredients and benefits spotlight. Close-up of the product with magnified ingredient callouts connected by thin lines. Each callout shows the ingredient name and its benefit. Scientific clean design with soft blue-white tones.',
-
-            'A+ lifestyle product photography. The product being used naturally in an everyday setting - bathroom counter, vanity table, or morning routine scene. Warm natural lighting, shallow depth of field, editorial style photography.',
-
-            'A+ multi-angle product view. The product shown from 3 different angles - front view, side view, and detail close-up - arranged in a clean triptych layout on a neutral background. Professional studio lighting with soft shadows.',
-
-            'A+ product comparison chart. The product on one side compared against a generic alternative. Checkmark and cross icons showing feature differences. Clean table layout with the product highlighted as the winner. Professional design.',
+            'A+ product listing infographic with hero shot, key benefits with icons, feature grid, how-to-use steps, ingredient callouts, before and after comparison, multi-angle views, and a quality badge. Clean professional layout with bold headings and organized sections.',
         ],
     },
     'social_post': {
