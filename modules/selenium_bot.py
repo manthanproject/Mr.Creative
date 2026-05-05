@@ -1347,20 +1347,36 @@ class PomelliBot:
             # Select one wanted from pool
             if i < len(to_select):
                 target_name = to_select[i]
-                # Re-query labels (DOM changed)
+                selected = False
+                # Re-query labels (DOM changed after deselect)
                 for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large'):
                     if 'selected' in (lbl.get_attribute('class') or ''):
                         continue
+                    if 'arrow_drop_down' in lbl.text:
+                        continue
                     if lbl.text.strip() == target_name:
+                        # Try clicking the label itself
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({block:'center'});", lbl)
+                        time.sleep(0.3)
+                        self.driver.execute_script("arguments[0].click();", lbl)
+                        time.sleep(0.5)
+                        # Verify it got selected
+                        if 'selected' in (lbl.get_attribute('class') or ''):
+                            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {target_name}')
+                            selected = True
+                            time.sleep(0.5)
+                            break
+                        # If label click didn't work, try clicking its IMG sibling
                         img = find_img_for_label(lbl)
                         if img:
-                            self.driver.execute_script(
-                                "arguments[0].scrollIntoView({block:'center'});", img)
-                            time.sleep(0.3)
-                            ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {target_name}')
+                            ActionChains(self.driver).move_to_element(img).pause(0.3).click().perform()
+                            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected via hover: {target_name}')
+                            selected = True
                             time.sleep(0.8)
                             break
+                if not selected:
+                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'FAILED to select: {target_name}')
 
         # Verify
         time.sleep(1)
