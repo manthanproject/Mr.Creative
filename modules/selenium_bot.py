@@ -1057,32 +1057,25 @@ class PomelliBot:
         if not templates:
             templates = []
         try:
+            # ── Navigate to Photoshoot landing page ──
             self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Photoshoot page...')
             self.driver.get(POMELLI_PHOTOSHOOT)
             time.sleep(3)
-
-            # Pomelli may redirect to Campaigns — click sidebar to reach Photoshoot
-            if 'photoshoot' not in self.driver.current_url.lower() or \
-               'Campaigns' in (self.driver.execute_script("return document.body?.innerText?.substring(0, 200)") or ''):
-                self._update_status(PomelliBotStatus.NAVIGATING, 'Redirected — clicking Photoshoot in sidebar...')
-                for link in self.driver.find_elements(By.CSS_SELECTOR, 'div.nav-item'):
-                    if 'Photoshoot' in link.text:
-                        self.driver.execute_script("arguments[0].click();", link)
-                        time.sleep(3)
-                        break
-
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
                 self.driver.get(POMELLI_PHOTOSHOOT)
                 time.sleep(3)
 
+            # ── Handle redirect: if Pomelli sent us to Campaigns, click sidebar ──
+            self._ensure_on_photoshoot_page()
+
             self._check_pause()
             self._update_status(PomelliBotStatus.NAVIGATING, 'Clicking mode card...')
             self._ps_click_mode_card(photoshoot_mode)
 
+            # ── Upload product image ──
             self._check_pause()
-            # Click Product Image edit button (first pencil icon)
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicking Product Image edit...')
             self._ps_click_edit_button('first')
             time.sleep(2)
@@ -1091,13 +1084,14 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Uploading product image...')
             self._ps_upload_and_select(image_path)
 
+            # ── Select templates ──
             if templates and photoshoot_mode == 'product':
                 self._check_pause()
-                # Wait for templates card to become enabled after image upload
+                # Wait for templates card to become enabled
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Waiting for Templates to enable...')
                 for _ in range(15):
-                    disabled_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient.disabled')
-                    if not disabled_cards:
+                    disabled = self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient.disabled')
+                    if not disabled:
                         break
                     time.sleep(1)
                 time.sleep(1)
@@ -1108,6 +1102,7 @@ class PomelliBot:
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selecting {len(templates)} templates...')
                 self._ps_match_templates(templates)
 
+            # ── Generate ──
             self._check_pause()
             self._update_status(PomelliBotStatus.GENERATING, 'Clicking Generate Photoshoot...')
             self._ps_click_create()
@@ -1123,71 +1118,98 @@ class PomelliBot:
             self.errors.append(str(e))
             return False
 
+    def _ensure_on_photoshoot_page(self):
+        """If Pomelli redirected to Campaigns or home, navigate back to Photoshoot."""
+        time.sleep(2)
+        current = self.driver.current_url
+        # Already on photoshoot? Check if landing page or editor rendered
+        if 'photoshoot' in current:
+            return
+        # Redirected to campaigns or home — click sidebar
+        self._update_status(PomelliBotStatus.NAVIGATING, 'Redirected — clicking Photoshoot sidebar...')
+        for link in self.driver.find_elements(By.CSS_SELECTOR, 'div.nav-item'):
+            if 'Photoshoot' in link.text:
+                self.driver.execute_script("arguments[0].click();", link)
+                time.sleep(3)
+                return
+        # Fallback: direct navigation
+        self.driver.get(POMELLI_PHOTOSHOOT)
+        time.sleep(3)
+
     def _ps_click_mode_card(self, mode):
-        """Landing page: click 'Create a product photoshoot' or 'Generate or edit an image'.
-        If already on editor page, skip."""
+        """Landing page: click 'Create a product photoshoot' or 'Generate or edit an image'."""
         target = 'Create a product' if mode == 'product' else 'Generate or edit'
 
         for attempt in range(3):
-            # Check if already on editor page (Pomelli remembers last session)
-            for tick in range(5):
+            # Already on editor page? Skip.
+            if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
+                self._update_status(PomelliBotStatus.NAVIGATING, 'Already on editor — skipping mode card')
+                return
+
+            # Wait up to 30s for Angular to render the cards
+            clicked = False
+            for tick in range(30):
                 time.sleep(1)
-                if self.driver.find_elements(By.CSS_SELECTOR, 'app-photoshoot-ingredients-editor') or \
-                   self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
-                    self._update_status(PomelliBotStatus.NAVIGATING, 'Already on editor page — skipping mode card')
+                # Check editor appeared (could have auto-navigated)
+                if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
+                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor appeared — skipping mode card')
                     return
 
-            # Debug: what's actually on this page?
-            page_url = self.driver.current_url
-            page_title = self.driver.title
-            body_text = self.driver.execute_script("return document.body?.innerText?.substring(0, 300) || 'empty'")
-            self._update_status(PomelliBotStatus.NAVIGATING, f'Page: {page_url}')
-            print(f"[PomelliBot] DEBUG url={page_url} title={page_title}")
-            print(f"[PomelliBot] DEBUG body={body_text[:200]}")
-
-            # Poll for mode cards on landing page (up to 15s)
-            for tick in range(15):
-                time.sleep(1)
+                # Try clicking the card
                 try:
+                    # Primary: div.photoshoot-branch-button
                     cards = self.driver.find_elements(By.CSS_SELECTOR, 'div.photoshoot-branch-button')
                     for card in cards:
                         if target in card.text:
                             self.driver.execute_script("arguments[0].click();", card)
                             self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked: {card.text.strip()[:40]}')
-                            # Wait for editor page
-                            for _ in range(15):
-                                time.sleep(1)
-                                if self.driver.find_elements(By.CSS_SELECTOR,
-                                    'app-photoshoot-ingredients-editor') or \
-                                   self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
-                                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
-                                    return
+                            clicked = True
                             break
+
+                    # Fallback: title text div
+                    if not clicked:
+                        titles = self.driver.find_elements(By.CSS_SELECTOR, 'div.title-medium.on-surface-variant')
+                        for t in titles:
+                            if target in t.text:
+                                self.driver.execute_script("arguments[0].click();", t)
+                                self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked title: {t.text.strip()[:40]}')
+                                clicked = True
+                                break
                 except Exception:
                     pass
 
-            # Retry via sidebar
-            self._update_status(PomelliBotStatus.NAVIGATING, f'Retry {attempt+1}/3 — clicking sidebar...')
-            try:
-                for link in self.driver.find_elements(By.CSS_SELECTOR, 'a'):
-                    if 'Photoshoot' in link.text:
-                        self.driver.execute_script("arguments[0].click();", link)
-                        break
-            except Exception:
-                self.driver.get(POMELLI_PHOTOSHOOT)
+                if clicked:
+                    break
+
+            if not clicked:
+                self._update_status(PomelliBotStatus.NAVIGATING, f'No card found — retry {attempt+1}/3')
+                self._ensure_on_photoshoot_page()
+                continue
+
+            # Wait for editor page to load (div.ingredient)
+            for _ in range(20):
+                time.sleep(1)
+                if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
+                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
+                    return
+
+            self._update_status(PomelliBotStatus.NAVIGATING, f'Editor not loaded — retry {attempt+1}/3')
+            self.driver.get(POMELLI_PHOTOSHOOT)
+            time.sleep(3)
 
         raise RuntimeError('Could not navigate past landing page')
 
     def _ps_click_edit_button(self, which='first'):
-        """Editor page: two pencil buttons with class containing 'edit'.
-        'first' = Product Image, 'second' = Templates."""
+        """Editor page: click pencil edit button. 'first'=Product Image, 'second'=Templates."""
+        idx = 0 if which == 'first' else 1
         for _ in range(15):
-            btns = [b for b in self.driver.find_elements(By.CSS_SELECTOR,
-                'button.edit') if b.is_displayed()]
-            idx = 0 if which == 'first' else 1
+            # Filter to only visible icon buttons with text "edit"
+            btns = []
+            for b in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                if b.is_displayed() and b.text.strip() == 'edit' and 'edit' in (b.get_attribute('class') or ''):
+                    btns.append(b)
             if len(btns) > idx:
-                btn = btns[idx]
-                self.driver.execute_script("arguments[0].click();", btn)
+                self.driver.execute_script("arguments[0].click();", btns[idx])
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Clicked edit button ({which})')
                 time.sleep(2)
                 return
@@ -1195,26 +1217,29 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Edit button "{which}" not found')
 
     def _ps_upload_and_select(self, image_path):
-        """Upload page: APP-PRODUCT-IMAGE-PICKER."""
+        """Upload page: upload image via file dialog, then click Looks Good."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f'Image not found: {abs_path}')
 
+        # Wait for upload page
         for _ in range(10):
-            if self.driver.find_elements(By.CSS_SELECTOR, 'app-product-image-picker, span.selection-count'):
+            if self.driver.find_elements(By.CSS_SELECTOR, 'app-upload-image-button'):
                 break
             time.sleep(1)
         time.sleep(1)
 
+        # Click "Upload Images" button
         try:
             upload_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'app-upload-image-button button')))
-            ActionChains(self.driver).move_to_element(upload_btn).pause(0.3).click().perform()
+            self.driver.execute_script("arguments[0].click();", upload_btn)
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
         except TimeoutException:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Upload button not found')
             return
 
+        # File dialog: paste path and enter
         import pyautogui
         import subprocess
         time.sleep(2)
@@ -1222,33 +1247,34 @@ class PomelliBot:
         pyautogui.hotkey('ctrl', 'v')
         time.sleep(0.5)
         pyautogui.press('enter')
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Path entered: {abs_path}')
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Path entered: {os.path.basename(abs_path)}')
         time.sleep(10)
 
+        # Check image appeared in thumbnails
         try:
-            sel = self.driver.find_element(By.CSS_SELECTOR, 'span.selection-count').text
-            match = re.search(r'\((\d+)/\d+ selected\)', sel)
-            if match and int(match.group(1)) > 0:
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Auto-selected: {sel}')
-            else:
-                thumbs = self.driver.find_elements(By.CSS_SELECTOR, 'img.thumbnail.img-loaded')
-                if thumbs:
-                    ActionChains(self.driver).move_to_element(thumbs[-1]).pause(0.3).click().perform()
-                    time.sleep(1)
-                    sel = self.driver.find_element(By.CSS_SELECTOR, 'span.selection-count').text
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {sel}')
-        except Exception as e:
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection error: {str(e)[:50]}')
+            thumbs = self.driver.find_elements(By.CSS_SELECTOR, 'img.thumbnail')
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{len(thumbs)} thumbnails found')
 
+            # If image not auto-selected, click the latest thumbnail
+            sel = self.driver.find_elements(By.CSS_SELECTOR, 'span.selection-count')
+            if sel:
+                sel_text = sel[0].text
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection: {sel_text}')
+                if '0/' in sel_text and thumbs:
+                    # Click last thumbnail to select it
+                    self.driver.execute_script("arguments[0].click();", thumbs[-1])
+                    time.sleep(1)
+        except Exception as e:
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection check: {str(e)[:50]}')
+
+        # Click Looks Good
         self._ps_click_looks_good()
 
     def _ps_match_templates(self, user_templates):
-        """Template page: swap templates one-by-one to match user's selection.
-        Pomelli requires exactly 4 selected at all times.
-        Approach: deselect one unwanted → select one wanted (repeat)."""
+        """Template picker: swap templates to match user selection. Always keep 4."""
         user_wants = set(t.strip() for t in user_templates[:4])
 
-        # Pad to 4 if user gave fewer (Pomelli requires exactly 4)
+        # Pad to 4 if user gave fewer
         available_names = ['Studio', 'Floating', 'Ingredient', 'In Use', 'Contextual', 'Flatlay']
         while len(user_wants) < 4:
             for fallback in available_names:
@@ -1258,7 +1284,7 @@ class PomelliBot:
             else:
                 break
 
-        # Wait for template picker to load
+        # Wait for template picker
         for _ in range(10):
             if self.driver.find_elements(By.CSS_SELECTOR, 'app-template-picker'):
                 break
@@ -1268,7 +1294,7 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Want: {sorted(user_wants)}')
 
         def find_img_for_label(label_el):
-            """Walk backwards from label DIV to find its IMG sibling."""
+            """Walk backwards from label to find its IMG sibling."""
             return self.driver.execute_script("""
                 var el = arguments[0].previousElementSibling;
                 while (el) { if (el.tagName === 'IMG') return el; el = el.previousElementSibling; }
@@ -1276,15 +1302,16 @@ class PomelliBot:
             """, label_el)
 
         def get_selected_names():
-            """Read currently selected template names."""
+            """Get names of currently selected templates."""
             names = []
             for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected'):
                 name = lbl.text.strip()
-                if name:
+                # Skip seasonal labels (contain "arrow_drop_down")
+                if name and 'arrow_drop_down' not in name:
                     names.append(name)
             return names
 
-        # ── Read current state ──
+        # Read current state
         current = get_selected_names()
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Currently selected: {current}')
 
@@ -1292,14 +1319,13 @@ class PomelliBot:
         to_select = [n for n in user_wants if n not in current]
 
         self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-            f'Swap plan: deselect {to_deselect}, select {to_select}')
+            f'Swap: deselect {to_deselect}, select {to_select}')
 
-        # ── Swap one-by-one: deselect unwanted → select wanted ──
+        # Swap one-by-one: deselect one → select one (keep count at 4)
         for i in range(max(len(to_deselect), len(to_select))):
-            # Step A: Deselect one unwanted from the selected section (top)
+            # Deselect one unwanted
             if i < len(to_deselect):
                 target_name = to_deselect[i]
-                deselected = False
                 for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected'):
                     if lbl.text.strip() == target_name:
                         img = find_img_for_label(lbl)
@@ -1308,21 +1334,15 @@ class PomelliBot:
                                 "arguments[0].scrollIntoView({block:'center'});", img)
                             time.sleep(0.3)
                             ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                                f'Deselected: {target_name}')
-                            deselected = True
+                            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Deselected: {target_name}')
                             time.sleep(0.8)
                             break
-                if not deselected:
-                    print(f"[PomelliBot] Could not deselect: {target_name}")
 
-            # Step B: Select one wanted from the available pool (bottom)
+            # Select one wanted from pool
             if i < len(to_select):
                 target_name = to_select[i]
-                selected = False
-                # Re-query pool labels (DOM changed after deselect)
-                pool_labels = self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large')
-                for lbl in pool_labels:
+                # Re-query labels (DOM changed)
+                for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large'):
                     if 'selected' in (lbl.get_attribute('class') or ''):
                         continue
                     if lbl.text.strip() == target_name:
@@ -1332,62 +1352,54 @@ class PomelliBot:
                                 "arguments[0].scrollIntoView({block:'center'});", img)
                             time.sleep(0.3)
                             ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                                f'Selected: {target_name}')
-                            selected = True
+                            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {target_name}')
                             time.sleep(0.8)
                             break
-                if not selected:
-                    print(f"[PomelliBot] Could not select: {target_name}")
 
-        # ── Verify final state ──
+        # Verify
         time.sleep(1)
         final = get_selected_names()
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-            f'Templates final ({len(final)}): {final}')
+        count_el = self.driver.find_elements(By.CSS_SELECTOR, 'span.selection-count')
+        count_text = count_el[0].text if count_el else '?'
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Final: {final} {count_text}')
 
         if len(final) != 4:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                f'WARNING: {len(final)} selected, Pomelli needs exactly 4!')
-
-        missing = user_wants - set(final)
-        if missing:
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                f'WARNING: could not find: {missing}')
+                f'WARNING: {len(final)} selected, need 4!')
 
         self._ps_click_looks_good()
 
     def _ps_click_looks_good(self):
-        """All subpages: button with span.mdc-button__label = 'Looks Good'"""
+        """Click the 'Looks Good' button (shared across sub-pages)."""
         time.sleep(1)
-        try:
-            btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.element_to_be_clickable((By.XPATH,
-                '//span[@class="mdc-button__label" and contains(text(), "Looks Good")]/ancestor::button')))
-            ActionChains(self.driver).move_to_element(btn).pause(0.3).click().perform()
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Looks Good')
-            time.sleep(3)
-        except TimeoutException:
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Looks Good not found')
+        for _ in range(20):
+            for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                if 'Looks Good' in btn.text and btn.is_displayed():
+                    if btn.is_enabled():
+                        self.driver.execute_script("arguments[0].click();", btn)
+                        self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Looks Good')
+                        time.sleep(3)
+                        return
+                    else:
+                        self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Looks Good disabled — waiting...')
+            time.sleep(1)
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Looks Good not found after 20s')
 
     def _ps_click_create(self):
-        """Editor page: 'Generate Photoshoot' button."""
-        for _ in range(20):
-            try:
-                btns = self.driver.find_elements(By.CSS_SELECTOR, 'button')
-                for btn in btns:
-                    txt = btn.text.strip()
-                    if 'Generate Photoshoot' in txt or 'Create Photoshoot' in txt:
-                        if btn.is_enabled() and btn.is_displayed():
-                            self.driver.execute_script("arguments[0].click();", btn)
-                            self._update_status(PomelliBotStatus.GENERATING, f'Clicked: {txt}')
-                            time.sleep(5)
-                            return
-                        else:
-                            self._update_status(PomelliBotStatus.GENERATING, 'Button found but disabled — waiting...')
-            except Exception:
-                pass
+        """Click 'Generate Photoshoot' button on editor page."""
+        for _ in range(30):
+            for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                txt = btn.text.strip()
+                if ('Generate Photoshoot' in txt or 'Create Photoshoot' in txt):
+                    if btn.is_enabled() and btn.is_displayed():
+                        self.driver.execute_script("arguments[0].click();", btn)
+                        self._update_status(PomelliBotStatus.GENERATING, f'Clicked: {txt}')
+                        time.sleep(5)
+                        return
+                    else:
+                        self._update_status(PomelliBotStatus.GENERATING, 'Generate button disabled — waiting...')
             time.sleep(1)
-        raise RuntimeError('Generate Photoshoot button stayed disabled or not found')
+        raise RuntimeError('Generate Photoshoot button not found or stayed disabled')
 
     def _wait_for_creatives_to_load(self):
         """Results page: wait for all loading indicators to disappear."""
