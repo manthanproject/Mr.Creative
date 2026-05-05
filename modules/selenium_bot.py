@@ -1220,26 +1220,35 @@ class PomelliBot:
             time.sleep(1)
         time.sleep(1)
 
-        # Click "Upload Images" button
+        # Upload via hidden file input — no file dialog needed
         try:
-            upload_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, 'app-upload-image-button button')))
-            self.driver.execute_script("arguments[0].click();", upload_btn)
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
-        except TimeoutException:
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Upload button not found')
-            return
+            file_input = self.driver.find_element(By.CSS_SELECTOR, 'app-upload-image-button input')
+            file_input.send_keys(abs_path)
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploaded via input: {os.path.basename(abs_path)}')
+            time.sleep(10)
+        except Exception:
+            # Fallback: click button + pyautogui file dialog
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'No file input — using file dialog...')
+            try:
+                upload_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'app-upload-image-button button')))
+                ActionChains(self.driver).move_to_element(upload_btn).pause(0.3).click().perform()
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
+            except TimeoutException:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Upload button not found')
+                return
 
-        # File dialog: paste path and enter
-        import pyautogui
-        import subprocess
-        time.sleep(2)
-        subprocess.run(['clip'], input=abs_path.encode(), check=True)
-        pyautogui.hotkey('ctrl', 'v')
-        time.sleep(0.5)
-        pyautogui.press('enter')
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Path entered: {os.path.basename(abs_path)}')
-        time.sleep(10)
+            import pyautogui
+            import subprocess
+            time.sleep(2)
+            subprocess.run(['clip'], input=abs_path.encode(), check=True)
+            pyautogui.hotkey('ctrl', 'a')
+            time.sleep(0.3)
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(1)
+            pyautogui.press('enter')
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Path entered: {os.path.basename(abs_path)}')
+            time.sleep(10)
 
         # Image is auto-selected after upload — just verify
         try:
