@@ -841,48 +841,8 @@ class PomelliBot:
                     'app-resource-picker-dialog')))
             time.sleep(2)
 
-            # 3. Click Upload Images button (JS click — ActionChains crashes on submit buttons)
-            upload_btn = self.driver.find_element(By.CSS_SELECTOR, 'app-upload-image-button button')
-            self.driver.execute_script("arguments[0].click();", upload_btn)
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
-            time.sleep(3)
-
-            # 4. File dialog — paste path and Enter
-            import pyautogui
-            import subprocess
-            subprocess.run(['clip'], input=abs_path.encode(), check=True)
-            pyautogui.hotkey('ctrl', 'a')
-            time.sleep(0.3)
-            pyautogui.hotkey('ctrl', 'v')
-            time.sleep(1)
-            pyautogui.press('enter')
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploading: {os.path.basename(abs_path)}')
-            time.sleep(10)
-
-            # 5. Image should auto-select — check count
-            try:
-                sel = self.driver.find_element(By.CSS_SELECTOR, 'span').text
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection: {sel.strip()[:30]}')
-            except Exception:
-                pass
-
-            # 6. Click Update or Confirm button
-            time.sleep(1)
-            try:
-                update_btn = None
-                for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
-                    txt = btn.text.strip()
-                    if txt in ('Update', 'Confirm', 'Looks Good') and btn.is_displayed():
-                        update_btn = btn
-                        break
-                if update_btn:
-                    ActionChains(self.driver).move_to_element(update_btn).pause(0.3).click().perform()
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Clicked {update_btn.text.strip()}!')
-                    time.sleep(2)
-                else:
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Update/Confirm button not found')
-            except Exception:
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Could not click Update')
+            # 3. Reuse _ps_upload_and_select — it auto-scopes to the CDK dialog
+            self._ps_upload_and_select(abs_path)
 
         except Exception as e:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT,
@@ -1294,16 +1254,27 @@ class PomelliBot:
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f'Image not found: {abs_path}')
 
+        # === SCOPE: prefer dialog overlay if open, else page-level ===
+        # Works for both photoshoot (no dialog) and campaign (CDK dialog)
+        search_root = self.driver
+        panes = self.driver.find_elements(By.CSS_SELECTOR, ".cdk-overlay-pane")
+        visible_panes = [p for p in panes if p.is_displayed()]
+        if visible_panes:
+            search_root = visible_panes[-1]  # most recent visible dialog
+            print(f"[PomelliBot] [upload] Scoping to CDK dialog ({len(visible_panes)} visible)")
+        else:
+            print("[PomelliBot] [upload] No dialog open, using page-level scope")
+
         # Wait for upload page
         for _ in range(10):
-            if self.driver.find_elements(By.CSS_SELECTOR, 'app-upload-image-button'):
+            if search_root.find_elements(By.CSS_SELECTOR, 'app-upload-image-button'):
                 break
             time.sleep(1)
         time.sleep(1)
 
         # Upload via hidden file input — no file dialog needed
         try:
-            file_input = self.driver.find_element(By.CSS_SELECTOR, 'app-upload-image-button input')
+            file_input = search_root.find_element(By.CSS_SELECTOR, 'app-upload-image-button input')
             file_input.send_keys(abs_path)
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploaded via input: {os.path.basename(abs_path)}')
             time.sleep(10)
@@ -1311,11 +1282,10 @@ class PomelliBot:
             # Fallback: click button + pyautogui file dialog
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'No file input — using file dialog...')
             try:
-                upload_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'app-upload-image-button button')))
-                ActionChains(self.driver).move_to_element(upload_btn).pause(0.3).click().perform()
+                upload_btn = search_root.find_element(By.CSS_SELECTOR, 'app-upload-image-button button')
+                self.driver.execute_script("arguments[0].click();", upload_btn)
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
-            except TimeoutException:
+            except Exception:
                 self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Upload button not found')
                 return
 
