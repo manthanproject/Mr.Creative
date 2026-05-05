@@ -1313,15 +1313,17 @@ class PomelliBot:
         self._ps_click_looks_good()
 
     def _ps_match_templates(self, user_templates):
-        """Template picker: swap templates to match user selection. Always keep 4."""
+        """Template picker: select exactly the user's templates.
+        Works like a human: hover each card → read name → click to toggle.
+        Pomelli requires exactly 4 selected."""
         user_wants = set(t.strip() for t in user_templates[:4])
 
         # Pad to 4 if user gave fewer
-        available_names = ['Studio', 'Floating', 'Ingredient', 'In Use', 'Contextual', 'Flatlay']
+        available_defaults = ['Studio', 'Floating', 'Ingredient', 'In Use', 'Contextual', 'Flatlay']
         while len(user_wants) < 4:
-            for fallback in available_names:
-                if fallback not in user_wants:
-                    user_wants.add(fallback)
+            for f in available_defaults:
+                if f not in user_wants:
+                    user_wants.add(f)
                     break
             else:
                 break
@@ -1335,102 +1337,189 @@ class PomelliBot:
 
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Want: {sorted(user_wants)}')
 
-        def find_img_for_label(label_el):
-            """Walk backwards from label to find its IMG sibling."""
-            return self.driver.execute_script("""
-                var el = arguments[0].previousElementSibling;
-                while (el) { if (el.tagName === 'IMG') return el; el = el.previousElementSibling; }
-                return null;
-            """, label_el)
+        # ── Step 1: Scan ALL template cards, build a map of name → element + state ──
+        card_map = []  # list of {name, img, label, selected, y}
 
-        def get_selected_names():
-            """Get names of currently selected templates."""
-            names = []
-            for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected'):
-                name = lbl.text.strip()
-                # Skip seasonal labels (contain "arrow_drop_down")
-                if name and 'arrow_drop_down' not in name:
-                    names.append(name)
-            return names
+        all_labels = self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large')
+        for lbl in all_labels:
+            try:
+                if not lbl.is_displayed():
+                    continue
+                rect = lbl.rect
+                # Skip sidebar labels (y < 250 are sidebar nav items)
+                if rect['y'] < 250:
+                    continue
 
-        # Read current state
-        current = get_selected_names()
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Currently selected: {current}')
+                raw_name = lbl.text.strip()
+                # Clean seasonal "arrow_drop_down" suffix
+                name = raw_name.replace('arrow_drop_down', '').strip()
+                if not name or name in ('Beauty', 'General', 'Fashion', 'Consumables',
+                                        'Amazon Product Images', 'Home', '(Recommended)'):
+                    continue
 
-        to_deselect = [n for n in current if n not in user_wants]
-        to_select = [n for n in user_wants if n not in current]
+                is_selected = 'selected' in (lbl.get_attribute('class') or '')
+
+                # Find the IMG sibling (walk backwards)
+                img = self.driver.execute_script("""
+                    var el = arguments[0].previousElementSibling;
+                    while (el) { if (el.tagName === 'IMG') return el; el = el.previousElementSibling; }
+                    return null;
+                """, lbl)
+
+                if img:
+                    card_map.append({
+                        'name': name,
+                        'img': img,
+                        'label': lbl,
+                        'selected': is_selected,
+                        'y': rect['y'],
+                    })
+            except Exception:
+                continue
+
+        # Only use first occurrence of each name (Beauty section first)
+        seen = set()
+        unique_cards = []
+        for card in sorted(card_map, key=lambda c: c['y']):
+            if card['name'] not in seen:
+                seen.add(card['name'])
+                unique_cards.append(card)
+
+        current_selected = [c['name'] for c in unique_cards if c['selected']]
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+            f'Found {len(unique_cards)} templates, selected: {current_selected}')
+
+        # ── Step 2: Figure out what to change ──
+        to_deselect = [c for c in unique_cards if c['selected'] and c['name'] not in user_wants]
+        to_select = [c for c in unique_cards if not c['selected'] and c['name'] in user_wants]
 
         self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-            f'Swap: deselect {to_deselect}, select {to_select}')
+            f'Deselect: {[c["name"] for c in to_deselect]}, Select: {[c["name"] for c in to_select]}')
 
-        # Swap one-by-one: deselect one → select one (keep count at 4)
+        # ── Step 3: Swap one by one — deselect one, then select one ──
         for i in range(max(len(to_deselect), len(to_select))):
-            # Deselect one unwanted
+            # Deselect
             if i < len(to_deselect):
-                target_name = to_deselect[i]
-                for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected'):
-                    if lbl.text.strip() == target_name:
-                        img = find_img_for_label(lbl)
-                        if img:
-                            self.driver.execute_script(
-                                "arguments[0].scrollIntoView({block:'center'});", img)
-                            time.sleep(0.3)
-                            ActionChains(self.driver).move_to_element(img).pause(0.2).click().perform()
-                            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Deselected: {target_name}')
-                            time.sleep(0.8)
-                            break
+                card = to_deselect[i]
+                self._click_template_card(card['img'], card['name'], 'Deselected')
 
-            # Select one wanted from pool
+            # Select
             if i < len(to_select):
-                target_name = to_select[i]
-                selected = False
-                for lbl in self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large'):
-                    if 'selected' in (lbl.get_attribute('class') or ''):
-                        continue
-                    if 'arrow_drop_down' in lbl.text:
-                        continue
-                    if lbl.text.strip() == target_name:
-                        # Try 3 click targets: parent, label, img
-                        for click_target_js in [
-                            "arguments[0].parentElement.click();",  # parent container
-                            "arguments[0].click();",                 # label itself
-                        ]:
-                            self.driver.execute_script(
-                                "arguments[0].scrollIntoView({block:'center'});", lbl)
-                            time.sleep(0.3)
-                            self.driver.execute_script(click_target_js, lbl)
-                            time.sleep(1)
-                            # Check if it worked
-                            if 'selected' in (lbl.get_attribute('class') or ''):
-                                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {target_name}')
-                                selected = True
-                                break
-                        if selected:
-                            break
-                        # Last resort: ActionChains hover + click on the img
-                        img = find_img_for_label(lbl)
-                        if img:
-                            ActionChains(self.driver).move_to_element(img).pause(0.5).click().perform()
-                            time.sleep(1)
-                            if 'selected' in (lbl.get_attribute('class') or ''):
-                                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected via hover: {target_name}')
-                                selected = True
-                                break
-                if not selected:
-                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'FAILED to select: {target_name}')
+                card = to_select[i]
+                self._click_template_card(card['img'], card['name'], 'Selected')
 
-        # Verify
+        # ── Step 4: Verify final state ──
         time.sleep(1)
-        final = get_selected_names()
+        final_labels = self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large.selected')
+        final_names = []
+        for lbl in final_labels:
+            name = lbl.text.replace('arrow_drop_down', '').strip()
+            if name and lbl.rect['y'] > 250:
+                final_names.append(name)
+
         count_el = self.driver.find_elements(By.CSS_SELECTOR, 'span.selection-count')
         count_text = count_el[0].text if count_el else '?'
-        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Final: {final} {count_text}')
+        self._update_status(PomelliBotStatus.ENTERING_PROMPT,
+            f'Final: {final_names} {count_text}')
 
-        if len(final) != 4:
+        if len(final_names) != 4:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                f'WARNING: {len(final)} selected, need 4!')
+                f'WARNING: {len(final_names)} selected, need 4!')
 
         self._ps_click_looks_good()
+
+    def _click_template_card(self, img_element, name, action_label):
+        """Click a template card image using real mouse movement — like a human.
+        Tries multiple click strategies until the state changes."""
+        try:
+            # Scroll into view
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block:'center'});", img_element)
+            time.sleep(0.5)
+
+            # Check current state before clicking
+            label_before = self.driver.execute_script("""
+                var el = arguments[0].nextElementSibling;
+                while (el) {
+                    if (el.classList && el.classList.contains('label')) return el.classList.contains('selected');
+                    el = el.nextElementSibling;
+                }
+                return null;
+            """, img_element)
+
+            # Strategy 1: Real mouse hover + click (most human-like)
+            ActionChains(self.driver).move_to_element(img_element).pause(0.5).click().perform()
+            time.sleep(1)
+
+            # Check if state changed
+            label_after = self.driver.execute_script("""
+                var el = arguments[0].nextElementSibling;
+                while (el) {
+                    if (el.classList && el.classList.contains('label')) return el.classList.contains('selected');
+                    el = el.nextElementSibling;
+                }
+                return null;
+            """, img_element)
+
+            if label_before != label_after:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{action_label}: {name}')
+                return
+
+            # Strategy 2: Click slightly above center (avoid label overlay)
+            ActionChains(self.driver).move_to_element_with_offset(
+                img_element, 0, -int(img_element.rect['height'] * 0.25)
+            ).pause(0.3).click().perform()
+            time.sleep(1)
+
+            label_after = self.driver.execute_script("""
+                var el = arguments[0].nextElementSibling;
+                while (el) {
+                    if (el.classList && el.classList.contains('label')) return el.classList.contains('selected');
+                    el = el.nextElementSibling;
+                }
+                return null;
+            """, img_element)
+
+            if label_before != label_after:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{action_label} (offset): {name}')
+                return
+
+            # Strategy 3: JS dispatchEvent with full mouse event sequence
+            self.driver.execute_script("""
+                var el = arguments[0];
+                var rect = el.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 2;
+                ['mousedown', 'mouseup', 'click'].forEach(function(type) {
+                    el.dispatchEvent(new MouseEvent(type, {
+                        bubbles: true, cancelable: true, view: window,
+                        clientX: cx, clientY: cy
+                    }));
+                });
+            """, img_element)
+            time.sleep(1)
+
+            label_after = self.driver.execute_script("""
+                var el = arguments[0].nextElementSibling;
+                while (el) {
+                    if (el.classList && el.classList.contains('label')) return el.classList.contains('selected');
+                    el = el.nextElementSibling;
+                }
+                return null;
+            """, img_element)
+
+            if label_before != label_after:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{action_label} (dispatch): {name}')
+                return
+
+            # Strategy 4: Click parent element
+            self.driver.execute_script("arguments[0].parentElement.click();", img_element)
+            time.sleep(1)
+
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{action_label} (attempted): {name}')
+
+        except Exception as e:
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Click failed for {name}: {str(e)[:50]}')
 
     def _ps_click_looks_good(self):
         """Click the 'Looks Good' button (shared across sub-pages)."""
