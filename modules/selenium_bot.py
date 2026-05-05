@@ -1057,17 +1057,18 @@ class PomelliBot:
         if not templates:
             templates = []
         try:
-            # ── Navigate to Photoshoot landing page ──
-            self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Photoshoot page...')
-            self.driver.get(POMELLI_PHOTOSHOOT)
+            # ── Force navigate to clean landing page ──
+            self._update_status(PomelliBotStatus.NAVIGATING, 'Resetting to Pomelli home...')
+            self.driver.get(POMELLI_HOME)
             time.sleep(3)
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
-                self.driver.get(POMELLI_PHOTOSHOOT)
-                time.sleep(3)
 
-            # ── Handle redirect: if Pomelli sent us to Campaigns, click sidebar ──
+            # Navigate to Photoshoot landing page
+            self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Photoshoot page...')
+            self.driver.get(POMELLI_PHOTOSHOOT)
+            time.sleep(5)
             self._ensure_on_photoshoot_page()
 
             self._check_pause()
@@ -1141,20 +1142,10 @@ class PomelliBot:
         target = 'Create a product' if mode == 'product' else 'Generate or edit'
 
         for attempt in range(3):
-            # Already on editor page? Skip.
-            if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
-                self._update_status(PomelliBotStatus.NAVIGATING, 'Already on editor — skipping mode card')
-                return
-
             # Wait up to 30s for Angular to render the cards
             clicked = False
             for tick in range(30):
                 time.sleep(1)
-                # Check editor appeared (could have auto-navigated)
-                if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
-                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor appeared — skipping mode card')
-                    return
-
                 # Try clicking the card
                 try:
                     # Primary: div.photoshoot-branch-button
