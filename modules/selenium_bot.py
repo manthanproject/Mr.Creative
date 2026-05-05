@@ -1908,25 +1908,9 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ANIMATING, f'Clicked Animate!')
         time.sleep(3)
 
-        # Handle "Animate without text" dialog if it appears
-        try:
-            dialog_clicked = self.driver.execute_script("""
-                var btns = document.querySelectorAll('button');
-                for (var b of btns) {
-                    var t = b.textContent.trim();
-                    if ((t === 'Animate without text' || b.getAttribute('aria-label') === 'Animate without text')
-                        && b.offsetParent) {
-                        b.click();
-                        return 'clicked';
-                    }
-                }
-                return 'no_dialog';
-            """)
-            if dialog_clicked == 'clicked':
-                self._update_status(PomelliBotStatus.ANIMATING, 'Clicked "Animate without text"')
-                time.sleep(2)
-        except Exception:
-            pass
+        # Wait for animation to start (skip "Animate without text" — it may trigger all cards)
+        time.sleep(3)
+        self._update_status(PomelliBotStatus.ANIMATING, 'Animation started!')
 
         self._update_status(PomelliBotStatus.ANIMATING, f'Animation started!')
         time.sleep(2)
