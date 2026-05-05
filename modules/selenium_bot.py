@@ -622,14 +622,18 @@ class PomelliBot:
         try:
             self._update_status(PomelliBotStatus.NAVIGATING, 'Going to Pomelli home...')
             CAMPAIGN_URL = "https://labs.google.com/pomelli/campaigns"
-            self.driver.get(CAMPAIGN_URL)
-            time.sleep(15)  # Angular needs 15s+ to bootstrap
+            self.driver.get(POMELLI_HOME)
+            time.sleep(15)  # Angular bootstrap
+            self.driver.execute_script(f"window.location.href = '{CAMPAIGN_URL}'")
+            time.sleep(8)   # Route settle
             # Check if redirected to Google login
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
-                self.driver.get(CAMPAIGN_URL)
+                self.driver.get(POMELLI_HOME)
                 time.sleep(5)
+                self.driver.execute_script(f"window.location.href = '{CAMPAIGN_URL}'")
+                time.sleep(8)
             self._check_pause()
 
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Entering prompt...')
