@@ -844,9 +844,10 @@ class PomelliBot:
             # 3. Upload via hidden file input directly (no button click needed)
             file_input = self.driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
             file_input.send_keys(abs_path)
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploaded: {os.path.basename(abs_path)}')
+            # Trigger change event for Angular to detect the upload
+            self.driver.execute_script("arguments[0].dispatchEvent(new Event('change', {bubbles: true}));", file_input)
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploading: {os.path.basename(abs_path)}')
-            time.sleep(10)  # Wait for upload to complete
+            time.sleep(10)  # Wait for upload to complete and thumbnail to appear
 
             # 5. Check selection count
             try:
