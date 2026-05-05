@@ -1067,7 +1067,7 @@ class PomelliBot:
     # ============================================
     # PHOTOSHOOT FLOW — Exact DOM selectors
     # ============================================
-    def run_photoshoot(self, image_path, templates=None, photoshoot_mode='product'):
+    def run_photoshoot(self, image_path, templates=None, photoshoot_mode='product', aspect_ratio='story'):
         if not templates:
             templates = []
         try:
@@ -1091,6 +1091,11 @@ class PomelliBot:
             self._check_pause()
             self._update_status(PomelliBotStatus.NAVIGATING, 'Clicking mode card...')
             self._ps_click_mode_card(photoshoot_mode)
+
+            # ── Set aspect ratio ──
+            self._check_pause()
+            ar = aspect_ratio or self.config.get('aspect_ratio', 'story')
+            self._ps_set_aspect_ratio(ar)
 
             # ── Upload product image ──
             self._check_pause()
@@ -1225,6 +1230,44 @@ class PomelliBot:
             time.sleep(5)
 
         raise RuntimeError('Could not reach editor page')
+
+    def _ps_set_aspect_ratio(self, ratio='story'):
+        """Editor page: select aspect ratio from dropdown.
+        Options: 'story' (9:16), 'square' (1:1), 'feed' (4:5)."""
+        ratio_map = {
+            'story': 'Story (9:16)',
+            'square': 'Square (1:1)',
+            'feed': 'Feed (4:5)',
+            '9:16': 'Story (9:16)',
+            '1:1': 'Square (1:1)',
+            '4:5': 'Feed (4:5)',
+        }
+        target_text = ratio_map.get(ratio, 'Story (9:16)')
+
+        # Check if already set to the right ratio
+        current = self.driver.find_elements(By.CSS_SELECTOR, 'span.aspect-ratio-label')
+        if current and target_text in current[0].text:
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Aspect ratio already: {target_text}')
+            return
+
+        # Click the aspect ratio dropdown button
+        try:
+            ar_btn = self.driver.find_element(By.CSS_SELECTOR, 'app-aspect-ratio-selector button')
+            self.driver.execute_script("arguments[0].click();", ar_btn)
+            time.sleep(1)
+
+            # Click the matching menu item
+            items = self.driver.find_elements(By.CSS_SELECTOR, 'button.mat-mdc-menu-item')
+            for item in items:
+                if target_text.split(' (')[0] in item.text:
+                    self.driver.execute_script("arguments[0].click();", item)
+                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Aspect ratio set: {target_text}')
+                    time.sleep(1)
+                    return
+
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Aspect ratio option not found: {target_text}')
+        except Exception as e:
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Aspect ratio error: {str(e)[:50]}')
 
     def _ps_click_edit_button(self, which='first'):
         """Editor page: click pencil edit button. 'first'=Product Image, 'second'=Templates."""
@@ -2394,7 +2437,7 @@ class PomelliBot:
                          templates=None, photoshoot_mode='product',
                          enable_animate_selection=False,
                          product_url=None, campaign_aspect_ratio=None,
-                         campaign_images=None):
+                         campaign_images=None, aspect_ratio='story'):
         """Full workflow: connect → verify account → generate → animate → download.
 
         Args:
@@ -2426,7 +2469,8 @@ class PomelliBot:
                     aspect_ratio=self.config.get('aspect_ratio', 'story'))
             elif image_path and os.path.exists(image_path):
                 success = self.run_photoshoot(
-                    image_path, templates=templates, photoshoot_mode=photoshoot_mode)
+                    image_path, templates=templates, photoshoot_mode=photoshoot_mode,
+                    aspect_ratio=aspect_ratio)
             elif prompt_text:
                 success = self.generate_campaign(
                     prompt_text,

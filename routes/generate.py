@@ -409,6 +409,7 @@ def run_photoshoot_in_background(app, image_path, templates, photoshoot_mode,
                     image_path=image_path,
                     templates=templates,
                     photoshoot_mode=photoshoot_mode,
+                    aspect_ratio=aspect_ratio,
                 )
 
                 if result['success'] and result['downloaded_files']:

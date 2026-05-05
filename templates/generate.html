@@ -1445,6 +1445,17 @@
                 </div>
             </div>
 
+            <div class="pm-group" id="psAspectGroup" style="display: flex; gap: 12px; align-items: center;">
+                <div style="flex: 1;">
+                    <label class="pm-label">Aspect Ratio</label>
+                    <select id="psAspectRatio" class="pm-select" style="padding: 6px 10px; font-size: 0.78rem;">
+                        <option value="story">Story (9:16)</option>
+                        <option value="square">Square (1:1)</option>
+                        <option value="feed">Feed (4:5)</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Collection (shared) -->
             <div class="pm-group">
                 <label class="pm-label">Save to Collection</label>
@@ -1933,6 +1944,7 @@
             formData.append('collection_id', document.getElementById('collectionSelect').value);
             formData.append('templates', JSON.stringify(selectedTemplates));
             formData.append('photoshoot_mode', selectedPhotoshootMode);
+            formData.append('aspect_ratio', document.getElementById('psAspectRatio') ? document.getElementById('psAspectRatio').value : 'story');
             try {
                 var res = await fetch('/generate/upload-and-launch', { method: 'POST', body: formData });
                 var data = await res.json();
