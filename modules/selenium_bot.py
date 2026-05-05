@@ -630,6 +630,16 @@ class PomelliBot:
                 self.driver.get(POMELLI_HOME)
                 time.sleep(5)
             self._check_pause()
+
+            # === Navigate to Campaign page ===
+            CAMPAIGN_URL = "https://labs.google.com/pomelli/campaigns"
+            current = self.driver.current_url
+            if "campaigns" not in current.lower():
+                self._update_status(PomelliBotStatus.NAVIGATING, 'Navigating to Campaign...')
+                self.driver.execute_script(f"window.location.href = '{CAMPAIGN_URL}'")
+                time.sleep(5)  # Angular bootstrap
+                self._update_status(PomelliBotStatus.NAVIGATING, 'Campaign page loaded')
+
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Entering prompt...')
             textarea = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'textarea[placeholder*="Describe"]')))
             textarea.clear()
