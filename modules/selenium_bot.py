@@ -622,7 +622,7 @@ class PomelliBot:
         try:
             self._update_status(PomelliBotStatus.NAVIGATING, 'Going to Pomelli home...')
             self.driver.get(POMELLI_HOME)
-            time.sleep(3)
+            time.sleep(15)  # Angular needs 15s+ to bootstrap (same as photoshoot)
             # Check if redirected to Google login
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
@@ -631,34 +631,7 @@ class PomelliBot:
                 time.sleep(5)
             self._check_pause()
 
-            # === Navigate to Campaign page ===
-            CAMPAIGN_URL = "https://labs.google.com/pomelli/campaigns"
-            current = self.driver.current_url
-            if "campaigns" not in current.lower():
-                self._update_status(PomelliBotStatus.NAVIGATING, 'Navigating to Campaign...')
-                self.driver.execute_script(f"window.location.href = '{CAMPAIGN_URL}'")
-                time.sleep(5)  # Angular bootstrap
-                self._update_status(PomelliBotStatus.NAVIGATING, 'Campaign page loaded')
-
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Entering prompt...')
-
-            # === DEBUG: what's on the campaign page? ===
-            import json
-            page_info = self.driver.execute_script("""
-                var result = {url: window.location.href, title: document.title};
-                result.textareas = Array.from(document.querySelectorAll('textarea')).map(t => ({
-                    placeholder: t.placeholder, visible: t.offsetHeight > 0, classes: t.className
-                }));
-                result.inputs = Array.from(document.querySelectorAll('input[type="text"]')).map(i => ({
-                    placeholder: i.placeholder, visible: i.offsetHeight > 0
-                }));
-                result.buttons = Array.from(document.querySelectorAll('button')).slice(0, 10).map(b => ({
-                    text: b.textContent.trim().substring(0, 50), visible: b.offsetHeight > 0
-                }));
-                return result;
-            """)
-            print(f"[DEBUG-CAMPAIGN] {json.dumps(page_info, indent=2)}")
-
             textarea = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'textarea[placeholder*="Describe"]')))
             textarea.clear()
             self._type_slowly(textarea, prompt_text, delay=0.03)
