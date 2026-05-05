@@ -571,7 +571,12 @@ def upload_and_launch():
         if photoshoot_mode == 'campaign':
             col_name = prompt_text[:50].strip() if prompt_text else f'Campaign — {clean[:40]}'
         else:
-            col_name = f'Photoshoot — {clean[:40]}'
+            base_name = f'Photoshoot — {clean[:40]}'
+            existing_count = Collection.query.filter(
+                Collection.user_id == current_user.id,
+                Collection.name.like(f'{base_name}%')
+            ).count()
+            col_name = f'{base_name} #{existing_count + 1}' if existing_count > 0 else base_name
     else:
         col_name = f'Generated — {prompt_text[:40]}' if prompt_text else 'Generated Image'
 
