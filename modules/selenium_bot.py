@@ -1447,6 +1447,32 @@ class PomelliBot:
                 return null;
             """, img_element)
 
+            # Strategy 0: Click whatever element is at the card's visual position
+            self.driver.execute_script("""
+                var el = arguments[0];
+                var rect = el.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 4;
+                var target = document.elementFromPoint(cx, cy);
+                if (target) {
+                    target.click();
+                }
+            """, img_element)
+            time.sleep(1)
+
+            label_after = self.driver.execute_script("""
+                var el = arguments[0].nextElementSibling;
+                while (el) {
+                    if (el.classList && el.classList.contains('label')) return el.classList.contains('selected');
+                    el = el.nextElementSibling;
+                }
+                return null;
+            """, img_element)
+
+            if label_before != label_after:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{action_label} (elementFromPoint): {name}')
+                return
+
             # Strategy 1: Real mouse hover + click (most human-like)
             ActionChains(self.driver).move_to_element(img_element).pause(0.5).click().perform()
             time.sleep(1)
