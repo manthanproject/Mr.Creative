@@ -1057,19 +1057,32 @@ class PomelliBot:
         if not templates:
             templates = []
         try:
-            # ── Force navigate to clean landing page ──
-            self._update_status(PomelliBotStatus.NAVIGATING, 'Resetting to Pomelli home...')
+            # ── Navigate via sidebar (Angular router doesn't work with direct URL) ──
+            self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Pomelli...')
             self.driver.get(POMELLI_HOME)
-            time.sleep(3)
+            time.sleep(5)
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
+                self.driver.get(POMELLI_HOME)
+                time.sleep(5)
 
-            # Navigate to Photoshoot landing page
-            self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Photoshoot page...')
-            self.driver.get(POMELLI_PHOTOSHOOT)
-            time.sleep(5)
-            self._ensure_on_photoshoot_page()
+            # Click Photoshoot in sidebar — forces Angular router properly
+            self._update_status(PomelliBotStatus.NAVIGATING, 'Clicking Photoshoot in sidebar...')
+            for _ in range(15):
+                time.sleep(1)
+                try:
+                    for nav in self.driver.find_elements(By.CSS_SELECTOR, 'div.nav-item'):
+                        if 'Photoshoot' in nav.text:
+                            self.driver.execute_script("arguments[0].click();", nav)
+                            self._update_status(PomelliBotStatus.NAVIGATING, 'Sidebar Photoshoot clicked!')
+                            time.sleep(5)
+                            break
+                    else:
+                        continue
+                    break
+                except Exception:
+                    pass
 
             self._check_pause()
             self._update_status(PomelliBotStatus.NAVIGATING, 'Clicking mode card...')
