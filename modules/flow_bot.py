@@ -742,6 +742,15 @@ class FlowBot:
         self._update_status('entering_prompt', f'Uploading reference: {os.path.basename(abs_path)}')
 
         try:
+            # Step 0: Ensure Chrome window has focus by clicking the prompt area
+            try:
+                prompt_area = self.driver.find_element(By.CSS_SELECTOR, 'textarea, [contenteditable="true"], input[type="text"]')
+                prompt_area.click()
+                time.sleep(0.5)
+            except Exception:
+                self.driver.execute_script("document.body.click();")
+                time.sleep(0.5)
+
             # Step 1: Click the + button
             plus_btn = self.driver.execute_script("""
                 var btns = document.querySelectorAll('button');
