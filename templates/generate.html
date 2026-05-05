@@ -1633,6 +1633,9 @@
 
         // Animate only available in Campaign mode
         var animToggle = document.getElementById('animateToggle');
+        // Show photoshoot aspect ratio only in photoshoot mode
+        document.getElementById('psAspectGroup').style.display = mode === 'photoshoot' ? 'flex' : 'none';
+
         if (mode === 'photoshoot') {
             animToggle.style.display = 'none';
             // Reset animate state when switching away
