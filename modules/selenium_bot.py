@@ -1147,6 +1147,19 @@ class PomelliBot:
             # Poll for 30s — detect whichever page we're on
             for tick in range(30):
                 time.sleep(1)
+
+                # After 10s with nothing, try clicking sidebar to force Angular
+                if tick == 10:
+                    try:
+                        for nav in self.driver.find_elements(By.CSS_SELECTOR, 'div.nav-item'):
+                            if 'Photoshoot' in nav.text:
+                                self.driver.execute_script("arguments[0].click();", nav)
+                                self._update_status(PomelliBotStatus.NAVIGATING, 'Clicked sidebar Photoshoot')
+                                time.sleep(3)
+                                break
+                    except Exception:
+                        pass
+
                 try:
                     # State B: editor already loaded
                     if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
