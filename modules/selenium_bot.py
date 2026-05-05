@@ -825,27 +825,41 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Adding image: {os.path.basename(abs_path)}')
 
         try:
-            # 1. Click the Images button on campaign page
-            img_btn = None
-            for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button.ingredient-button'):
-                if 'Images' in btn.text or 'image' in btn.text.lower():
-                    img_btn = btn
-                    break
-            if not img_btn:
-                img_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR,
-                        'button[aria-label="Add image ingredient"]')))
-            ActionChains(self.driver).move_to_element(img_btn).pause(0.3).click().perform()
+            # 1. Click "Images" button — aria-label="Add image ingredient"
+            img_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR,
+                    'button[aria-label="Add image ingredient"]')))
+            self.driver.execute_script("arguments[0].click();", img_btn)
+            print("[campaign-images] Clicked Images button")
             time.sleep(3)
 
-            # 2. Wait for dialog to open
+            # 2. Wait for "Select images" dialog — app-image-ingredient-picker-dialog
             WebDriverWait(self.driver, WAIT_MEDIUM).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR,
-                    'app-resource-picker-dialog')))
+                    'app-image-ingredient-picker-dialog')))
+            print("[campaign-images] Dialog opened")
             time.sleep(2)
 
-            # 3. Reuse _ps_upload_and_select — it auto-scopes to the CDK dialog
-            self._ps_upload_and_select(abs_path)
+            # 3. Upload image — reuse photoshoot upload (auto-scopes to CDK dialog)
+            self._ps_upload_and_select(abs_path, click_confirm=False)
+
+            # 4. Click Update or Confirm button in dialog
+            clicked = False
+            for _ in range(15):
+                for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                    txt = btn.text.strip()
+                    if txt in ('Update', 'Confirm') and btn.is_displayed() and btn.is_enabled():
+                        self.driver.execute_script("arguments[0].click();", btn)
+                        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Clicked {txt}')
+                        print(f"[campaign-images] Clicked {txt} — dialog closed")
+                        time.sleep(2)
+                        clicked = True
+                        break
+                if clicked:
+                    break
+                time.sleep(1)
+            if not clicked:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Update/Confirm not found')
 
         except Exception as e:
             import traceback
@@ -1255,7 +1269,7 @@ class PomelliBot:
             time.sleep(1)
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Edit button "{which}" not found')
 
-    def _ps_upload_and_select(self, image_path):
+    def _ps_upload_and_select(self, image_path, click_confirm=True):
         """Upload page: upload image via file dialog, then click Looks Good."""
         abs_path = os.path.abspath(image_path)
         if not os.path.exists(abs_path):
@@ -1341,7 +1355,8 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection error: {str(e)[:50]}')
 
         # Click Looks Good
-        self._ps_click_looks_good()
+        if click_confirm:
+            self._ps_click_looks_good()
 
     def _ps_match_templates(self, user_templates):
         """Template picker: hover each card to read name, click to toggle.
