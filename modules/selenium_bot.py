@@ -1138,57 +1138,57 @@ class PomelliBot:
         time.sleep(3)
 
     def _ps_click_mode_card(self, mode):
-        """Landing page: click 'Create a product photoshoot' or 'Generate or edit an image'."""
+        """Navigate past landing page to editor. Handles both states:
+        A) Landing page with cards → click card → editor loads
+        B) Editor already loaded → proceed directly"""
         target = 'Create a product' if mode == 'product' else 'Generate or edit'
 
         for attempt in range(3):
-            # Wait up to 30s for Angular to render the cards
-            clicked = False
+            # Poll for 30s — detect whichever page we're on
             for tick in range(30):
                 time.sleep(1)
-                # Try clicking the card
                 try:
-                    # Primary: div.photoshoot-branch-button
+                    # State B: editor already loaded
+                    if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
+                        self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
+                        return
+
+                    # State A: landing page cards
                     cards = self.driver.find_elements(By.CSS_SELECTOR, 'div.photoshoot-branch-button')
                     for card in cards:
                         if target in card.text:
                             self.driver.execute_script("arguments[0].click();", card)
                             self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked: {card.text.strip()[:40]}')
-                            clicked = True
+                            # Wait for editor
+                            for _ in range(20):
+                                time.sleep(1)
+                                if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
+                                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
+                                    return
                             break
 
-                    # Fallback: title text div
-                    if not clicked:
+                    # Fallback: title text
+                    if not cards:
                         titles = self.driver.find_elements(By.CSS_SELECTOR, 'div.title-medium.on-surface-variant')
                         for t in titles:
                             if target in t.text:
                                 self.driver.execute_script("arguments[0].click();", t)
                                 self._update_status(PomelliBotStatus.NAVIGATING, f'Clicked title: {t.text.strip()[:40]}')
-                                clicked = True
+                                for _ in range(20):
+                                    time.sleep(1)
+                                    if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
+                                        self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
+                                        return
                                 break
                 except Exception:
                     pass
 
-                if clicked:
-                    break
-
-            if not clicked:
-                self._update_status(PomelliBotStatus.NAVIGATING, f'No card found — retry {attempt+1}/3')
-                self._ensure_on_photoshoot_page()
-                continue
-
-            # Wait for editor page to load (div.ingredient)
-            for _ in range(20):
-                time.sleep(1)
-                if self.driver.find_elements(By.CSS_SELECTOR, 'div.ingredient'):
-                    self._update_status(PomelliBotStatus.NAVIGATING, 'Editor loaded!')
-                    return
-
-            self._update_status(PomelliBotStatus.NAVIGATING, f'Editor not loaded — retry {attempt+1}/3')
+            # Retry
+            self._update_status(PomelliBotStatus.NAVIGATING, f'Retry {attempt+1}/3...')
             self.driver.get(POMELLI_PHOTOSHOOT)
-            time.sleep(3)
+            time.sleep(5)
 
-        raise RuntimeError('Could not navigate past landing page')
+        raise RuntimeError('Could not reach editor page')
 
     def _ps_click_edit_button(self, which='first'):
         """Editor page: click pencil edit button. 'first'=Product Image, 'second'=Templates."""
