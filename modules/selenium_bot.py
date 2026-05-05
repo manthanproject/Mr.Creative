@@ -1845,7 +1845,6 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ANIMATING,
             f'Found card, triggering Animate...')
 
-        # Hover the card container and click its animate button
         # Find the parent creative-card-container
         card_container = self.driver.execute_script("""
             var el = arguments[0];
@@ -1860,16 +1859,22 @@ class PomelliBot:
             self._update_status(PomelliBotStatus.ANIMATING, 'Card container not found')
             return
 
-        # Hover the card to reveal animate button
-        ActionChains(self.driver).move_to_element(card_container).pause(1).perform()
-        time.sleep(1)
+        # JS hover ONLY on this container (no physical mouse = no adjacent card triggers)
+        # Then find and click the animate button within this container
+        clicked = self.driver.execute_script("""
+            var container = arguments[0];
+            // Dispatch hover events only on this container
+            ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'].forEach(function(evt) {
+                container.dispatchEvent(new MouseEvent(evt, {bubbles: true, cancelable: true}));
+            });
+            return 'hovered';
+        """, card_container)
+        time.sleep(2)  # Wait for animate button to appear
 
-        # Click the animate button within THIS card container only
         clicked = self.driver.execute_script("""
             var container = arguments[0];
             var btn = container.querySelector('button.animate-button');
             if (btn) { btn.click(); return 'clicked'; }
-            // Fallback: aria-label
             btn = container.querySelector('button[aria-label="Animate"]');
             if (btn) { btn.click(); return 'clicked'; }
             return 'not_found';
