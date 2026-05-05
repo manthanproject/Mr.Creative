@@ -1083,22 +1083,10 @@ class PomelliBot:
                 self.driver.get(POMELLI_HOME)
                 time.sleep(5)
 
-            # Click Photoshoot in sidebar — forces Angular router properly
-            self._update_status(PomelliBotStatus.NAVIGATING, 'Clicking Photoshoot in sidebar...')
-            for _ in range(15):
-                time.sleep(1)
-                try:
-                    for nav in self.driver.find_elements(By.CSS_SELECTOR, 'div.nav-item'):
-                        if 'Photoshoot' in nav.text:
-                            self.driver.execute_script("arguments[0].click();", nav)
-                            self._update_status(PomelliBotStatus.NAVIGATING, 'Sidebar Photoshoot clicked!')
-                            time.sleep(5)
-                            break
-                    else:
-                        continue
-                    break
-                except Exception:
-                    pass
+            # Navigate to Photoshoot via JS location (Angular picks this up)
+            self._update_status(PomelliBotStatus.NAVIGATING, 'Navigating to Photoshoot...')
+            self.driver.execute_script("window.location.href = arguments[0];", POMELLI_PHOTOSHOOT)
+            time.sleep(8)
 
             self._check_pause()
             self._update_status(PomelliBotStatus.NAVIGATING, 'Clicking mode card...')
