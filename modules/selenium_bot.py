@@ -1060,7 +1060,9 @@ class PomelliBot:
             # ── Navigate via sidebar (Angular router doesn't work with direct URL) ──
             self._update_status(PomelliBotStatus.NAVIGATING, 'Opening Pomelli...')
             self.driver.get(POMELLI_HOME)
-            time.sleep(5)
+            # Angular needs 15s+ to bootstrap on fresh Chrome sessions
+            self._update_status(PomelliBotStatus.NAVIGATING, 'Waiting for Pomelli to load...')
+            time.sleep(15)
             if not self._is_on_pomelli():
                 if not self._ensure_on_pomelli_or_login():
                     raise RuntimeError('Could not reach Pomelli — redirected to login')
@@ -1172,6 +1174,12 @@ class PomelliBot:
                                 break
                     except Exception:
                         pass
+
+                # After 20s, try direct URL as last resort
+                if tick == 20:
+                    self._update_status(PomelliBotStatus.NAVIGATING, 'Trying direct URL...')
+                    self.driver.get(POMELLI_PHOTOSHOOT)
+                    time.sleep(10)
 
                 try:
                     # State B: editor already loaded
