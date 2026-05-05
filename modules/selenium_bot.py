@@ -291,6 +291,20 @@ class PomelliBot:
             self.driver.set_script_timeout(120)  # 2 min for async video downloads
             self.driver.execute_cdp_cmd('Page.setDownloadBehavior', {
                 'behavior': 'allow', 'downloadPath': download_dir})
+            # Switch to a real browser tab (avoid Chrome internal popups like "Omnibox Popup")
+            if 'omnibox' in self.driver.title.lower() or 'popup' in self.driver.title.lower():
+                handles = self.driver.window_handles
+                for h in handles:
+                    self.driver.switch_to.window(h)
+                    title = self.driver.title.lower()
+                    if 'omnibox' not in title and 'popup' not in title:
+                        break
+                else:
+                    # No real tab found — open one
+                    self.driver.switch_to.window(handles[0])
+                    self.driver.get(POMELLI_HOME)
+                    time.sleep(5)
+
             self._update_status(PomelliBotStatus.NAVIGATING,
                 f'Reconnected to existing Chrome: {self.driver.title[:50]}')
             return True
