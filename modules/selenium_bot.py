@@ -841,10 +841,19 @@ class PomelliBot:
                     'app-resource-picker-dialog')))
             time.sleep(2)
 
-            # 3. Upload via hidden file input directly (no button click needed)
+            # 3. Make the file input visible and upload
             file_input = self.driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
+            # Make input visible so send_keys works (hidden inputs crash chromedriver)
+            self.driver.execute_script("""
+                var inp = arguments[0];
+                inp.style.display = 'block';
+                inp.style.visibility = 'visible';
+                inp.style.height = '1px';
+                inp.style.width = '1px';
+                inp.style.opacity = '0.01';
+            """, file_input)
+            time.sleep(0.5)
             file_input.send_keys(abs_path)
-            # Trigger change event for Angular to detect the upload
             self.driver.execute_script("arguments[0].dispatchEvent(new Event('change', {bubbles: true}));", file_input)
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploading: {os.path.basename(abs_path)}')
             time.sleep(10)  # Wait for upload to complete and thumbnail to appear
