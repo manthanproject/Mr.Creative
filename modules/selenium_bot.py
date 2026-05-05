@@ -1873,10 +1873,17 @@ class PomelliBot:
         # Then find and click the animate button within this container
         clicked = self.driver.execute_script("""
             var container = arguments[0];
-            // Dispatch hover events only on this container
-            ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'].forEach(function(evt) {
-                container.dispatchEvent(new MouseEvent(evt, {bubbles: true, cancelable: true}));
+            // Dispatch hover events ONLY on this container (bubbles false = no parent propagation)
+            ['mouseenter', 'pointerenter'].forEach(function(evt) {
+                container.dispatchEvent(new MouseEvent(evt, {bubbles: false, cancelable: true}));
             });
+            // mouseover/pointerover DO bubble — dispatch on the img inside instead
+            var img = container.querySelector('img');
+            if (img) {
+                ['mouseover', 'pointerover'].forEach(function(evt) {
+                    img.dispatchEvent(new MouseEvent(evt, {bubbles: false, cancelable: true}));
+                });
+            }
             return 'hovered';
         """, card_container)
         time.sleep(2)  # Wait for animate button to appear
