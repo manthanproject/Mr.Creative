@@ -841,51 +841,54 @@ class PomelliBot:
                     'app-resource-picker-dialog')))
             time.sleep(2)
 
-            # 3. Make the file input visible and upload
-            file_input = self.driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
-            # Make input visible so send_keys works (hidden inputs crash chromedriver)
-            self.driver.execute_script("""
-                var inp = arguments[0];
-                inp.style.display = 'block';
-                inp.style.visibility = 'visible';
-                inp.style.height = '1px';
-                inp.style.width = '1px';
-                inp.style.opacity = '0.01';
-            """, file_input)
-            time.sleep(0.5)
-            file_input.send_keys(abs_path)
-            self.driver.execute_script("arguments[0].dispatchEvent(new Event('change', {bubbles: true}));", file_input)
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploading: {os.path.basename(abs_path)}')
-            time.sleep(10)  # Wait for upload to complete and thumbnail to appear
-
-            # 5. Check selection count
+            # 3. Click Upload Images button to open file dialog
             try:
-                sel = self.driver.find_element(By.CSS_SELECTOR, 'span.selection-count').text
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection: {sel.strip()}')
-                # If not auto-selected, click the last thumbnail
-                match = re.search(r'\((\d+)/\d+ selected\)', sel)
-                if match and int(match.group(1)) == 0:
-                    thumbs = self.driver.find_elements(By.CSS_SELECTOR, 'img.thumbnail.img-loaded')
-                    if thumbs:
-                        ActionChains(self.driver).move_to_element(thumbs[-1]).pause(0.3).click().perform()
-                        time.sleep(1)
-                        sel = self.driver.find_element(By.CSS_SELECTOR, 'span.selection-count').text
-                        self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selected: {sel.strip()}')
+                upload_btn = WebDriverWait(self.driver, WAIT_MEDIUM).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR,
+                        'app-upload-image-button button')))
+                ActionChains(self.driver).move_to_element(upload_btn).pause(0.3).click().perform()
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Clicked Upload Images')
+                time.sleep(3)
+            except Exception:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Upload button not found')
+                return
+
+            # 4. File dialog — paste path and Enter
+            import pyautogui
+            import subprocess
+            subprocess.run(['clip'], input=abs_path.encode(), check=True)
+            pyautogui.hotkey('ctrl', 'a')
+            time.sleep(0.3)
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(1)
+            pyautogui.press('enter')
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Uploading: {os.path.basename(abs_path)}')
+            time.sleep(10)
+
+            # 5. Image should auto-select — check count
+            try:
+                sel = self.driver.find_element(By.CSS_SELECTOR, 'span').text
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection: {sel.strip()[:30]}')
             except Exception:
                 pass
 
-            # 6. Click Looks Good
+            # 6. Click Update or Confirm button
             time.sleep(1)
             try:
-                looks_good = WebDriverWait(self.driver, WAIT_MEDIUM).until(
-                    EC.element_to_be_clickable((By.XPATH,
-                        '//span[contains(text(), "Looks Good")]/ancestor::button')))
-                ActionChains(self.driver).move_to_element(looks_good).pause(0.3).click().perform()
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Image added!')
-                time.sleep(2)
-            except TimeoutException:
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT,
-                    'Looks Good not found — closing dialog')
+                update_btn = None
+                for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                    txt = btn.text.strip()
+                    if txt in ('Update', 'Confirm', 'Looks Good') and btn.is_displayed():
+                        update_btn = btn
+                        break
+                if update_btn:
+                    ActionChains(self.driver).move_to_element(update_btn).pause(0.3).click().perform()
+                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Clicked {update_btn.text.strip()}!')
+                    time.sleep(2)
+                else:
+                    self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Update/Confirm button not found')
+            except Exception:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Could not click Update')
 
         except Exception as e:
             self._update_status(PomelliBotStatus.ENTERING_PROMPT,
