@@ -1447,6 +1447,29 @@ class PomelliBot:
                 return null;
             """, img_element)
 
+            # DIAGNOSTIC: Log what's actually on this element
+            diag = self.driver.execute_script("""
+                var el = arguments[0];
+                var style = getComputedStyle(el);
+                var parent = el.parentElement;
+                var parentTag = parent ? parent.tagName + '.' + parent.className.substring(0,40) : 'none';
+                var parentParent = parent && parent.parentElement ? parent.parentElement.tagName + '.' + parent.parentElement.className.substring(0,40) : 'none';
+                return {
+                    tag: el.tagName,
+                    cls: el.className.substring(0,60),
+                    pointerEvents: style.pointerEvents,
+                    opacity: style.opacity,
+                    visibility: style.visibility,
+                    display: style.display,
+                    cursor: style.cursor,
+                    parentTag: parentTag,
+                    parentParentTag: parentParent,
+                    parentPointerEvents: parent ? getComputedStyle(parent).pointerEvents : 'n/a',
+                    rect: JSON.stringify(el.getBoundingClientRect()),
+                };
+            """, img_element)
+            print(f"[PomelliBot] DIAG {name}: {diag}")
+
             # Strategy 0: Click whatever element is at the card's visual position
             self.driver.execute_script("""
                 var el = arguments[0];
