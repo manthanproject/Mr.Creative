@@ -1343,8 +1343,6 @@ class PomelliBot:
         all_labels = self.driver.find_elements(By.CSS_SELECTOR, 'div.label.label-large')
         for lbl in all_labels:
             try:
-                if not lbl.is_displayed():
-                    continue
                 rect = lbl.rect
                 # Skip sidebar labels (y < 250 are sidebar nav items)
                 if rect['y'] < 250:
