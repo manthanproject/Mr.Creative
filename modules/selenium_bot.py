@@ -641,6 +641,24 @@ class PomelliBot:
                 self._update_status(PomelliBotStatus.NAVIGATING, 'Campaign page loaded')
 
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Entering prompt...')
+
+            # === DEBUG: what's on the campaign page? ===
+            import json
+            page_info = self.driver.execute_script("""
+                var result = {url: window.location.href, title: document.title};
+                result.textareas = Array.from(document.querySelectorAll('textarea')).map(t => ({
+                    placeholder: t.placeholder, visible: t.offsetHeight > 0, classes: t.className
+                }));
+                result.inputs = Array.from(document.querySelectorAll('input[type="text"]')).map(i => ({
+                    placeholder: i.placeholder, visible: i.offsetHeight > 0
+                }));
+                result.buttons = Array.from(document.querySelectorAll('button')).slice(0, 10).map(b => ({
+                    text: b.textContent.trim().substring(0, 50), visible: b.offsetHeight > 0
+                }));
+                return result;
+            """)
+            print(f"[DEBUG-CAMPAIGN] {json.dumps(page_info, indent=2)}")
+
             textarea = WebDriverWait(self.driver, WAIT_MEDIUM).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'textarea[placeholder*="Describe"]')))
             textarea.clear()
             self._type_slowly(textarea, prompt_text, delay=0.03)
