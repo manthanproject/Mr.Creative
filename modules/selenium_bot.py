@@ -1250,22 +1250,28 @@ class PomelliBot:
         self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Path entered: {os.path.basename(abs_path)}')
         time.sleep(10)
 
-        # Check image appeared in thumbnails
+        # Image is auto-selected after upload — just verify
         try:
+            time.sleep(3)
             thumbs = self.driver.find_elements(By.CSS_SELECTOR, 'img.thumbnail')
             self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'{len(thumbs)} thumbnails found')
 
-            # If image not auto-selected, click the latest thumbnail
-            sel = self.driver.find_elements(By.CSS_SELECTOR, 'span.selection-count')
-            if sel:
-                sel_text = sel[0].text
-                self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection: {sel_text}')
-                if '0/' in sel_text and thumbs:
-                    # Click last thumbnail to select it
-                    self.driver.execute_script("arguments[0].click();", thumbs[-1])
-                    time.sleep(1)
+            # Check if Looks Good is already enabled (image auto-selected)
+            looks_good_ready = False
+            for btn in self.driver.find_elements(By.CSS_SELECTOR, 'button'):
+                if 'Looks Good' in btn.text and btn.is_enabled():
+                    looks_good_ready = True
+                    break
+
+            if looks_good_ready:
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Image auto-selected!')
+            elif thumbs:
+                # Fallback: click first thumbnail if not auto-selected
+                self._update_status(PomelliBotStatus.ENTERING_PROMPT, 'Not auto-selected — clicking first thumbnail')
+                self.driver.execute_script("arguments[0].click();", thumbs[0])
+                time.sleep(2)
         except Exception as e:
-            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection check: {str(e)[:50]}')
+            self._update_status(PomelliBotStatus.ENTERING_PROMPT, f'Selection error: {str(e)[:50]}')
 
         # Click Looks Good
         self._ps_click_looks_good()
