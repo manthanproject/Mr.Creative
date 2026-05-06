@@ -1582,6 +1582,17 @@
             </div>
         </div>
 
+        <!-- Connected Accounts (Extension) -->
+        <div class="pm-card" id="profilesCard" style="margin-top: 12px;">
+            <div class="pm-card-header">
+                <h3>🔗 Connected Accounts</h3>
+                <button class="pm-btn-ghost" onclick="loadProfiles()">↺</button>
+            </div>
+            <div class="pm-card-body" id="profilesList" style="font-size: 0.75rem;">
+                Loading...
+            </div>
+        </div>
+
         <!-- Settings -->
         <div class="pm-card" style="margin-top: 1rem;">
             <div class="pm-card-header">
@@ -2611,6 +2622,39 @@
     // UTILITY
     // ════════════════════
     function refreshJobs() { location.reload(); }
+
+    async function loadProfiles() {
+        try {
+            var res = await fetch('/api/ext/status');
+            var data = await res.json();
+            var container = document.getElementById('profilesList');
+
+            if (!data.profiles || Object.keys(data.profiles).length === 0) {
+                container.innerHTML = '<div style="color: #555; padding: 8px;">No profiles connected. Install extension in Chrome profiles.</div>';
+                return;
+            }
+
+            container.innerHTML = Object.entries(data.profiles).map(function(entry) {
+                var pid = entry[0];
+                var info = entry[1];
+                var statusDot = info.status === 'cooldown' ? '🔴' : '🟢';
+                var jobInfo = info.current_job ? ' — ' + (info.current_job.state || 'busy') : '';
+                var account = info.account || 'Unknown';
+                if (account.length > 30) account = account.substring(0, 30) + '...';
+                return '<div style="display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid #1a1a1a;">' +
+                    '<span>' + statusDot + '</span>' +
+                    '<span style="flex: 1;">' + account + jobInfo + '</span>' +
+                    '<span style="font-size: 0.65rem; color: #555;">' + (info.capabilities || []).join(', ') + '</span>' +
+                '</div>';
+            }).join('');
+        } catch (e) {
+            document.getElementById('profilesList').innerHTML = '<div style="color: #f87171;">Server offline</div>';
+        }
+    }
+
+    // Load on page init
+    loadProfiles();
+    setInterval(loadProfiles, 10000);  // Refresh every 10s
 
     async function clearJobs() {
         if (!await showConfirm('Clear all jobs?')) return;
