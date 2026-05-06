@@ -17,7 +17,7 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 import json
 import os
-import requests
+import requests  # type: ignore[import-untyped]
 import time
 from datetime import datetime, timedelta
 from threading import Lock
@@ -99,7 +99,7 @@ def get_status():
         'connected': True,
         'message': f"Server running — {len(profiles)} profile(s) connected",
         'profiles': profiles,
-        'queue_size': len(_state.get('job_queue', []))
+        'queue_size': len(_state['job_queue']) if isinstance(_state.get('job_queue'), list) else 0
     })
 
 
@@ -139,11 +139,34 @@ def register_profile():
         _state['profiles'][profile_id] = {
             'account': data.get('account', 'unknown'),
             'capabilities': data.get('capabilities', []),
+            'profile_dir': data.get('profile_dir', ''),
             'last_seen': datetime.now().isoformat(),
             'cooldown_until': None
         }
     print(f"[Extension] Profile registered: {profile_id} — {data.get('account')}")
+    # Save to disk so launch script can find profiles
+    _save_profiles_to_disk()
     return jsonify({'ok': True, 'profile_id': profile_id})
+
+
+def _save_profiles_to_disk():
+    """Persist registered profiles so launch_profiles.py can read them."""
+    import json
+    profiles_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+    os.makedirs(profiles_dir, exist_ok=True)
+    filepath = os.path.join(profiles_dir, 'extension_profiles.json')
+
+    profiles = []
+    for pid, info in _state['profiles'].items():
+        profiles.append({
+            'profile_id': pid,
+            'account': info.get('account', 'unknown'),
+            'profile_dir': info.get('profile_dir', ''),
+            'capabilities': info.get('capabilities', [])
+        })
+
+    with open(filepath, 'w') as f:
+        json.dump(profiles, f, indent=2)
 
 
 @bp.route('/queue', methods=['GET'])
