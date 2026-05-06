@@ -1,5 +1,6 @@
 from flask import Flask, redirect, url_for, request
 from flask_login import LoginManager
+from flask_cors import CORS  # type: ignore[import-untyped]
 from config import Config
 from models import db, User
 import os
@@ -8,6 +9,8 @@ import os
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    CORS(app, resources={r"/api/ext/*": {"origins": "*"}})
 
     @app.after_request
     def add_static_cors(response):
