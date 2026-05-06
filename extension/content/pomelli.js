@@ -63,7 +63,9 @@ const CampaignBot = {
       MC.log('Campaign: navigating to /campaigns');
       await MC.sendStatus(job_id, 'navigating', 'Opening campaigns page...');
 
-      if (!location.href.includes('/campaigns')) {
+      // Always navigate to campaigns landing — /campaigns/b-xxx is a specific campaign, not the landing
+      const onLanding = /\/pomelli\/campaigns\/?$/.test(location.pathname);
+      if (!onLanding) {
         location.href = 'https://labs.google.com/pomelli/campaigns';
         await MC.sleep(5000);
         await MC.waitFor(SEL.textarea, 30000);
@@ -359,7 +361,8 @@ const PhotoshootBot = {
       MC.log('Photoshoot: navigating');
       await MC.sendStatus(job_id, 'navigating', 'Opening Pomelli...');
 
-      if (!location.href.includes('/photoshoot')) {
+      const onPhotoshoot = /\/pomelli\/photoshoot\/?$/.test(location.pathname);
+      if (!onPhotoshoot) {
         location.href = 'https://labs.google.com/pomelli/photoshoot';
         await MC.sleep(5000);
       }
