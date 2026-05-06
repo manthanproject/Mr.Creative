@@ -1488,6 +1488,9 @@
                         <button class="pm-btn-pause" id="pauseResumeBtn" onclick="togglePause()" title="Pause/Resume bot">
                             ⏸
                         </button>
+                        <button class="pm-btn-pause" id="stopJobBtn" onclick="stopCurrentJob()" title="Stop job" style="background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3); color: #f87171;">
+                            ⏹
+                        </button>
                     </div>
                     <div class="pm-steps" id="stepIndicators">
                         <div class="pm-step" data-step="connecting">🔌 Connect</div>
@@ -2324,6 +2327,18 @@
     // PAUSE / RESUME
     // ════════════════════
     var botPaused = false;
+
+    async function stopCurrentJob() {
+        if (!currentJobId) return;
+        if (!confirm('Stop this job? This cannot be undone.')) return;
+        try {
+            await fetch('/generate/clear-jobs', { method: 'POST' });
+            showToast('Job stopped', 'info');
+            hideProgress();
+        } catch(e) {
+            showToast('Failed to stop job', 'error');
+        }
+    }
 
     async function togglePause() {
         var btn = document.getElementById('pauseResumeBtn');
