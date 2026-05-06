@@ -1,125 +1,162 @@
-// ═══════════════════════════════════════════
-// Mr.Creative Extension — Background Service Worker
-// Polls Flask server for commands, dispatches to content scripts
-// ═══════════════════════════════════════════
-
 const SERVER = 'http://localhost:5000';
 let polling = false;
 let pollInterval = null;
+let profileId = null;
+
+// ── Get or create persistent profile ID ──
+async function getProfileId() {
+    const data = await chrome.storage.local.get('profileId');
+    if (!data.profileId) {
+        const id = 'profile_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        await chrome.storage.local.set({ profileId: id });
+        return id;
+    }
+    return data.profileId;
+}
+
+// ── Detect which Google account is logged in ──
+async function detectAccount() {
+    try {
+        // Check Pomelli tabs
+        let tabs = await chrome.tabs.query({ url: 'https://labs.google.com/pomelli/*' });
+        if (tabs.length === 0) {
+            tabs = await chrome.tabs.query({ url: 'https://labs.google/*' });
+        }
+        if (tabs.length > 0) {
+            const result = await chrome.scripting.executeScript({
+                target: { tabId: tabs[0].id },
+                func: () => {
+                    const img = document.querySelector('img[aria-label*="Google Account"], header img[src*="googleusercontent"]');
+                    if (img) return img.getAttribute('aria-label') || img.alt || 'detected';
+                    const btn = document.querySelector('[data-email]');
+                    if (btn) return btn.getAttribute('data-email');
+                    return document.title || 'unknown';
+                }
+            });
+            return result?.[0]?.result || 'unknown';
+        }
+    } catch (e) {}
+    return 'unknown';
+}
+
+// ── Detect what this profile can do ──
+async function detectCapabilities() {
+    const caps = [];
+    const pomelliTabs = await chrome.tabs.query({ url: 'https://labs.google.com/pomelli/*' });
+    const flowTabs = await chrome.tabs.query({ url: 'https://labs.google/fx/*' });
+
+    // If tabs exist or URLs are accessible, add capabilities
+    caps.push('campaign', 'photoshoot');  // Pomelli is always accessible
+    caps.push('flow');  // Flow too
+
+    return caps;
+}
+
+// ── Register this profile with the server ──
+async function registerWithServer() {
+    profileId = await getProfileId();
+    const account = await detectAccount();
+    const capabilities = await detectCapabilities();
+
+    try {
+        const res = await fetch(`${SERVER}/api/ext/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_id: profileId, account, capabilities })
+        });
+        const data = await res.json();
+        console.log('[MC-BG] Registered:', { profileId, account, capabilities });
+    } catch (e) {
+        console.warn('[MC-BG] Registration failed (server offline?):', e.message);
+    }
+}
 
 // ── Start polling for commands ──
 function startPolling() {
-  if (polling) return;
-  polling = true;
-  pollInterval = setInterval(checkForCommand, 3000);
-  console.log('[MC-BG] Polling started');
+    if (polling) return;
+    polling = true;
+    pollInterval = setInterval(checkForCommand, 3000);
+    console.log('[MC-BG] Polling started');
 }
 
 function stopPolling() {
-  polling = false;
-  if (pollInterval) clearInterval(pollInterval);
-  console.log('[MC-BG] Polling stopped');
+    polling = false;
+    if (pollInterval) clearInterval(pollInterval);
+    console.log('[MC-BG] Polling stopped');
 }
 
-// ── Check server for pending command ──
+// ── Check server for pending command (profile-aware) ──
 async function checkForCommand() {
-  try {
-    const res = await fetch(`${SERVER}/api/ext/command`);
-    if (!res.ok) return;
-
-    const cmd = await res.json();
-    if (!cmd || !cmd.job_id) return;
-
-    console.log('[MC-BG] Received command:', cmd.job_type, cmd.job_id);
-    await dispatchJob(cmd);
-  } catch (e) {
-    // Server not running — silently retry
-  }
+    if (!profileId) profileId = await getProfileId();
+    try {
+        const res = await fetch(`${SERVER}/api/ext/command?profile_id=${profileId}`);
+        if (!res.ok || res.status === 204) return;
+        const cmd = await res.json();
+        if (!cmd || !cmd.job_id) return;
+        console.log('[MC-BG] Received command:', cmd.job_type, cmd.job_id);
+        await dispatchJob(cmd);
+    } catch (e) {}
 }
 
 // ── Dispatch job to the right tab ──
 async function dispatchJob(job) {
-  const targetUrl = getTargetUrl(job.job_type);
+    const targetUrl = getTargetUrl(job.job_type);
+    const tabs = await chrome.tabs.query({ url: targetUrl + '*' });
+    let tab;
 
-  // Find existing tab or create new one
-  const tabs = await chrome.tabs.query({ url: targetUrl + '*' });
-  let tab;
-
-  if (tabs.length > 0) {
-    tab = tabs[0];
-    await chrome.tabs.update(tab.id, { active: true });
-    // Navigate if needed
-    if (job.job_type === 'campaign' && !tab.url.includes('/campaigns')) {
-      await chrome.tabs.update(tab.id, { url: targetUrl });
-      await waitForTabLoad(tab.id);
+    if (tabs.length > 0) {
+        tab = tabs[0];
+        await chrome.tabs.update(tab.id, { active: true });
+    } else {
+        tab = await chrome.tabs.create({ url: targetUrl });
+        await waitForTabLoad(tab.id);
+        await new Promise(r => setTimeout(r, 10000));
     }
-  } else {
-    tab = await chrome.tabs.create({ url: targetUrl });
-    await waitForTabLoad(tab.id);
-    // Extra wait for Angular bootstrap
-    await new Promise(r => setTimeout(r, 10000));
-  }
 
-  // Send job to content script
-  try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job });
-    console.log('[MC-BG] Job dispatched to tab', tab.id);
-
-    // Acknowledge to server
-    await fetch(`${SERVER}/api/ext/ack`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: job.job_id })
-    });
-  } catch (e) {
-    console.error('[MC-BG] Failed to dispatch:', e);
-    // Content script might not be loaded yet — retry
-    await new Promise(r => setTimeout(r, 5000));
     try {
-      await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job });
-    } catch (e2) {
-      console.error('[MC-BG] Retry failed:', e2);
+        await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job });
+        console.log('[MC-BG] Job dispatched to tab', tab.id);
+        await fetch(`${SERVER}/api/ext/ack`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: job.job_id, profile_id: profileId })
+        });
+    } catch (e) {
+        console.error('[MC-BG] Dispatch failed, retrying...', e);
+        await new Promise(r => setTimeout(r, 5000));
+        try { await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job }); } catch (e2) {}
     }
-  }
 }
 
-// ── Get target URL for job type ──
 function getTargetUrl(jobType) {
-  switch (jobType) {
-    case 'campaign': return 'https://labs.google.com/pomelli/campaigns';
-    case 'photoshoot': return 'https://labs.google.com/pomelli/photoshoot';
-    case 'flow':
-    case 'aplus': return 'https://labs.google/fx/tools/flow';
-    default: return 'https://labs.google.com/pomelli/campaigns';
-  }
+    switch (jobType) {
+        case 'campaign': return 'https://labs.google.com/pomelli/campaigns';
+        case 'photoshoot': return 'https://labs.google.com/pomelli/photoshoot';
+        case 'flow': case 'aplus': return 'https://labs.google/fx/tools/flow';
+        default: return 'https://labs.google.com/pomelli/campaigns';
+    }
 }
 
-// ── Wait for tab to finish loading ──
 function waitForTabLoad(tabId) {
-  return new Promise(resolve => {
-    chrome.tabs.onUpdated.addListener(function listener(id, info) {
-      if (id === tabId && info.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }
+    return new Promise(resolve => {
+        chrome.tabs.onUpdated.addListener(function listener(id, info) {
+            if (id === tabId && info.status === 'complete') {
+                chrome.tabs.onUpdated.removeListener(listener);
+                resolve();
+            }
+        });
     });
-  });
 }
 
 // ── Handle messages from popup ──
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'START_POLLING') {
-    startPolling();
-    sendResponse({ polling: true });
-  } else if (msg.type === 'STOP_POLLING') {
-    stopPolling();
-    sendResponse({ polling: false });
-  } else if (msg.type === 'GET_STATUS') {
-    sendResponse({ polling });
-  }
-  return true;
+    if (msg.type === 'START_POLLING') { startPolling(); sendResponse({ polling: true }); }
+    else if (msg.type === 'STOP_POLLING') { stopPolling(); sendResponse({ polling: false }); }
+    else if (msg.type === 'GET_STATUS') { sendResponse({ polling, profileId }); }
+    return true;
 });
 
-// Auto-start polling
+// ── Auto-start ──
+registerWithServer();
 startPolling();
 console.log('[MC-BG] Mr.Creative background worker loaded');
