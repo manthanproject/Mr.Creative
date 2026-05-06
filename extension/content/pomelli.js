@@ -261,15 +261,18 @@ const CampaignBot = {
   // ── Wait for creatives (images) to load ──
   async _waitForCreatives(timeout = 180000) {
     MC.log('Waiting for creatives...');
+    // Initial page transition wait (matches Selenium bot)
+    await MC.sleep(8000);
     const start = Date.now();
     while (Date.now() - start < timeout) {
       const cards = document.querySelectorAll(SEL.creativeCard);
+      const loading = document.querySelectorAll('[class*="loading"], [class*="spinner"]');
+      const loadingInGrid = Array.from(loading).filter(l =>
+        l.closest(SEL.creativeGrid) || l.closest(SEL.creativeCard)
+      );
+      MC.log(`Creatives poll: cards=${cards.length}, loadingInGrid=${loadingInGrid.length}`);
       if (cards.length >= 4) {
         // Check if all have loaded images (not loading spinners)
-        const loading = document.querySelectorAll('[class*="loading"], [class*="spinner"]');
-        const loadingInGrid = Array.from(loading).filter(l =>
-          l.closest(SEL.creativeGrid) || l.closest(SEL.creativeCard)
-        );
         if (loadingInGrid.length === 0) {
           MC.log(`All ${cards.length} creatives loaded`);
           return;
