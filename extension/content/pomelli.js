@@ -131,11 +131,17 @@ const CampaignBot = {
       const ideaCards = await this._waitForIdeaCards();
       MC.log(`Campaign: ${ideaCards.length} ideas generated`);
 
-      // Step 7: Send idea cards to server for user selection
-      const ideas = ideaCards.map((card, i) => ({
-        index: i,
-        text: this._getIdeaText(card)
-      }));
+      // Step 7: Build deduped ideas list (selector matches nested wrappers, tripling cards)
+      const ideas = [];
+      const seenTexts = new Set();
+      ideaCards.forEach((card, originalIndex) => {
+        const text = this._getIdeaText(card);
+        if (text && !seenTexts.has(text)) {
+          seenTexts.add(text);
+          ideas.push({ index: originalIndex, text });
+        }
+      });
+      MC.log(`Campaign: ${ideas.length} unique ideas (from ${ideaCards.length} matched cards)`);
       await MC.sendStatus(job_id, 'waiting_selection', 'Select a campaign idea...', { ideas });
 
       // Step 8: Wait for user selection from server
@@ -143,13 +149,13 @@ const CampaignBot = {
       const selection = await this._waitForSelection(job_id);
 
       if (selection && selection.idea_index !== undefined) {
-        // Click the selected idea card
-        const cards = document.querySelectorAll(SEL.deleteIdeaBtn);
-        // The idea cards are siblings of delete buttons — find the card container
+        // Map deduped display index back to original card index
         const allCards = this._getVisibleIdeaCards();
-        if (allCards[selection.idea_index]) {
-          MC.click(allCards[selection.idea_index]);
-          MC.log(`Campaign: selected idea ${selection.idea_index}`);
+        const chosen = ideas[selection.idea_index];
+        const originalIndex = chosen ? chosen.index : selection.idea_index;
+        if (allCards[originalIndex]) {
+          MC.click(allCards[originalIndex]);
+          MC.log(`Campaign: selected idea ${selection.idea_index} (original card ${originalIndex})`);
         }
 
         // Step 9: Wait for creatives to load
@@ -246,9 +252,13 @@ const CampaignBot = {
 
   // ── Get visible idea cards ──
   _getVisibleIdeaCards() {
-    const all = [...document.querySelectorAll('mat-card, [class*="idea"], [class*="suggestion-card"]')];
-    const visible = all.filter(c => c.offsetHeight > 0 && c.textContent.trim().length > 20);
-    const cards = visible.filter(c => !visible.some(other => other !== c && other.contains(c)));
+    const cards = [];
+    const containers = document.querySelectorAll('mat-card, [class*="idea"], [class*="suggestion-card"]');
+    for (const c of containers) {
+      if (c.offsetHeight > 0 && c.textContent.trim().length > 20) {
+        cards.push(c);
+      }
+    }
     return cards;
   },
 
