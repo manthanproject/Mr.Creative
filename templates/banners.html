@@ -189,6 +189,15 @@
                     </select>
                 </div>
 
+                <!-- Engine Toggle -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <label style="font-size: 0.7rem; color: var(--pm-text-muted);">BOT ENGINE</label>
+                    <button id="engineToggle" class="pm-btn-ghost" onclick="toggleEngine()"
+                        style="font-size: 0.72rem; padding: 4px 12px; border-radius: 16px;">
+                        🧩 Extension
+                    </button>
+                </div>
+
                 <button class="pm-btn pm-btn-primary" onclick="generateBanners()" id="generate-btn">
                     🎨 Generate Banners
                 </button>
@@ -556,7 +565,141 @@ function clearFlowImage() {
     document.getElementById('flowUploadPreview').style.display = 'none';
 }
 
+var useExtension = true;  // Default to extension mode
+var currentPollingJobId = null;
+
+function toggleEngine() {
+    useExtension = !useExtension;
+    var btn = document.getElementById('engineToggle');
+    btn.textContent = useExtension ? '🧩 Extension' : '🤖 Selenium';
+    btn.style.borderColor = useExtension ? 'var(--pm-accent)' : '#555';
+    showToast(useExtension ? 'Using Chrome Extension' : 'Using Selenium bot', 'info');
+}
+
+async function launchViaExtension() {
+    var prompt = document.getElementById('banner-prompt').value.trim();
+    if (!prompt) { showToast('Enter a banner prompt', 'warning'); return; }
+
+    var btn = document.getElementById('generate-btn');
+    var progress = document.getElementById('progress-panel');
+    var results = document.getElementById('results-section');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Launching via Extension...';
+    progress.style.display = 'block';
+    results.style.display = 'none';
+
+    document.getElementById('progress-bar').style.width = '5%';
+    document.getElementById('progress-bar').classList.remove('done', 'error');
+    document.getElementById('progress-icon').textContent = '🧩';
+    document.getElementById('progress-title').textContent = 'Extension Running';
+    document.getElementById('progress-msg').textContent = 'Waiting for extension to pick up job...';
+    document.getElementById('progress-pct').textContent = '5%';
+    document.getElementById('progress-pct').style.color = '';
+    document.getElementById('progress-title').style.color = '';
+    document.querySelectorAll('.pm-step').forEach(function(s) { s.classList.remove('active', 'done'); });
+
+    try {
+        var jobPayload = {
+            job_type: 'flow',
+            prompt_text: prompt,
+            image_url: '',
+            image_filename: '',
+            aspect_ratio: getToggleValue('ar-group') || 'square',
+            count: parseInt(getToggleValue('count-group') || '4'),
+            reuse_project: false
+        };
+
+        // Upload reference image if present
+        if (flowImageFile) {
+            var imgForm = new FormData();
+            imgForm.append('image', flowImageFile);
+            var imgRes = await fetch('/api/ext/upload-image', { method: 'POST', body: imgForm });
+            var imgData = await imgRes.json();
+            jobPayload.image_url = imgData.url;
+            jobPayload.image_filename = imgData.filename;
+        }
+
+        var res = await fetch('/api/ext/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(jobPayload)
+        });
+        var data = await res.json();
+
+        if (data.job_id) {
+            showToast('Job sent to Chrome Extension!', 'success');
+            currentPollingJobId = data.job_id;
+            pollExtensionStatus(data.job_id);
+        }
+    } catch (err) {
+        showError('Failed to launch via extension: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '🎨 Generate Banners';
+    }
+}
+
+async function pollExtensionStatus(jobId) {
+    var interval = setInterval(async function() {
+        try {
+            var res = await fetch('/api/ext/job-status/' + jobId);
+            if (!res.ok) return;
+            var data = await res.json();
+
+            var stateMap = {
+                'navigating': { icon: '🌐', title: 'Navigating', step: 'navigating', pct: 15 },
+                'settings': { icon: '⚙', title: 'Settings', step: 'settings', pct: 25 },
+                'entering_prompt': { icon: '✍', title: 'Typing Prompt', step: 'entering_prompt', pct: 40 },
+                'generating': { icon: '🎨', title: 'Generating', step: 'generating', pct: 60 },
+                'downloading': { icon: '📥', title: 'Downloading', step: 'downloading', pct: 85 },
+                'complete': { icon: '✓', title: 'Complete!', step: 'complete', pct: 100 },
+                'error': { icon: '✗', title: 'Error', step: 'error', pct: 100 }
+            };
+
+            var info = stateMap[data.state] || { icon: '⏳', title: data.state || 'Running', step: '', pct: 10 };
+            document.getElementById('progress-icon').textContent = info.icon;
+            document.getElementById('progress-title').textContent = info.title;
+            document.getElementById('progress-msg').textContent = data.message || '';
+            document.getElementById('progress-bar').style.width = info.pct + '%';
+            document.getElementById('progress-pct').textContent = info.pct + '%';
+
+            // Highlight steps
+            document.querySelectorAll('.pm-step').forEach(function(s) { s.classList.remove('active', 'done'); });
+            if (info.step && info.step !== 'error') {
+                var stepEl = document.querySelector('.pm-step[data-step="' + info.step + '"]');
+                if (stepEl) stepEl.classList.add('active');
+                var idx = stepOrder.indexOf(info.step);
+                for (var i = 0; i < idx; i++) {
+                    var prev = document.querySelector('.pm-step[data-step="' + stepOrder[i] + '"]');
+                    if (prev) prev.classList.add('done');
+                }
+            }
+
+            if (data.state === 'complete' || data.state === 'error') {
+                clearInterval(interval);
+                var btn = document.getElementById('generate-btn');
+                btn.disabled = false;
+                btn.textContent = '🎨 Generate Banners';
+                if (data.state === 'complete') {
+                    document.getElementById('progress-bar').classList.add('done');
+                    document.getElementById('progress-title').style.color = 'var(--pm-accent)';
+                    showToast('Banners generated!', 'success');
+                } else {
+                    document.getElementById('progress-bar').classList.add('error');
+                    document.getElementById('progress-title').style.color = 'var(--pm-danger)';
+                }
+                fetch('/api/ext/next', { method: 'POST' });
+            }
+        } catch (e) { /* keep retrying */ }
+    }, 2000);
+}
+
 async function generateBanners() {
+    // ── Extension mode: route to Chrome extension ──
+    if (useExtension) {
+        return launchViaExtension();
+    }
+
     var prompt = document.getElementById('banner-prompt').value.trim();
     if (!prompt) { showToast('Enter a banner prompt', 'warning'); return; }
 
