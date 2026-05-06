@@ -134,7 +134,7 @@ const CampaignBot = {
       // Step 7: Send idea cards to server for user selection
       const ideas = ideaCards.map((card, i) => ({
         index: i,
-        text: card.textContent.trim().substring(0, 200)
+        text: this._getIdeaText(card)
       }));
       await MC.sendStatus(job_id, 'waiting_selection', 'Select a campaign idea...', { ideas });
 
@@ -246,16 +246,16 @@ const CampaignBot = {
 
   // ── Get visible idea cards ──
   _getVisibleIdeaCards() {
-    // Idea cards are clickable cards with campaign descriptions
-    // They appear below the prompt area with titles + descriptions
-    const cards = [];
-    const containers = document.querySelectorAll('mat-card, [class*="idea"], [class*="suggestion-card"]');
-    for (const c of containers) {
-      if (c.offsetHeight > 0 && c.textContent.trim().length > 20) {
-        cards.push(c);
-      }
-    }
+    const all = [...document.querySelectorAll('mat-card, [class*="idea"], [class*="suggestion-card"]')];
+    const visible = all.filter(c => c.offsetHeight > 0 && c.textContent.trim().length > 20);
+    const cards = visible.filter(c => !visible.some(other => other !== c && other.contains(c)));
     return cards;
+  },
+
+  _getIdeaText(card) {
+    const clone = card.cloneNode(true);
+    clone.querySelectorAll('button, mat-icon, .mat-icon').forEach(el => el.remove());
+    return clone.textContent.trim().substring(0, 200);
   },
 
   // ── Wait for creatives (images) to load ──
