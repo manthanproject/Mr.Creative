@@ -97,7 +97,7 @@ def get_status():
             if last_seen:
                 try:
                     since = (now - datetime.fromisoformat(last_seen)).total_seconds()
-                    stale = since > 30
+                    stale = since > 60
                 except (ValueError, TypeError):
                     stale = True
 
@@ -233,7 +233,7 @@ def submit_job():
             if last_seen:
                 try:
                     since = (now - datetime.fromisoformat(last_seen)).total_seconds()
-                    if since > 30:
+                    if since > 60:
                         continue
                 except (ValueError, TypeError):
                     continue

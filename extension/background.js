@@ -76,14 +76,29 @@ function startPolling() {
     if (polling) return;
     polling = true;
     pollInterval = setInterval(checkForCommand, 3000);
-    console.log('[MC-BG] Polling started');
+    chrome.alarms.create('mc_keepalive', { periodInMinutes: 0.4 });
+    checkForCommand();  // immediate
+    console.log('[MC-BG] Polling started (interval + alarm keepalive)');
 }
 
 function stopPolling() {
     polling = false;
-    if (pollInterval) clearInterval(pollInterval);
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    chrome.alarms.clear('mc_keepalive');
     console.log('[MC-BG] Polling stopped');
 }
+
+// ── Keepalive alarm: restart setInterval if worker just woke up ──
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'mc_keepalive') {
+        if (polling && pollInterval === null) {
+            // Worker was asleep; setInterval was lost. Restart it.
+            pollInterval = setInterval(checkForCommand, 3000);
+            console.log('[MC-BG] Worker woke — restarted interval polling');
+        }
+        checkForCommand();
+    }
+});
 
 // ── Check server for pending command (profile-aware) ──
 async function checkForCommand() {
