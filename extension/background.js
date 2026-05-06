@@ -107,6 +107,14 @@ async function dispatchJob(job) {
     if (tabs.length > 0) {
         tab = tabs[0];
         await chrome.tabs.update(tab.id, { active: true });
+
+        // If tab is on a sub-page (e.g. /campaigns/b-xxx), navigate to landing first
+        if (tab.url && tab.url !== targetUrl && tab.url !== targetUrl + '/') {
+            console.log('[MC-BG] Tab on sub-page, navigating to landing:', targetUrl);
+            await chrome.tabs.update(tab.id, { url: targetUrl });
+            await waitForTabLoad(tab.id);
+            await new Promise(r => setTimeout(r, 5000));  // Angular bootstrap
+        }
     } else {
         tab = await chrome.tabs.create({ url: targetUrl });
         await waitForTabLoad(tab.id);
