@@ -84,19 +84,40 @@ def ack_command():
 @bp.route('/status', methods=['GET'])
 def get_status():
     with _lock:
+        now = datetime.now()
         profiles = {}
+        active_count = 0
         for pid, info in _state['profiles'].items():
             cooldown = info.get('cooldown_until')
-            in_cooldown = cooldown and datetime.fromisoformat(cooldown) > datetime.now()
+            in_cooldown = cooldown and datetime.fromisoformat(cooldown) > now
+
+            # Check freshness — profile is "active" only if polled in last 30s
+            stale = True
+            last_seen = info.get('last_seen')
+            if last_seen:
+                try:
+                    since = (now - datetime.fromisoformat(last_seen)).total_seconds()
+                    stale = since > 30
+                except (ValueError, TypeError):
+                    stale = True
+
+            if in_cooldown:
+                status = 'cooldown'
+            elif stale:
+                status = 'stale'
+            else:
+                status = 'active'
+                active_count += 1
+
             profiles[pid] = {
                 'account': info.get('account', 'unknown'),
                 'capabilities': info.get('capabilities', []),
-                'status': 'cooldown' if in_cooldown else 'active',
+                'status': status,
                 'current_job': _state['current_jobs'].get(pid)
             }
     return jsonify({
         'connected': True,
-        'message': f"Server running — {len(profiles)} profile(s) connected",
+        'message': f"Server running — {active_count} profile(s) connected",
         'profiles': profiles,
         'queue_size': len(_state['job_queue']) if isinstance(_state.get('job_queue'), list) else 0
     })
@@ -202,26 +223,43 @@ def submit_job():
                     _state['pending_commands'][pid] = job
                     return jsonify({'job_id': job['job_id'], 'queued': True, 'routed_to': pid})
 
-        # Find best available profile (not in cooldown, has capability)
+        # Find best available profile (not in cooldown, has capability, recently active)
         best_profile = None
+        now = datetime.now()
+        active_count = 0
         for pid, info in _state['profiles'].items():
+            # Skip profiles not seen in the last 30s (service worker likely dead)
+            last_seen = info.get('last_seen')
+            if last_seen:
+                try:
+                    since = (now - datetime.fromisoformat(last_seen)).total_seconds()
+                    if since > 30:
+                        continue
+                except (ValueError, TypeError):
+                    continue
+            else:
+                continue  # Never polled — skip
+
+            active_count += 1
             cooldown = info.get('cooldown_until')
-            if cooldown and datetime.fromisoformat(cooldown) > datetime.now():
+            if cooldown and datetime.fromisoformat(cooldown) > now:
                 continue
             caps = info.get('capabilities', [])
             if job['job_type'] in caps or not caps:
                 # Prefer profile not currently busy
                 current = _state['current_jobs'].get(pid)
                 if not current or (isinstance(current, dict) and current.get('state') in ('complete', 'error', None)):
-                    best_profile = pid
-                    break
+                    if best_profile is None:
+                        best_profile = pid
 
         if best_profile:
             _state['pending_commands'][best_profile] = job
+            print(f"[Extension] Job {job['job_id']} routed to profile {best_profile}")
             return jsonify({'job_id': job['job_id'], 'queued': True, 'routed_to': best_profile})
         else:
             # No profile available — put in general queue
             _state['pending_any'] = job
+            print(f"[Extension] Job {job['job_id']} → pending_any (no active profile). Registered: {len(_state['profiles'])}, Active: {active_count}")
             return jsonify({'job_id': job['job_id'], 'queued': True, 'routed_to': 'any'})
 
 
