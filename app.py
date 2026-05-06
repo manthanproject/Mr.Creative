@@ -89,6 +89,9 @@ def create_app():
     from routes.agent import agent_bp
     app.register_blueprint(agent_bp, url_prefix='/agent')
 
+    from routes.extension import bp as extension_bp
+    app.register_blueprint(extension_bp)
+
     # Root route
     @app.route('/')
     def index():

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px; font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0a; color: #e5e3d9; padding: 16px;
+    }
+    .header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 16px; padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+    .header h1 { font-size: 14px; font-weight: 600; }
+    .header .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #555; margin-left: auto;
+    }
+    .header .dot.active { background: #C1CD7D; }
+    .status-card {
+      background: #141414; border: 1px solid #222; border-radius: 10px;
+      padding: 12px; margin-bottom: 10px;
+    }
+    .status-label {
+      font-size: 10px; text-transform: uppercase; color: #888;
+      letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .status-msg { font-size: 12px; color: #ccc; }
+    .btn-row { display: flex; gap: 6px; margin-top: 12px; }
+    .btn {
+      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #333;
+      background: #1a1a1a; color: #e5e3d9; font-size: 11px;
+      cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .btn:hover { border-color: #C1CD7D; }
+    .btn.active { background: rgba(193,205,125,0.15); border-color: #C1CD7D; color: #C1CD7D; }
+    .btn.danger { border-color: rgba(248,113,113,0.3); color: #f87171; }
+    .btn.danger:hover { background: rgba(248,113,113,0.1); }
+    .queue-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px; border-bottom: 1px solid #1a1a1a;
+      font-size: 11px;
+    }
+    .queue-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    }
+    .queue-dot.queued { background: #888; }
+    .queue-dot.running { background: #C1CD7D; animation: pulse 1.5s infinite; }
+    .queue-dot.done { background: #4ade80; }
+    .queue-dot.error { background: #f87171; }
+    @keyframes pulse { 50% { opacity: 0.4; } }
+    .server-link {
+      display: block; text-align: center; margin-top: 12px;
+      font-size: 10px; color: #666; text-decoration: none;
+    }
+    .server-link:hover { color: #C1CD7D; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span>🎨</span>
+    <h1>Mr.Creative Bot</h1>
+    <div class="dot" id="statusDot"></div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-label">STATUS</div>
+    <div class="status-msg" id="statusMsg">Checking server...</div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-label">CURRENT JOB</div>
+    <div class="status-msg" id="currentJob">No active job</div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-label">QUEUE</div>
+    <div id="queueList">
+      <div style="font-size: 11px; color: #555; padding: 4px;">No pending jobs</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="toggleBtn" onclick="togglePolling()">▶ Start</button>
+    <button class="btn" onclick="openDashboard()">🖥 Dashboard</button>
+    <button class="btn danger" id="stopBtn" onclick="stopJob()">⏹ Stop</button>
+  </div>
+
+  <a class="server-link" href="http://localhost:5000/generate/" target="_blank">
+    Open Mr.Creative Dashboard ↗
+  </a>
+
+  <script src="popup.js"></script>
+</body>
+</html>
