@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, request
 from flask_login import LoginManager
 from config import Config
 from models import db, User
@@ -8,6 +8,13 @@ import os
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    @app.after_request
+    def add_static_cors(response):
+        """Allow extension to fetch uploaded images."""
+        if '/static/uploads/' in request.path:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
 
     # Initialize extensions
     db.init_app(app)

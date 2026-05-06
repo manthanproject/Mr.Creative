@@ -13,7 +13,7 @@ Endpoints:
   POST /api/ext/stop          - Stop current job
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, after_this_request
 from flask_login import login_required, current_user
 import os
 import requests  # type: ignore[import-untyped]
@@ -22,6 +22,25 @@ from datetime import datetime, timedelta
 from threading import Lock
 
 bp = Blueprint('extension', __name__, url_prefix='/api/ext')
+
+
+@bp.after_request
+def add_cors_headers(response):
+    """Allow Chrome extension content scripts to call these endpoints."""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
+
+@bp.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    """Handle CORS preflight requests."""
+    response = jsonify({'ok': True})
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
 
 # ── In-memory job state (shared between extension and dashboard) ──
 _state = {
