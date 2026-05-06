@@ -90,7 +90,7 @@ const MC = {
     if (typeof el === 'string') el = document.querySelector(el);
     if (!el) throw new Error(`Element not found: ${el}`);
     el.scrollIntoView({ block: 'center' });
-    el.click();
+    el.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
   },
 
   // ── Find button by aria-label ──

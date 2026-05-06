@@ -80,35 +80,40 @@ const CampaignBot = {
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
       await MC.sleep(500);
 
-      // Step 3: Upload image
+      // Step 3: Upload image (optional — continues without if it fails)
       if (image_url) {
-        MC.log('Campaign: uploading image');
-        await MC.sendStatus(job_id, 'entering_prompt', `Adding image: ${image_filename}`);
+        try {
+          MC.log('Campaign: uploading image');
+          await MC.sendStatus(job_id, 'entering_prompt', `Adding image: ${image_filename}`);
 
-        // Click "Images" button
-        const imgBtn = await MC.waitFor(SEL.imagesBtn);
-        MC.click(imgBtn);
-        await MC.sleep(3000);
+          const imgBtn = await MC.waitFor(SEL.imagesBtn, 5000);
+          imgBtn.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+          await MC.sleep(3000);
 
-        // Wait for dialog
-        await MC.waitFor(SEL.imageDialog);
-        MC.log('Campaign: dialog opened');
-        await MC.sleep(2000);
-
-        // Find file input inside dialog's upload component
-        const pane = this._getDialogPane();
-        const fileInput = pane
-          ? pane.querySelector(SEL.fileInput)
-          : document.querySelector(SEL.fileInput);
-
-        if (fileInput) {
-          await MC.uploadFile(fileInput, image_url, image_filename);
-          MC.log('Campaign: file uploaded via input');
-          await MC.sleep(5000);  // wait for upload + auto-select
-
-          // Click Update/Confirm
-          await this._clickDialogConfirm(pane);
+          // Wait for dialog — shorter timeout, skip if it doesn't open
+          const dialog = await MC.waitFor(SEL.imageDialog, 10000);
+          MC.log('Campaign: dialog opened');
           await MC.sleep(2000);
+
+          const pane = this._getDialogPane();
+          const fileInput = pane
+            ? pane.querySelector(SEL.fileInput)
+            : document.querySelector(SEL.fileInput);
+
+          if (fileInput) {
+            await MC.uploadFile(fileInput, image_url, image_filename);
+            MC.log('Campaign: file uploaded');
+            await MC.sleep(5000);
+            await this._clickDialogConfirm(pane);
+            await MC.sleep(2000);
+          }
+        } catch (imgErr) {
+          MC.log('Campaign: image upload skipped:', imgErr.message);
+          await MC.sendStatus(job_id, 'entering_prompt', 'Image upload skipped, continuing...');
+          // Close dialog if it opened
+          const closeBtn = document.querySelector('.cdk-overlay-pane button[aria-label="close"], .cdk-overlay-pane .close-button');
+          if (closeBtn) closeBtn.click();
+          await MC.sleep(1000);
         }
       }
 
