@@ -1582,6 +1582,17 @@
             </div>
         </div>
 
+        <!-- Connected Accounts (Extension) -->
+        <div class="pm-card" style="margin-top: 12px;">
+            <div class="pm-card-header">
+                <h3>🔗 Accounts</h3>
+                <button class="pm-btn-ghost" onclick="loadProfiles()">↺</button>
+            </div>
+            <div class="pm-card-body" id="profilesList" style="font-size: 0.75rem;">
+                Loading...
+            </div>
+        </div>
+
         <!-- Settings -->
         <div class="pm-card" style="margin-top: 1rem;">
             <div class="pm-card-header">
@@ -2611,6 +2622,30 @@
     // UTILITY
     // ════════════════════
     function refreshJobs() { location.reload(); }
+
+    async function loadProfiles() {
+        try {
+            var res = await fetch('/api/ext/status');
+            var data = await res.json();
+            var container = document.getElementById('profilesList');
+            if (!data.profiles || Object.keys(data.profiles).length === 0) {
+                container.innerHTML = '<div style="color: #555; padding: 8px;">No profiles connected</div>';
+                return;
+            }
+            container.innerHTML = Object.entries(data.profiles).map(function(entry) {
+                var info = entry[1];
+                var dot = info.status === 'cooldown' ? '🔴' : '🟢';
+                var job = info.current_job ? ' — ' + (info.current_job.state || 'busy') : '';
+                var acct = (info.account || 'Unknown').substring(0, 28);
+                return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #1a1a1a;">' +
+                    '<span>' + dot + '</span><span style="flex:1">' + acct + job + '</span></div>';
+            }).join('');
+        } catch(e) {
+            document.getElementById('profilesList').innerHTML = '<div style="color:#f87171">Server offline</div>';
+        }
+    }
+    loadProfiles();
+    setInterval(loadProfiles, 10000);
 
     async function clearJobs() {
         if (!await showConfirm('Clear all jobs?')) return;
