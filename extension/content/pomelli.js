@@ -91,7 +91,7 @@ const CampaignBot = {
           await MC.sleep(3000);
 
           // Wait for dialog — shorter timeout, skip if it doesn't open
-          const dialog = await MC.waitFor(SEL.imageDialog, 10000);
+          const dialog = await MC.waitFor('.cdk-overlay-pane app-upload-image-button', 10000);
           MC.log('Campaign: dialog opened');
           await MC.sleep(2000);
 
