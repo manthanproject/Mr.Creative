@@ -80,7 +80,7 @@ CONTENT_TYPE_CONFIG = {
         'scenarios': [],
         'prompt_template': '{scenario}',
         'expert_prompts': [
-            'A+ product listing infographic with hero shot, key benefits with icons, feature grid, how-to-use steps, ingredient callouts, before and after comparison, multi-angle views, and a quality badge. Clean professional layout with bold headings and organized sections.',
+            'A+ product listing infographic showing hero product shot, key benefits with icons, feature comparison grid, step-by-step usage guide, ingredient highlights, before and after results, multiple product angles, and trust badge.',
         ],
     },
     'social_post': {
