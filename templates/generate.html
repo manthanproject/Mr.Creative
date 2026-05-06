@@ -1467,6 +1467,15 @@
                 </select>
             </div>
 
+            <!-- Engine Toggle -->
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <label style="font-size: 0.7rem; color: var(--pm-text-muted);">BOT ENGINE</label>
+                <button id="engineToggle" class="pm-btn-ghost" onclick="toggleEngine()"
+                    style="font-size: 0.72rem; padding: 4px 12px; border-radius: 16px;">
+                    🧩 Extension
+                </button>
+            </div>
+
             <!-- Launch Button -->
             <button class="pm-btn pm-btn-primary" onclick="launchGeneration()" id="launchBtn">
                 ⚡ Launch Generation
@@ -1904,6 +1913,11 @@
     async function launchGeneration() {
         var btn = document.getElementById('launchBtn');
 
+        // ── Extension mode: route to Chrome extension ──
+        if (useExtension) {
+            return launchViaExtension();
+        }
+
         if (currentMode === 'photoshoot') {
             // Generate/Edit mode
             if (selectedPhotoshootMode === 'generate') {
@@ -2327,6 +2341,230 @@
     // PAUSE / RESUME
     // ════════════════════
     var botPaused = false;
+    var useExtension = true;  // Default to extension mode
+    var currentPollingJobId = null;
+
+    function toggleEngine() {
+        useExtension = !useExtension;
+        var btn = document.getElementById('engineToggle');
+        btn.textContent = useExtension ? '🧩 Extension' : '🤖 Selenium';
+        btn.style.borderColor = useExtension ? 'var(--pm-accent)' : '#555';
+        showToast(useExtension ? 'Using Chrome Extension' : 'Using Selenium bot', 'info');
+    }
+
+    async function launchViaExtension() {
+        var btn = document.getElementById('launchBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Launching via Extension...';
+
+        try {
+            var jobPayload = {
+                job_type: currentMode === 'photoshoot' ? 'photoshoot' : 'campaign',
+                prompt_text: '',
+                aspect_ratio: 'story',
+                templates: [],
+                photoshoot_mode: selectedPhotoshootMode || 'product',
+                image_url: '',
+                image_filename: ''
+            };
+
+            // Get prompt text based on mode
+            if (currentMode === 'photoshoot') {
+                if (selectedPhotoshootMode === 'generate') {
+                    jobPayload.prompt_text = (document.getElementById('photoshootPrompt')?.value || '').trim();
+                    jobPayload.aspect_ratio = document.getElementById('aspectRatio')?.value || 'story';
+                } else {
+                    jobPayload.templates = selectedTemplates;
+                    jobPayload.aspect_ratio = document.getElementById('psAspectRatio')?.value || 'story';
+                }
+            } else {
+                // Campaign
+                jobPayload.prompt_text = selectedPromptId
+                    ? document.getElementById('promptSelect')?.selectedOptions[0]?.textContent?.trim() || ''
+                    : (document.getElementById('customPrompt')?.value || '').trim();
+                jobPayload.aspect_ratio = document.getElementById('campaignAspectRatio')?.value || 'story';
+            }
+
+            // Upload image if present
+            var imageInput = null;
+            if (currentMode === 'photoshoot') {
+                imageInput = selectedPhotoshootMode === 'generate'
+                    ? document.getElementById('editImageInput')
+                    : document.getElementById('genImageInput');
+            } else {
+                imageInput = document.getElementById('campaignImageInput');
+            }
+
+            if (imageInput && imageInput.files && imageInput.files[0]) {
+                var imgForm = new FormData();
+                imgForm.append('image', imageInput.files[0]);
+                var imgRes = await fetch('/api/ext/upload-image', { method: 'POST', body: imgForm });
+                var imgData = await imgRes.json();
+                jobPayload.image_url = imgData.url;
+                jobPayload.image_filename = imgData.filename;
+            }
+
+            // Submit job to extension
+            var res = await fetch('/api/ext/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(jobPayload)
+            });
+            var data = await res.json();
+
+            if (data.job_id) {
+                showToast('Job sent to Chrome Extension!', 'success');
+                currentPollingJobId = data.job_id;
+
+                // Show progress panel
+                var panel = document.getElementById('progressPanel');
+                panel.style.display = 'block';
+                document.getElementById('progressIcon').textContent = '🧩';
+                document.getElementById('progressTitle').textContent = 'Extension Running';
+                document.getElementById('progressMessage').textContent = 'Waiting for extension to pick up job...';
+
+                // Reset UI
+                botPaused = false;
+                var pauseBtn = document.getElementById('pauseResumeBtn');
+                pauseBtn.style.display = 'none';  // No pause for extension mode
+
+                // Start polling extension status
+                pollExtensionStatus(data.job_id);
+            }
+        } catch (err) {
+            showToast('Failed to launch via extension: ' + err.message, 'error');
+        }
+
+        btn.disabled = false;
+        btn.textContent = currentMode === 'photoshoot' ? '📸 Launch Photoshoot' : '⚡ Launch Generation';
+    }
+
+    async function pollExtensionStatus(jobId) {
+        var interval = setInterval(async function() {
+            try {
+                var res = await fetch('/api/ext/job-status/' + jobId);
+                if (!res.ok) return;
+                var data = await res.json();
+
+                // Update progress UI
+                var stateMap = {
+                    'navigating': { icon: '🔌', title: 'Navigating', step: 'connecting' },
+                    'entering_prompt': { icon: '✍', title: 'Setting Up', step: 'entering_prompt' },
+                    'generating': { icon: '🎨', title: 'Generating', step: 'generating' },
+                    'waiting_selection': { icon: '👆', title: 'Select Idea', step: 'generating' },
+                    'waiting_animate': { icon: '🎬', title: 'Select Cards', step: 'animating' },
+                    'animating': { icon: '🎬', title: 'Animating', step: 'animating' },
+                    'downloading': { icon: '📥', title: 'Downloading', step: 'downloading' },
+                    'complete': { icon: '✓', title: 'Complete!', step: 'saving' },
+                    'error': { icon: '✗', title: 'Error', step: '' }
+                };
+
+                var info = stateMap[data.state] || { icon: '⏳', title: data.state, step: '' };
+                document.getElementById('progressIcon').textContent = info.icon;
+                document.getElementById('progressTitle').textContent = info.title;
+                document.getElementById('progressMessage').textContent = data.message || '';
+
+                // Highlight current step
+                document.querySelectorAll('.pm-step').forEach(function(s) {
+                    s.classList.remove('active', 'done');
+                });
+                if (info.step) {
+                    var stepEl = document.querySelector('.pm-step[data-step="' + info.step + '"]');
+                    if (stepEl) stepEl.classList.add('active');
+                    // Mark previous steps as done
+                    var steps = ['connecting', 'entering_prompt', 'generating', 'animating', 'downloading', 'saving'];
+                    var idx = steps.indexOf(info.step);
+                    for (var i = 0; i < idx; i++) {
+                        var prev = document.querySelector('.pm-step[data-step="' + steps[i] + '"]');
+                        if (prev) prev.classList.add('done');
+                    }
+                }
+
+                // Handle idea selection
+                if (data.state === 'waiting_selection' && data.ideas) {
+                    var ideasPanel = document.getElementById('ideasPanel');
+                    var ideasGrid = document.getElementById('ideasGrid');
+                    if (ideasPanel && ideasGrid.children.length === 0) {
+                        ideasPanel.style.display = 'block';
+                        data.ideas.forEach(function(idea) {
+                            var card = document.createElement('div');
+                            card.className = 'pm-idea-card';
+                            card.style.cssText = 'padding: 12px; border: 1px solid #2a2a2a; border-radius: 10px; cursor: pointer; font-size: 0.75rem; background: #141414; transition: all 0.2s;';
+                            card.textContent = idea.text;
+                            card.onclick = async function() {
+                                await fetch('/api/ext/selection/' + jobId, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ idea_index: idea.index })
+                                });
+                                ideasPanel.style.display = 'none';
+                                showToast('Idea selected!', 'success');
+                            };
+                            card.onmouseenter = function() { card.style.borderColor = 'var(--pm-accent)'; };
+                            card.onmouseleave = function() { card.style.borderColor = '#2a2a2a'; };
+                            ideasGrid.appendChild(card);
+                        });
+                    }
+                }
+
+                // Handle animate selection
+                if (data.state === 'waiting_animate' && data.images) {
+                    var animPanel = document.getElementById('animatePanel');
+                    var animGrid = document.getElementById('animateGrid');
+                    if (animPanel && animGrid.children.length === 0) {
+                        animPanel.style.display = 'block';
+                        var selectedAnims = [];
+                        data.images.forEach(function(imgUrl, i) {
+                            var card = document.createElement('div');
+                            card.className = 'animate-card';
+                            card.style.cssText = 'cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; transition: all 0.2s;';
+                            card.innerHTML = '<img src="' + imgUrl + '" style="width: 100%; display: block;">';
+                            card.onclick = function() {
+                                var idx = selectedAnims.indexOf(i);
+                                if (idx >= 0) { selectedAnims.splice(idx, 1); card.style.borderColor = 'transparent'; }
+                                else { selectedAnims.push(i); card.style.borderColor = 'var(--pm-accent)'; }
+                                document.getElementById('animateCount').textContent = selectedAnims.length;
+                                document.getElementById('animateConfirmBtn').disabled = selectedAnims.length === 0;
+                            };
+                            animGrid.appendChild(card);
+                        });
+
+                        // Override confirm/skip for extension mode
+                        document.getElementById('animateConfirmBtn').onclick = async function() {
+                            await fetch('/api/ext/selection/' + jobId, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ animate_indices: selectedAnims })
+                            });
+                            animPanel.style.display = 'none';
+                            showToast('Animating ' + selectedAnims.length + ' cards...', 'success');
+                        };
+                        document.querySelector('.pm-btn-skip').onclick = async function() {
+                            await fetch('/api/ext/selection/' + jobId, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ animate_indices: [] })
+                            });
+                            animPanel.style.display = 'none';
+                        };
+                    }
+                }
+
+                // Job complete or error — stop polling
+                if (data.state === 'complete' || data.state === 'error') {
+                    clearInterval(interval);
+                    if (data.state === 'complete') {
+                        document.getElementById('progressTitle').style.color = 'var(--pm-accent)';
+                        showToast('Generation complete!', 'success');
+                    } else {
+                        document.getElementById('progressTitle').style.color = 'var(--pm-danger)';
+                    }
+                    // Advance queue
+                    fetch('/api/ext/next', { method: 'POST' });
+                }
+            } catch (e) { /* server not reachable, keep retrying */ }
+        }, 2000);
+    }
 
     async function stopCurrentJob() {
         if (!currentJobId) return;

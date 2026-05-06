@@ -146,6 +146,31 @@ def submit_job():
     return jsonify({'job_id': job['job_id'], 'queued': True})
 
 
+@bp.route('/upload-image', methods=['POST'])
+def upload_image():
+    """Dashboard uploads product image, returns URL for extension to fetch."""
+    file = request.files.get('image')
+    if not file:
+        return jsonify({'error': 'No file'}), 400
+    filename = f"ext_{int(time.time())}_{file.filename}"
+    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    filepath = os.path.join(upload_dir, filename)
+    file.save(filepath)
+    url = f"http://localhost:5000/static/uploads/{filename}"
+    return jsonify({'url': url, 'filename': filename})
+
+
+@bp.route('/job-status/<job_id>', methods=['GET'])
+def get_job_status(job_id):
+    """Dashboard polls this for job progress."""
+    with _lock:
+        current = _state.get('current_job')
+        if isinstance(current, dict) and current.get('job_id') == job_id:
+            return jsonify(current)
+    return jsonify({'state': 'unknown'}), 404
+
+
 @bp.route('/selection/<job_id>', methods=['GET'])
 def get_selection(job_id):
     """Extension polls for user selection (idea card or animate cards)."""
