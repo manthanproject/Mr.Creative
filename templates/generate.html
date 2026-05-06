@@ -2577,7 +2577,7 @@
     }
 
     async function stopCurrentJob() {
-        if (!currentJobId) return;
+        if (!currentPollingJobId) return;
         if (!confirm('Stop this job? This cannot be undone.')) return;
         try {
             await fetch('/generate/clear-jobs', { method: 'POST' });

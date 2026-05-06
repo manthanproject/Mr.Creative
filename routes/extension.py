@@ -263,12 +263,28 @@ def upload_image():
 def get_job_status(job_id):
     """Dashboard polls this for job progress."""
     with _lock:
-        cj = _state.get('current_jobs', {})
-        if isinstance(cj, dict):
-            for pid, job in cj.items():
+        # Check current running jobs
+        for pid, job in _state['current_jobs'].items():
+            if isinstance(job, dict) and job.get('job_id') == job_id:
+                return jsonify(job)
+
+        # Check pending commands (not yet picked up by extension)
+        for pid, job in _state['pending_commands'].items():
+            if isinstance(job, dict) and job.get('job_id') == job_id:
+                return jsonify({'job_id': job_id, 'state': 'queued', 'message': 'Waiting for extension to pick up...'})
+
+        # Check pending_any
+        if isinstance(_state['pending_any'], dict) and _state['pending_any'].get('job_id') == job_id:
+            return jsonify({'job_id': job_id, 'state': 'queued', 'message': 'Waiting for any available profile...'})
+
+        # Check job queue
+        jq = _state.get('job_queue') or []
+        if isinstance(jq, list):
+            for job in jq:
                 if isinstance(job, dict) and job.get('job_id') == job_id:
-                    return jsonify(job)
-    return jsonify({'state': 'unknown'}), 404
+                    return jsonify({'job_id': job_id, 'state': 'queued', 'message': 'In queue...'})
+
+    return jsonify({'job_id': job_id, 'state': 'queued', 'message': 'Waiting...'})
 
 
 @bp.route('/selection/<job_id>', methods=['GET'])
