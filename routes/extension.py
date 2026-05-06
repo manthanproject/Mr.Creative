@@ -310,7 +310,7 @@ def get_job_status(job_id):
 def get_selection(job_id):
     """Extension polls for user selection (idea card or animate cards)."""
     with _lock:
-        sel = _state['selections'].get(job_id)
+        sel = _state['selections'].pop(job_id, None)
     if sel:
         return jsonify(sel)
     return jsonify(None), 204
