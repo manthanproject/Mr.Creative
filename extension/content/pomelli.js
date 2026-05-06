@@ -163,7 +163,7 @@ const CampaignBot = {
         await this._waitForCreatives();
 
         // Step 10: Extract creative images and send to server
-        const images = MC.getCardImages();
+        const images = this._extractCreativeImages();
         MC.log(`Campaign: ${images.length} creatives ready`);
         await MC.sendStatus(job_id, 'waiting_animate', 'Select images to animate...', { images });
 
@@ -269,28 +269,60 @@ const CampaignBot = {
   },
 
   // ── Wait for creatives (images) to load ──
+  // Mirrors selenium_bot._wait_for_creatives: waits for all Pomelli loaders to disappear
+  // AND at least 15s elapsed before accepting "loaded" state.
   async _waitForCreatives(timeout = 180000) {
     MC.log('Waiting for creatives...');
     // Initial page transition wait (matches Selenium bot)
     await MC.sleep(8000);
     const start = Date.now();
     while (Date.now() - start < timeout) {
-      const cards = document.querySelectorAll(SEL.creativeCard);
-      const loading = document.querySelectorAll('[class*="loading"], [class*="spinner"]');
-      const loadingInGrid = Array.from(loading).filter(l =>
-        l.closest(SEL.creativeGrid) || l.closest(SEL.creativeCard)
-      );
-      MC.log(`Creatives poll: cards=${cards.length}, loadingInGrid=${loadingInGrid.length}`);
-      if (cards.length >= 4) {
-        // Check if all have loaded images (not loading spinners)
-        if (loadingInGrid.length === 0) {
-          MC.log(`All ${cards.length} creatives loaded`);
-          return;
-        }
+      const visible = (sel) => Array.from(document.querySelectorAll(sel))
+        .filter(el => el.offsetParent !== null).length;
+      const shimmer = visible('app-shimmer-loader');
+      const spinner = visible('mat-progress-spinner');
+      const progress = visible('app-generation-progress-loader .text');
+      const elapsed = (Date.now() - start) / 1000;
+      MC.log(`Creatives poll: shimmer=${shimmer}, spinner=${spinner}, progress=${progress}, elapsed=${elapsed.toFixed(1)}s`);
+      if (shimmer === 0 && spinner === 0 && progress === 0 && elapsed >= 15) {
+        MC.log('All creatives loaded');
+        return;
       }
-      await MC.sleep(3000);
+      await MC.sleep(5000);
     }
-    throw new Error('Creatives did not load');
+    MC.log('Creatives wait timed out — continuing anyway');
+  },
+
+  // ── Extract creative images as base64 (Pomelli image URLs need auth cookies) ──
+  // Mirrors selenium_bot.extract_creative_cards.
+  _extractCreativeImages() {
+    const imgs = Array.from(document.querySelectorAll('img'))
+      .filter(img => {
+        if (!img.offsetParent || !img.src) return false;
+        const r = img.getBoundingClientRect();
+        if (r.width <= 100 || r.height <= 100 || r.left <= 0) return false;
+        if ((img.naturalWidth || 0) <= 200) return false;
+        return true;
+      })
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+
+    const dataUris = [];
+    for (const img of imgs) {
+      try {
+        const w = Math.min(img.naturalWidth, 400);
+        const h = Math.round(img.naturalHeight * (w / img.naturalWidth));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        dataUris.push(canvas.toDataURL('image/jpeg', 0.7));
+      } catch (e) {
+        MC.log('Failed to canvas-extract image:', e.message);
+      }
+    }
+    MC.log(`Extracted ${dataUris.length} creative thumbnails as base64`);
+    return dataUris;
   },
 
   // ── Animate a specific card by index ──
@@ -338,17 +370,31 @@ const CampaignBot = {
 
   // ── Poll server for user selection ──
   async _waitForSelection(jobId, timeout = 300000) {
+    MC.log(`_waitForSelection: polling /api/ext/selection/${jobId} (timeout ${timeout}ms)`);
     const start = Date.now();
+    let polls = 0;
     while (Date.now() - start < timeout) {
+      polls++;
       try {
         const res = await fetch(`${MC.SERVER}/api/ext/selection/${jobId}`);
         if (res.ok) {
           const data = await res.json();
-          if (data && data.selected) return data;
+          if (polls % 10 === 1) {
+            MC.log(`_waitForSelection poll #${polls}: status=${res.status}, data=${JSON.stringify(data)}`);
+          }
+          if (data && data.selected) {
+            MC.log(`_waitForSelection received selection on poll #${polls}: ${JSON.stringify(data)}`);
+            return data;
+          }
+        } else if (polls % 10 === 1) {
+          MC.log(`_waitForSelection poll #${polls}: HTTP ${res.status}`);
         }
-      } catch (e) { /* retry */ }
+      } catch (e) {
+        if (polls % 10 === 1) MC.log(`_waitForSelection poll #${polls} error: ${e.message}`);
+      }
       await MC.sleep(2000);
     }
+    MC.log(`_waitForSelection timed out after ${polls} polls`);
     return null;
   }
 };
