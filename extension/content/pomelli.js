@@ -164,12 +164,16 @@ const CampaignBot = {
           MC.log(`Campaign: ${images.length} creatives ready for animate selection`);
           await MC.sendStatus(job_id, 'waiting_animate', 'Select images to animate...', { images });
 
-          // Step 11: Wait for animate selection
+          // Step 11: Wait for animate selection, then click ALL animate buttons,
+          // THEN wait once for ALL videos to complete (matches Selenium pattern)
           const animateSelection = await this._waitForSelection(job_id);
-          if (animateSelection && animateSelection.animate_indices) {
+          if (animateSelection && animateSelection.animate_indices && animateSelection.animate_indices.length) {
+            const videosBefore = document.querySelectorAll('video').length;
+            MC.log(`Animate: clicking ${animateSelection.animate_indices.length} buttons, videosBefore=${videosBefore}`);
             for (const idx of animateSelection.animate_indices) {
-              await this._animateCard(idx, job_id);
+              await this._clickAnimateButton(idx, job_id);
             }
+            await this._waitForAnimationsToComplete(job_id, videosBefore);
           }
         } else {
           MC.log(`Campaign: aspect ratio ${aspect_ratio} doesn't support animate — skipping`);
@@ -348,8 +352,10 @@ const CampaignBot = {
     return dataUris;
   },
 
-  // ── Animate a specific card by index ──
-  async _animateCard(index, jobId) {
+  // ── Click animate button on a single card (no waiting) ──
+  // Mirrors Selenium animate_selected_cards: queue all animations quickly,
+  // then wait once page-level via _waitForAnimationsToComplete.
+  async _clickAnimateButton(index, jobId) {
     const cards = document.querySelectorAll(SEL.creativeCard);
     if (!cards[index]) { MC.log(`No card at index ${index}`); return; }
 
@@ -357,11 +363,18 @@ const CampaignBot = {
     card.scrollIntoView({ block: 'center', behavior: 'instant' });
     await MC.sleep(400);
 
-    // Reveal opacity:0 buttons via non-bubbling hover events
+    // Reveal opacity:0 buttons via non-bubbling hover events on container...
     for (const evtName of ['mouseenter', 'pointerenter']) {
       card.dispatchEvent(new MouseEvent(evtName, { bubbles: false, cancelable: true }));
     }
-    await MC.sleep(600);
+    // ...and on the inner img (some Pomelli builds expect mouseover on the visual)
+    const innerImg = card.querySelector('img');
+    if (innerImg) {
+      for (const evtName of ['mouseover', 'pointerover']) {
+        innerImg.dispatchEvent(new MouseEvent(evtName, { bubbles: false, cancelable: true }));
+      }
+    }
+    await MC.sleep(2000);
 
     // Pick the mdc-button variant (NOT mdc-icon-button)
     const animateButtons = card.querySelectorAll('button.animate-button');
@@ -378,25 +391,67 @@ const CampaignBot = {
 
     if (!btn) { MC.log(`No animate button in card ${index}`); return; }
 
-    await MC.sendStatus(jobId, 'animating', `Animating card ${index + 1}...`);
+    await MC.sendStatus(jobId, 'animating', `Queuing animate ${index + 1}...`);
     MC.click(btn);
+    await MC.sleep(3000);
+    MC.log(`Card ${index}: animate button clicked`);
+  },
 
-    // Wait for animation: shimmers/spinners go to 0 AND a <video> appears in this card
+  // ── Wait for ALL animations to finish (page-level) ──
+  // Mirrors Selenium _wait_for_animations_to_complete.
+  async _waitForAnimationsToComplete(jobId, videosBefore) {
     const start = Date.now();
-    const timeout = 120000;
+    const timeout = 600000;  // 10 min
+    let lastLog = 0;
     while (Date.now() - start < timeout) {
-      const visible = (sel, root = document) => Array.from(root.querySelectorAll(sel))
+      const visible = (sel) => Array.from(document.querySelectorAll(sel))
         .filter(el => el.offsetParent !== null).length;
-      const shimmer = visible('app-shimmer-loader', card);
-      const spinner = visible('mat-progress-spinner', card);
-      const video = card.querySelector('video');
-      if (shimmer === 0 && spinner === 0 && video) {
-        MC.log(`Card ${index} animated (video appeared after ${((Date.now()-start)/1000).toFixed(1)}s)`);
+      const shimmer = visible('app-shimmer-loader');
+      const spinner = visible('mat-progress-spinner');
+      const progress = visible('app-generation-progress-loader .text');
+      const totalLoading = shimmer + spinner + progress;
+      const videos = Array.from(document.querySelectorAll('video'))
+        .filter(v => v.src && v.src.startsWith('http'));
+      const videoCount = videos.length;
+      const elapsed = (Date.now() - start) / 1000;
+
+      // Detect "high demand" / rate-limit error
+      const errBanner = Array.from(document.querySelectorAll('*'))
+        .some(el => el.textContent && /high demand|try again later|unusual activity/i.test(el.textContent.slice(0, 200)));
+
+      if (Date.now() - lastLog > 8000) {
+        MC.log(`Animate poll: shimmer=${shimmer}, spinner=${spinner}, progress=${progress}, videos=${videoCount}, elapsed=${elapsed.toFixed(0)}s`);
+        await MC.sendStatus(jobId, 'animating',
+          `Waiting for animations... ${videoCount} video(s), ${totalLoading} loader(s), ${elapsed.toFixed(0)}s`);
+        lastLog = Date.now();
+      }
+
+      if (errBanner && elapsed > 30) {
+        MC.log('Animate: high-demand banner detected — aborting wait');
         return;
       }
-      await MC.sleep(3000);
+
+      // Done: at least one new video AND no loaders
+      if (videoCount > videosBefore && totalLoading === 0) {
+        MC.log(`Animate complete: ${videoCount} videos, 0 loaders, ${elapsed.toFixed(1)}s`);
+        return;
+      }
+
+      // Keep waiting if loaders present OR not yet 120s
+      if (totalLoading > 0 || elapsed < 120) {
+        await MC.sleep(8000);
+        continue;
+      }
+
+      // Give up: no loaders AND no new videos AND elapsed > 120
+      if (totalLoading === 0 && videoCount <= videosBefore && elapsed > 120) {
+        MC.log(`Animate gave up: no progress after ${elapsed.toFixed(0)}s`);
+        return;
+      }
+
+      await MC.sleep(8000);
     }
-    MC.log(`Card ${index} animate wait timed out — continuing`);
+    MC.log('Animate wait timed out (10 min)');
   },
 
   // ── Download all creative card images ──
