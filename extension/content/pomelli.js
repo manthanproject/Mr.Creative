@@ -160,7 +160,7 @@ const CampaignBot = {
         // Step 10: Smart animate — only Story (9:16) supports animation
         const animateSupported = (aspect_ratio || '').includes('9:16') || aspect_ratio === 'story';
         if (animateSupported) {
-          const images = this._extractCreativeImages();
+          const images = await this._extractCreativeImages();
           MC.log(`Campaign: ${images.length} creatives ready for animate selection`);
           await MC.sendStatus(job_id, 'waiting_animate', 'Select images to animate...', { images });
 
@@ -295,8 +295,9 @@ const CampaignBot = {
   },
 
   // ── Extract creative images as base64 (Pomelli image URLs need auth cookies) ──
-  // Mirrors selenium_bot.extract_creative_cards.
-  _extractCreativeImages() {
+  // Fetches with credentials → blob → createImageBitmap → canvas thumbnail.
+  // Avoids the cross-origin tainted-canvas error from drawing <img> directly.
+  async _extractCreativeImages() {
     const imgs = Array.from(document.querySelectorAll('img'))
       .filter(img => {
         if (!img.offsetParent || !img.src) return false;
@@ -310,16 +311,21 @@ const CampaignBot = {
     const dataUris = [];
     for (const img of imgs) {
       try {
-        const w = Math.min(img.naturalWidth, 400);
-        const h = Math.round(img.naturalHeight * (w / img.naturalWidth));
+        const resp = await fetch(img.src, { credentials: 'include' });
+        if (!resp.ok) { MC.log(`Fetch ${resp.status} for ${img.src}`); continue; }
+        const blob = await resp.blob();
+        const bmp = await createImageBitmap(blob);
+        const w = Math.min(bmp.width, 400);
+        const h = Math.round(bmp.height * (w / bmp.width));
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx.drawImage(bmp, 0, 0, w, h);
         dataUris.push(canvas.toDataURL('image/jpeg', 0.7));
+        bmp.close && bmp.close();
       } catch (e) {
-        MC.log('Failed to canvas-extract image:', e.message);
+        MC.log('Failed to extract image:', e.message);
       }
     }
     MC.log(`Extracted ${dataUris.length} creative thumbnails as base64`);
@@ -378,23 +384,49 @@ const CampaignBot = {
   },
 
   // ── Download all creative card images ──
+  // Server can't fetch Pomelli URLs (auth-gated). Fetch with page cookies,
+  // convert to base64 data URI, POST to server with is_base64 flag.
   async _downloadAllCards() {
-    const images = MC.getCardImages();
-    const downloaded = [];
+    const srcs = Array.from(new Set(
+      Array.from(document.querySelectorAll('img'))
+        .filter(img => {
+          if (!img.offsetParent || !img.src) return false;
+          const r = img.getBoundingClientRect();
+          if (r.width <= 100 || r.height <= 100 || r.left <= 0) return false;
+          if ((img.naturalWidth || 0) <= 200) return false;
+          return true;
+        })
+        .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
+        .map(img => img.src)
+    ));
+    MC.log(`Downloading ${srcs.length} unique images...`);
 
-    for (let i = 0; i < images.length; i++) {
+    const downloaded = [];
+    for (let i = 0; i < srcs.length; i++) {
+      const src = srcs[i];
       try {
-        // Send image URL to server for download
-        await fetch(`${MC.SERVER}/api/ext/download`, {
+        const resp = await fetch(src, { credentials: 'include' });
+        if (!resp.ok) { MC.log(`  [${i}] fetch ${resp.status}`); continue; }
+        const blob = await resp.blob();
+        const dataUri = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+        const postRes = await fetch(`${MC.SERVER}/api/ext/download`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: images[i], index: i })
+          body: JSON.stringify({ url: dataUri, index: i, is_base64: true })
         });
-        downloaded.push(images[i]);
+        const postData = await postRes.json().catch(() => ({}));
+        MC.log(`  [${i}] ${blob.size}b → server: ${JSON.stringify(postData)}`);
+        if (postRes.ok) downloaded.push(src);
       } catch (e) {
-        MC.log(`Download failed for card ${i}:`, e);
+        MC.log(`  [${i}] download failed: ${e.message}`);
       }
     }
+    MC.log(`Downloaded ${downloaded.length}/${srcs.length}`);
     return downloaded;
   },
 
@@ -407,7 +439,10 @@ const CampaignBot = {
       polls++;
       try {
         const res = await fetch(`${MC.SERVER}/api/ext/selection/${jobId}`);
-        if (res.ok) {
+        if (res.status === 204) {
+          // No selection yet — empty body, skip res.json()
+          if (polls % 10 === 1) MC.log(`_waitForSelection poll #${polls}: 204 (no selection yet)`);
+        } else if (res.ok) {
           const data = await res.json();
           if (polls % 10 === 1) {
             MC.log(`_waitForSelection poll #${polls}: status=${res.status}, data=${JSON.stringify(data)}`);

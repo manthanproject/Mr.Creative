@@ -9,6 +9,7 @@ import os
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for base64 image uploads
 
     CORS(app, resources={r"/api/ext/*": {"origins": "*"}})
 

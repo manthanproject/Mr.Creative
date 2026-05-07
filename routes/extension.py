@@ -340,44 +340,65 @@ def set_selection(job_id):
 
 @bp.route('/download', methods=['POST'])
 def download_image():
-    """Extension sends image URL — server downloads and saves to collection."""
+    """Extension sends image URL or base64 data URI — server saves to disk."""
+    import base64
     data = request.json
     image_url = data.get('url')
     index = data.get('index', 0)
     job_id = data.get('job_id', '')
+    is_base64 = data.get('is_base64', False)
 
     if not image_url:
         return jsonify({'error': 'No URL'}), 400
 
+    downloads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'downloads')
+    os.makedirs(downloads_dir, exist_ok=True)
+
     try:
-        # Download image
-        resp = requests.get(image_url, timeout=30)
-        if resp.status_code != 200:
-            return jsonify({'error': f'HTTP {resp.status_code}'}), 400
-
-        # Save to downloads folder
-        downloads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'downloads')
-        os.makedirs(downloads_dir, exist_ok=True)
-
-        ext = 'jpg'
-        if 'png' in resp.headers.get('content-type', ''):
-            ext = 'png'
-        elif 'webp' in resp.headers.get('content-type', ''):
-            ext = 'webp'
+        if is_base64 or image_url.startswith('data:'):
+            # data:image/png;base64,XXXX
+            if ',' not in image_url:
+                return jsonify({'error': 'Invalid data URI'}), 400
+            header, b64body = image_url.split(',', 1)
+            ext = 'jpg'
+            if 'png' in header:
+                ext = 'png'
+            elif 'webp' in header:
+                ext = 'webp'
+            elif 'mp4' in header:
+                ext = 'mp4'
+            elif 'jpeg' in header or 'jpg' in header:
+                ext = 'jpg'
+            content = base64.b64decode(b64body)
+        else:
+            # HTTP fallback
+            resp = requests.get(image_url, timeout=30)
+            if resp.status_code != 200:
+                return jsonify({'error': f'HTTP {resp.status_code}'}), 400
+            ct = resp.headers.get('content-type', '')
+            ext = 'jpg'
+            if 'png' in ct:
+                ext = 'png'
+            elif 'webp' in ct:
+                ext = 'webp'
+            elif 'mp4' in ct:
+                ext = 'mp4'
+            content = resp.content
 
         filename = f"{job_id}_{index}.{ext}" if job_id else f"ext_{int(time.time())}_{index}.{ext}"
         filepath = os.path.join(downloads_dir, filename)
-
         with open(filepath, 'wb') as f:
-            f.write(resp.content)
+            f.write(content)
 
+        print(f"[Extension] Downloaded {len(content)}b → {filename}")
         return jsonify({
             'ok': True,
             'path': filepath,
-            'size': len(resp.content),
+            'size': len(content),
             'filename': filename
         })
     except Exception as e:
+        print(f"[Extension] Download error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
