@@ -495,6 +495,22 @@ def finalize_job():
     return jsonify({'ok': True, 'saved': saved, 'collection_id': collection_id})
 
 
+@bp.route('/pending-for-tab', methods=['GET'])
+def pending_for_tab():
+    """Content script polls this as backup if background dispatch failed."""
+    with _lock:
+        # Check pending_any first
+        if _state['pending_any']:
+            job = _state['pending_any']
+            _state['pending_any'] = None
+            return jsonify(job)
+        # Check all pending_commands
+        for pid, job in list(_state['pending_commands'].items()):
+            _state['pending_commands'].pop(pid)
+            return jsonify(job)
+    return ('', 204)
+
+
 @bp.route('/stop', methods=['POST'])
 def stop_job():
     with _lock:

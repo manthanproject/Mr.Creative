@@ -816,3 +816,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 MC.log('Pomelli content script loaded on:', location.href);
+
+// Self-check: poll server for any pending job (backup if background dispatch failed)
+(async function selfCheck() {
+  await MC.sleep(3000);  // Let background dispatch try first
+  try {
+    const res = await fetch(MC.SERVER + '/api/ext/pending-for-tab');
+    if (res.ok) {
+      const job = await res.json();
+      if (job && job.job_id) {
+        MC.log('Self-check found pending job:', job.job_type, job.job_id);
+        if (job.job_type === 'campaign') CampaignBot.run(job);
+        else if (job.job_type === 'photoshoot') PhotoshootBot.run(job);
+        // Ack the job
+        await fetch(MC.SERVER + '/api/ext/ack', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: job.job_id, profile_id: 'content-script' })
+        });
+      }
+    }
+  } catch (e) {}
+})();
