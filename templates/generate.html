@@ -2474,6 +2474,19 @@
                 document.getElementById('progressTitle').textContent = info.title;
                 document.getElementById('progressMessage').textContent = data.message || '';
 
+                var progressMap = {
+                    'navigating': 5, 'entering_prompt': 15, 'generating': 35,
+                    'waiting_selection': 45, 'waiting_animate': 60,
+                    'animating': 70, 'downloading': 85, 'complete': 100, 'error': 0
+                };
+                var pct = progressMap[data.state] || 0;
+                document.getElementById('progressPercent').textContent = pct + '%';
+                var bar = document.getElementById('progressBar');
+                bar.style.width = pct + '%';
+                bar.classList.remove('success', 'error');
+                if (data.state === 'complete') bar.classList.add('success');
+                if (data.state === 'error') bar.classList.add('error');
+
                 // Highlight current step
                 document.querySelectorAll('.pm-step').forEach(function(s) {
                     s.classList.remove('active', 'done');
