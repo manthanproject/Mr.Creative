@@ -177,7 +177,21 @@ const CampaignBot = {
 
         // Step 12: Download all images
         await MC.sendStatus(job_id, 'downloading', 'Downloading images...');
-        const downloadedImages = await this._downloadAllCards();
+        const downloadedImages = await this._downloadAllCards(job_id);
+
+        // Step 13: Save to collection on server
+        await MC.sendStatus(job_id, 'saving', 'Saving to collection...');
+        try {
+          const finRes = await fetch(`${MC.SERVER}/api/ext/finalize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id })
+          });
+          const finData = await finRes.json().catch(() => ({}));
+          MC.log(`Finalize: ${JSON.stringify(finData)}`);
+        } catch (e) {
+          MC.log(`Finalize failed: ${e.message}`);
+        }
 
         // Navigate back to /campaigns landing
         const m = location.pathname.match(/^(\/u\/\d+)?\//);
@@ -386,7 +400,7 @@ const CampaignBot = {
   // ── Download all creative card images ──
   // Server can't fetch Pomelli URLs (auth-gated). Fetch with page cookies,
   // convert to base64 data URI, POST to server with is_base64 flag.
-  async _downloadAllCards() {
+  async _downloadAllCards(jobId) {
     const srcs = Array.from(new Set(
       Array.from(document.querySelectorAll('img'))
         .filter(img => {
@@ -417,7 +431,7 @@ const CampaignBot = {
         const postRes = await fetch(`${MC.SERVER}/api/ext/download`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: dataUri, index: i, is_base64: true })
+          body: JSON.stringify({ url: dataUri, index: i, is_base64: true, job_id: jobId })
         });
         const postData = await postRes.json().catch(() => ({}));
         MC.log(`  [${i}] ${blob.size}b → server: ${JSON.stringify(postData)}`);

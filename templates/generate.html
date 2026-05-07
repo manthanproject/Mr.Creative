@@ -2375,7 +2375,8 @@
                 templates: [],
                 photoshoot_mode: selectedPhotoshootMode || 'product',
                 image_url: '',
-                image_filename: ''
+                image_filename: '',
+                collection_id: document.getElementById('collectionSelect')?.value || ''
             };
 
             // Get prompt text based on mode
@@ -2465,6 +2466,7 @@
                     'waiting_animate': { icon: '🎬', title: 'Select Cards', step: 'animating' },
                     'animating': { icon: '🎬', title: 'Animating', step: 'animating' },
                     'downloading': { icon: '📥', title: 'Downloading', step: 'downloading' },
+                    'saving': { icon: '💾', title: 'Saving to Collection', step: 'saving' },
                     'complete': { icon: '✓', title: 'Complete!', step: 'saving' },
                     'error': { icon: '✗', title: 'Error', step: '' }
                 };
@@ -2477,7 +2479,8 @@
                 var progressMap = {
                     'navigating': 5, 'entering_prompt': 15, 'generating': 35,
                     'waiting_selection': 45, 'waiting_animate': 60,
-                    'animating': 70, 'downloading': 85, 'complete': 100, 'error': 0
+                    'animating': 70, 'downloading': 85, 'saving': 95,
+                    'complete': 100, 'error': 0
                 };
                 var pct = progressMap[data.state] || 0;
                 document.getElementById('progressPercent').textContent = pct + '%';

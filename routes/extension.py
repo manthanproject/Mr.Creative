@@ -31,6 +31,7 @@ _state = {
     'selections': {},             # job_id → user selection
     'job_queue': [],              # Pending jobs
     'profiles': {},               # profile_id → {account, capabilities, last_seen, cooldown_until}
+    'job_data': {},               # job_id → full job payload (for finalize/save)
 }
 _lock = Lock()
 
@@ -220,9 +221,13 @@ def submit_job():
         'count': data.get('count', 4),
         'reuse_project': data.get('reuse_project', False),
         'target_account': data.get('target_account'),  # Optional: route to specific account
+        'collection_id': data.get('collection_id', ''),  # For finalize → save to collection
+        'user_id': data.get('user_id', ''),
     }
 
     with _lock:
+        # Store full payload for finalize lookup
+        _state['job_data'][job['job_id']] = job
         target = data.get('target_account')
 
         if target:
@@ -402,6 +407,93 @@ def download_image():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/finalize', methods=['POST'])
+def finalize_job():
+    """After downloads, copy files to collection folder + create Generation records."""
+    import shutil
+    import glob
+    from datetime import datetime as _dt
+    from flask import current_app
+    from models import db, Collection, Generation, User
+
+    data = request.json
+    job_id = data.get('job_id')
+    if not job_id:
+        return jsonify({'error': 'No job_id'}), 400
+
+    with _lock:
+        jd = _state.get('job_data')
+        job = jd.get(job_id) if isinstance(jd, dict) else None
+    if not isinstance(job, dict):
+        return jsonify({'error': 'Unknown job_id'}), 404
+
+    collection_id = (job.get('collection_id') or '').strip()
+    user_id = job.get('user_id', '')
+    job_type = job.get('job_type', 'campaign')
+
+    # Resolve user (fallback: first user in DB)
+    user = None
+    if user_id:
+        user = db.session.get(User, user_id)
+    if user is None:
+        user = User.query.first()
+    if user is None:
+        return jsonify({'error': 'No user available'}), 400
+
+    # Auto-create collection if missing/auto
+    if not collection_id or collection_id == 'auto':
+        base_name = f"Extension {_dt.now().strftime('%b %d %H:%M')}"
+        col = Collection(user_id=user.id, name=base_name, description=f'From Chrome extension ({job_type})')
+        db.session.add(col)
+        db.session.flush()
+        collection_id = col.id
+    else:
+        col = db.session.get(Collection, collection_id)
+        if col is None:
+            return jsonify({'error': f'Collection {collection_id} not found'}), 404
+
+    output_folder = current_app.config.get('OUTPUT_FOLDER',
+        os.path.join(current_app.static_folder or 'static', 'outputs'))
+    col_dir = os.path.join(output_folder, f'collection_{collection_id}')
+    os.makedirs(col_dir, exist_ok=True)
+
+    downloads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'downloads')
+    pattern = os.path.join(downloads_dir, f'{job_id}_*')
+    files = sorted(glob.glob(pattern))
+    print(f"[Extension] finalize: job_id={job_id}, found {len(files)} files matching {pattern}")
+
+    saved = 0
+    for filepath in files:
+        if not os.path.exists(filepath):
+            continue
+        filename = os.path.basename(filepath)
+        timestamp = _dt.now().strftime('%Y%m%d_%H%M%S')
+        new_name = f"{timestamp}_{filename}"
+        dest = os.path.join(col_dir, new_name)
+        shutil.copy2(filepath, dest)
+
+        ext = os.path.splitext(filename)[1].lower()
+        output_type = 'video' if ext in ('.mp4', '.webm', '.mov') else 'image'
+
+        gen = Generation(
+            user_id=user.id,
+            collection_id=collection_id,
+            input_type='image' if job_type == 'photoshoot' else 'text',
+            output_type=output_type,
+            output_path=f'outputs/collection_{collection_id}/{new_name}',
+            pomelli_feature=job_type,
+            status='completed',
+            file_size=os.path.getsize(dest),
+            completed_at=_dt.now(),
+        )
+        db.session.add(gen)
+        saved += 1
+
+    db.session.commit()
+    print(f"[Extension] finalize: saved {saved} files to collection {collection_id}")
+    return jsonify({'ok': True, 'saved': saved, 'collection_id': collection_id})
+
+
 @bp.route('/stop', methods=['POST'])
 def stop_job():
     with _lock:
@@ -410,6 +502,7 @@ def stop_job():
         _state['current_jobs'] = {}
         _state['job_queue'] = []
         _state['selections'] = {}
+        _state['job_data'] = {}
     return jsonify({'ok': True})
 
 
