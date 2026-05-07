@@ -7,49 +7,49 @@
 // ── DOM SELECTORS (verified May 7 2026) ──
 const SEL = {
   // Campaign landing page (/campaigns)
-  textarea:           'textarea',
-  imagesBtn:          'button[aria-label="Add image ingredient"]',
-  aspectRatioBtn:     'button.aspect-ratio-button',
-  generateIdeasBtn:   'button.prompt-send-button',
-  productBtn:         'button[aria-label="Add product"]',
+  textarea: 'textarea',
+  imagesBtn: 'button[aria-label="Add image ingredient"]',
+  aspectRatioBtn: 'button.aspect-ratio-button',
+  generateIdeasBtn: 'button.prompt-send-button',
+  productBtn: 'button[aria-label="Add product"]',
 
   // Aspect ratio menu items
-  aspectMenuItem:     'button.mat-mdc-menu-item',
+  aspectMenuItem: 'button.mat-mdc-menu-item',
 
   // Select Images dialog (CDK overlay)
-  imageDialog:        'app-image-ingredient-picker-dialog',
-  uploadComponent:    'app-upload-image-button',
-  uploadBtn:          'app-upload-image-button button',
-  fileInput:          'app-upload-image-button input[type="file"]',
-  dialogOverlay:      '.cdk-overlay-pane',
-  dialogConfirmBtn:   '.cdk-overlay-pane button',  // scan for "Update"/"Confirm" text
+  imageDialog: 'app-image-ingredient-picker-dialog',
+  uploadComponent: 'app-upload-image-button',
+  uploadBtn: 'app-upload-image-button button',
+  fileInput: 'app-upload-image-button input[type="file"]',
+  dialogOverlay: '.cdk-overlay-pane',
+  dialogConfirmBtn: '.cdk-overlay-pane button',  // scan for "Update"/"Confirm" text
 
   // Idea cards (campaign results)
-  ideaCard:           '.campaign-idea-card',
-  ideaTitle:          '.idea-title',
-  ideaDescription:    '.idea-description',
-  campaignGrid:       '.campaign-grid',
-  deleteIdeaBtn:      'button[aria-label="Delete idea"]',
+  ideaCard: '.campaign-idea-card',
+  ideaTitle: '.idea-title',
+  ideaDescription: '.idea-description',
+  campaignGrid: '.campaign-grid',
+  deleteIdeaBtn: 'button[aria-label="Delete idea"]',
 
   // Creatives page (after idea selected)
-  creativeGrid:       'div.creative-grid',
-  creativeCard:       'div.creative-card-container',
-  creativeCardImg:    'div.creative-card-container img',
-  animateBtn:         'button.animate-button',  // opacity:0, needs hover first
-  animateNoTextBtn:   'button[aria-label="Animate without text"]',
-  moreBtn:            'button[aria-label="More"]',
-  backBtn:            'button.back-button',
+  creativeGrid: 'div.creative-grid',
+  creativeCard: 'div.creative-card-container',
+  creativeCardImg: 'div.creative-card-container img',
+  animateBtn: 'button.animate-button',  // opacity:0, needs hover first
+  animateNoTextBtn: 'button[aria-label="Animate without text"]',
+  moreBtn: 'button[aria-label="More"]',
+  backBtn: 'button.back-button',
 
   // Photoshoot page
   photoshootModeCard: 'div.photoshoot-branch-button',
-  shotThumbnail:      'div.shot-thumbnail',
-  selectionCount:     'span.selection-count',
-  looksGoodBtn:       'button',  // text "Looks Good"
+  shotThumbnail: 'div.shot-thumbnail',
+  selectionCount: 'span.selection-count',
+  looksGoodBtn: 'button',  // text "Looks Good"
 
   // Photoshoot upload
-  psUploadComponent:  'app-upload-image-button',
-  psFileInput:        'app-upload-image-button input[type="file"]',
-  psAspectSelector:   'app-aspect-ratio-selector button',
+  psUploadComponent: 'app-upload-image-button',
+  psFileInput: 'app-upload-image-button input[type="file"]',
+  psAspectSelector: 'app-aspect-ratio-selector button',
 };
 
 // ═══════════════════════════════════════════
@@ -86,7 +86,7 @@ const CampaignBot = {
           await MC.sendStatus(job_id, 'entering_prompt', `Adding image: ${image_filename}`);
 
           const imgBtn = await MC.waitFor(SEL.imagesBtn, 5000);
-          imgBtn.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+          imgBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
           await MC.sleep(3000);
 
           // Wait for dialog — shorter timeout, skip if it doesn't open
@@ -185,16 +185,18 @@ const CampaignBot = {
 
         // Step 13: Save to collection on server
         await MC.sendStatus(job_id, 'saving', 'Saving to collection...');
+        let collectionId = '';
         try {
           const finRes = await fetch(`${MC.SERVER}/api/ext/finalize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ job_id })
           });
-          const finData = await finRes.json().catch(() => ({}));
-          MC.log(`Finalize: ${JSON.stringify(finData)}`);
+          const finData = await finRes.json();
+          collectionId = finData.collection_id || '';
+          MC.log(`Campaign: saved ${finData.saved} files to collection ${collectionId}`);
         } catch (e) {
-          MC.log(`Finalize failed: ${e.message}`);
+          MC.log('Campaign: finalize failed:', e.message);
         }
 
         // Navigate back to /campaigns landing
@@ -203,7 +205,8 @@ const CampaignBot = {
         location.href = `https://labs.google.com${prefix}/pomelli/campaigns`;
 
         await MC.sendStatus(job_id, 'complete', `Done! ${downloadedImages.length} assets downloaded.`, {
-          downloaded: downloadedImages
+          downloaded: downloadedImages,
+          collection_id: collectionId
         });
       }
 
@@ -386,8 +389,8 @@ const CampaignBot = {
       }
     }
     if (!btn) btn = card.querySelector('button.animate-button.mdc-button')
-                || card.querySelector('button.animate-button')
-                || card.querySelector('button[aria-label="Animate"]');
+      || card.querySelector('button.animate-button')
+      || card.querySelector('button[aria-label="Animate"]');
 
     if (!btn) { MC.log(`No animate button in card ${index}`); return; }
 

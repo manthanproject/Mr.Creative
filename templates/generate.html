@@ -2582,6 +2582,13 @@
                     if (data.state === 'complete') {
                         document.getElementById('progressTitle').style.color = 'var(--pm-accent)';
                         showToast('Generation complete!', 'success');
+                        if (data.collection_id) {
+                            var msgEl = document.getElementById('progressMessage');
+                            msgEl.innerHTML = data.message +
+                                ' <a href="/collections/' + data.collection_id + '" ' +
+                                'style="color: var(--pm-accent); text-decoration: underline; margin-left: 8px;">' +
+                                '📂 View Collection</a>';
+                        }
                     } else {
                         document.getElementById('progressTitle').style.color = 'var(--pm-danger)';
                     }
