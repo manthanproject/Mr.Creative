@@ -2376,7 +2376,8 @@
                 photoshoot_mode: selectedPhotoshootMode || 'product',
                 image_url: '',
                 image_filename: '',
-                collection_id: document.getElementById('collectionSelect')?.value || ''
+                collection_id: document.getElementById('collectionSelect')?.value || '',
+                target_account: document.getElementById('activeEmail')?.textContent?.trim() || ''
             };
 
             // Get prompt text based on mode

@@ -18,7 +18,7 @@ async function getProfileId() {
 async function detectAccount() {
     try {
         // Check Pomelli tabs
-        let tabs = await chrome.tabs.query({ url: 'https://labs.google.com/pomelli/*' });
+        let tabs = await chrome.tabs.query({ url: ['https://labs.google.com/pomelli/*', 'https://labs.google.com/u/*/pomelli/*'] });
         if (tabs.length === 0) {
             tabs = await chrome.tabs.query({ url: 'https://labs.google/*' });
         }
