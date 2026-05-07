@@ -440,18 +440,8 @@ const CampaignBot = {
         return;
       }
 
-      // Keep waiting if loaders present OR not yet 120s
-      if (totalLoading > 0 || elapsed < 300) {
-        await MC.sleep(8000);
-        continue;
-      }
-
-      // Give up: no loaders AND no new videos AND elapsed > 300
-      if (totalLoading === 0 && videoCount <= videosBefore && elapsed > 300) {
-        MC.log(`Animate gave up: no progress after ${elapsed.toFixed(0)}s`);
-        return;
-      }
-
+      // No early give-up — keep polling until video appears or 10min timeout
+      // (Selenium WAIT_ANIMATE = 600s with no early exit either)
       await MC.sleep(8000);
     }
     MC.log('Animate wait timed out (10 min)');
