@@ -4,13 +4,13 @@
 // Handles: Campaign + Photoshoot modes
 // ═══════════════════════════════════════════
 
-// ── DOM SELECTORS (from Chrome DevTools console dumps, May 5 2026) ──
+// ── DOM SELECTORS (verified May 7 2026) ──
 const SEL = {
   // Campaign landing page (/campaigns)
-  textarea:           'textarea[placeholder*="Describe the campaign"]',
+  textarea:           'textarea',
   imagesBtn:          'button[aria-label="Add image ingredient"]',
   aspectRatioBtn:     'button.aspect-ratio-button',
-  generateIdeasBtn:   'button[aria-label="Generate Ideas"]',
+  generateIdeasBtn:   'button.prompt-send-button',
   productBtn:         'button[aria-label="Add product"]',
 
   // Aspect ratio menu items
@@ -21,21 +21,24 @@ const SEL = {
   uploadComponent:    'app-upload-image-button',
   uploadBtn:          'app-upload-image-button button',
   fileInput:          'app-upload-image-button input[type="file"]',
+  dialogOverlay:      '.cdk-overlay-pane',
   dialogConfirmBtn:   '.cdk-overlay-pane button',  // scan for "Update"/"Confirm" text
+
+  // Idea cards (campaign results)
+  ideaCard:           '.campaign-idea-card',
+  ideaTitle:          '.idea-title',
+  ideaDescription:    '.idea-description',
+  campaignGrid:       '.campaign-grid',
+  deleteIdeaBtn:      'button[aria-label="Delete idea"]',
 
   // Creatives page (after idea selected)
   creativeGrid:       'div.creative-grid',
   creativeCard:       'div.creative-card-container',
   creativeCardImg:    'div.creative-card-container img',
-  animateBtn:         'button[aria-label="Animate"]',
+  animateBtn:         'button.animate-button',  // opacity:0, needs hover first
   animateNoTextBtn:   'button[aria-label="Animate without text"]',
   moreBtn:            'button[aria-label="More"]',
   backBtn:            'button.back-button',
-  addCreativeBtn:     'button',  // text "Add Creative"
-
-  // Idea cards (campaign results)
-  ideaCard:           'mat-card, [class*="idea-card"], [class*="suggestion"]',
-  deleteIdeaBtn:      'button[aria-label="Delete idea"]',
 
   // Photoshoot page
   photoshootModeCard: 'div.photoshoot-branch-button',
@@ -131,17 +134,12 @@ const CampaignBot = {
       const ideaCards = await this._waitForIdeaCards();
       MC.log(`Campaign: ${ideaCards.length} ideas generated`);
 
-      // Step 7: Build deduped ideas list (selector matches nested wrappers, tripling cards)
-      const ideas = [];
-      const seenTexts = new Set();
-      ideaCards.forEach((card, originalIndex) => {
-        const text = this._getIdeaText(card);
-        if (text && !seenTexts.has(text)) {
-          seenTexts.add(text);
-          ideas.push({ index: originalIndex, text });
-        }
-      });
-      MC.log(`Campaign: ${ideas.length} unique ideas (from ${ideaCards.length} matched cards)`);
+      // Step 7: Build ideas list (3 cards = 3 ideas, no dedup needed with verified selector)
+      const ideas = ideaCards.map((card, i) => ({
+        index: i,
+        text: this._getIdeaText(card)
+      }));
+      MC.log(`Campaign: ${ideas.length} ideas`);
       await MC.sendStatus(job_id, 'waiting_selection', 'Select a campaign idea...', { ideas });
 
       // Step 8: Wait for user selection from server
@@ -149,37 +147,43 @@ const CampaignBot = {
       const selection = await this._waitForSelection(job_id);
 
       if (selection && selection.idea_index !== undefined) {
-        // Map deduped display index back to original card index
         const allCards = this._getVisibleIdeaCards();
-        const chosen = ideas[selection.idea_index];
-        const originalIndex = chosen ? chosen.index : selection.idea_index;
-        if (allCards[originalIndex]) {
-          MC.click(allCards[originalIndex]);
-          MC.log(`Campaign: selected idea ${selection.idea_index} (original card ${originalIndex})`);
+        if (allCards[selection.idea_index]) {
+          MC.click(allCards[selection.idea_index]);
+          MC.log(`Campaign: selected idea ${selection.idea_index}`);
         }
 
         // Step 9: Wait for creatives to load
         await MC.sendStatus(job_id, 'generating', 'Generating creatives...');
         await this._waitForCreatives();
 
-        // Step 10: Extract creative images and send to server
-        const images = this._extractCreativeImages();
-        MC.log(`Campaign: ${images.length} creatives ready`);
-        await MC.sendStatus(job_id, 'waiting_animate', 'Select images to animate...', { images });
+        // Step 10: Smart animate — only Story (9:16) supports animation
+        const animateSupported = (aspect_ratio || '').includes('9:16') || aspect_ratio === 'story';
+        if (animateSupported) {
+          const images = this._extractCreativeImages();
+          MC.log(`Campaign: ${images.length} creatives ready for animate selection`);
+          await MC.sendStatus(job_id, 'waiting_animate', 'Select images to animate...', { images });
 
-        // Step 11: Wait for animate selection
-        const animateSelection = await this._waitForSelection(job_id);
-
-        if (animateSelection && animateSelection.animate_indices) {
-          // Animate only selected cards
-          for (const idx of animateSelection.animate_indices) {
-            await this._animateCard(idx, job_id);
+          // Step 11: Wait for animate selection
+          const animateSelection = await this._waitForSelection(job_id);
+          if (animateSelection && animateSelection.animate_indices) {
+            for (const idx of animateSelection.animate_indices) {
+              await this._animateCard(idx, job_id);
+            }
           }
+        } else {
+          MC.log(`Campaign: aspect ratio ${aspect_ratio} doesn't support animate — skipping`);
         }
 
         // Step 12: Download all images
         await MC.sendStatus(job_id, 'downloading', 'Downloading images...');
         const downloadedImages = await this._downloadAllCards();
+
+        // Navigate back to /campaigns landing
+        const m = location.pathname.match(/^(\/u\/\d+)?\//);
+        const prefix = (m && m[1]) || '';
+        location.href = `https://labs.google.com${prefix}/pomelli/campaigns`;
+
         await MC.sendStatus(job_id, 'complete', `Done! ${downloadedImages.length} assets downloaded.`, {
           downloaded: downloadedImages
         });
@@ -252,20 +256,17 @@ const CampaignBot = {
 
   // ── Get visible idea cards ──
   _getVisibleIdeaCards() {
-    const cards = [];
-    const containers = document.querySelectorAll('mat-card, [class*="idea"], [class*="suggestion-card"]');
-    for (const c of containers) {
-      if (c.offsetHeight > 0 && c.textContent.trim().length > 20) {
-        cards.push(c);
-      }
-    }
-    return cards;
+    return Array.from(document.querySelectorAll(SEL.ideaCard))
+      .filter(c => c.offsetHeight > 0);
   },
 
   _getIdeaText(card) {
-    const clone = card.cloneNode(true);
-    clone.querySelectorAll('button, mat-icon, .mat-icon').forEach(el => el.remove());
-    return clone.textContent.trim().substring(0, 200);
+    const title = card.querySelector(SEL.ideaTitle);
+    const desc = card.querySelector(SEL.ideaDescription);
+    const t = title ? title.textContent.trim() : '';
+    const d = desc ? desc.textContent.trim() : '';
+    if (t && d) return `${t} — ${d}`;
+    return t || d;
   },
 
   // ── Wait for creatives (images) to load ──
@@ -328,23 +329,52 @@ const CampaignBot = {
   // ── Animate a specific card by index ──
   async _animateCard(index, jobId) {
     const cards = document.querySelectorAll(SEL.creativeCard);
-    if (!cards[index]) return;
+    if (!cards[index]) { MC.log(`No card at index ${index}`); return; }
 
     const card = cards[index];
-    const animBtn = card.querySelector(SEL.animateBtn.replace('button', '') + ', button.animate-button');
+    card.scrollIntoView({ block: 'center', behavior: 'instant' });
+    await MC.sleep(400);
 
-    // Find animate button inside this specific card
-    const btn = card.querySelector('button.animate-button') ||
-                card.querySelector('button[aria-label="Animate"]');
+    // Reveal opacity:0 buttons via non-bubbling hover events
+    for (const evtName of ['mouseenter', 'pointerenter']) {
+      card.dispatchEvent(new MouseEvent(evtName, { bubbles: false, cancelable: true }));
+    }
+    await MC.sleep(600);
+
+    // Pick the mdc-button variant (NOT mdc-icon-button)
+    const animateButtons = card.querySelectorAll('button.animate-button');
+    let btn = null;
+    for (const b of animateButtons) {
+      if (b.classList.contains('mdc-button') && !b.classList.contains('mdc-icon-button')) {
+        btn = b;
+        break;
+      }
+    }
+    if (!btn) btn = card.querySelector('button.animate-button.mdc-button')
+                || card.querySelector('button.animate-button')
+                || card.querySelector('button[aria-label="Animate"]');
 
     if (!btn) { MC.log(`No animate button in card ${index}`); return; }
 
     await MC.sendStatus(jobId, 'animating', `Animating card ${index + 1}...`);
     MC.click(btn);
 
-    // Wait for animation to complete (video element appears or loading finishes)
-    await MC.sleep(30000);  // Animations take ~30s
-    MC.log(`Card ${index} animated`);
+    // Wait for animation: shimmers/spinners go to 0 AND a <video> appears in this card
+    const start = Date.now();
+    const timeout = 120000;
+    while (Date.now() - start < timeout) {
+      const visible = (sel, root = document) => Array.from(root.querySelectorAll(sel))
+        .filter(el => el.offsetParent !== null).length;
+      const shimmer = visible('app-shimmer-loader', card);
+      const spinner = visible('mat-progress-spinner', card);
+      const video = card.querySelector('video');
+      if (shimmer === 0 && spinner === 0 && video) {
+        MC.log(`Card ${index} animated (video appeared after ${((Date.now()-start)/1000).toFixed(1)}s)`);
+        return;
+      }
+      await MC.sleep(3000);
+    }
+    MC.log(`Card ${index} animate wait timed out — continuing`);
   },
 
   // ── Download all creative card images ──

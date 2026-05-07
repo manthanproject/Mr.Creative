@@ -113,29 +113,23 @@ async function checkForCommand() {
     } catch (e) {}
 }
 
-// ── Dispatch job to the right tab ──
-async function dispatchJob(job) {
-    const targetUrl = getTargetUrl(job.job_type);
-    const tabs = await chrome.tabs.query({ url: targetUrl + '*' });
-    let tab;
-
-    if (tabs.length > 0) {
-        tab = tabs[0];
-        await chrome.tabs.update(tab.id, { active: true });
-
-        // If tab is on a sub-page (e.g. /campaigns/b-xxx), navigate to landing first
-        if (tab.url && tab.url !== targetUrl && tab.url !== targetUrl + '/') {
-            console.log('[MC-BG] Tab on sub-page, navigating to landing:', targetUrl);
-            await chrome.tabs.update(tab.id, { url: targetUrl });
-            await waitForTabLoad(tab.id);
-            await new Promise(r => setTimeout(r, 5000));  // Angular bootstrap
-        }
-    } else {
-        tab = await chrome.tabs.create({ url: targetUrl });
-        await waitForTabLoad(tab.id);
-        await new Promise(r => setTimeout(r, 10000));
+// ── Build landing URL preserving any /u/N/ prefix from an existing tab URL ──
+function buildLandingUrl(jobType, existingTabUrl) {
+    let prefix = '';
+    if (existingTabUrl) {
+        const m = existingTabUrl.match(/^https:\/\/labs\.google\.com(\/u\/\d+)?\//);
+        if (m && m[1]) prefix = m[1];
     }
+    switch (jobType) {
+        case 'campaign':   return `https://labs.google.com${prefix}/pomelli/campaigns`;
+        case 'photoshoot': return `https://labs.google.com${prefix}/pomelli/photoshoot`;
+        case 'flow': case 'aplus': return 'https://labs.google/fx/tools/flow';
+        default: return `https://labs.google.com${prefix}/pomelli/campaigns`;
+    }
+}
 
+// ── Send the job to a tab + ACK ──
+async function sendJobToTab(tab, job) {
     try {
         await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job });
         console.log('[MC-BG] Job dispatched to tab', tab.id);
@@ -149,6 +143,46 @@ async function dispatchJob(job) {
         await new Promise(r => setTimeout(r, 5000));
         try { await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job }); } catch (e2) {}
     }
+}
+
+// ── Dispatch job to the right tab ──
+async function dispatchJob(job) {
+    // Query both URL patterns (with and without /u/N/ prefix)
+    const queries = [];
+    if (job.job_type === 'flow' || job.job_type === 'aplus') {
+        queries.push('https://labs.google/fx/tools/flow*');
+    } else {
+        queries.push('https://labs.google.com/pomelli/*');
+        queries.push('https://labs.google.com/u/*/pomelli/*');
+    }
+
+    let tabs = [];
+    for (const q of queries) {
+        const found = await chrome.tabs.query({ url: q });
+        tabs.push(...found);
+    }
+
+    let tab;
+    if (tabs.length > 0) {
+        tab = tabs[0];
+        const targetUrl = buildLandingUrl(job.job_type, tab.url);
+        await chrome.tabs.update(tab.id, { active: true });
+
+        // If tab is on a sub-page (e.g. /campaigns/b-xxx), navigate to landing first
+        if (tab.url && tab.url !== targetUrl && tab.url !== targetUrl + '/') {
+            console.log('[MC-BG] Tab on sub-page, navigating to landing:', targetUrl);
+            await chrome.tabs.update(tab.id, { url: targetUrl });
+            await waitForTabLoad(tab.id);
+            await new Promise(r => setTimeout(r, 5000));  // Angular bootstrap
+        }
+    } else {
+        const targetUrl = buildLandingUrl(job.job_type, null);
+        tab = await chrome.tabs.create({ url: targetUrl });
+        await waitForTabLoad(tab.id);
+        await new Promise(r => setTimeout(r, 10000));
+    }
+
+    await sendJobToTab(tab, job);
 }
 
 function getTargetUrl(jobType) {
