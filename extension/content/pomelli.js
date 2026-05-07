@@ -413,9 +413,8 @@ const CampaignBot = {
       const spinner = visible('mat-progress-spinner');
       const progress = visible('app-generation-progress-loader .text');
       const totalLoading = shimmer + spinner + progress;
-      const videos = Array.from(document.querySelectorAll('video'))
-        .filter(v => v.src && v.src.startsWith('http'));
-      const videoCount = videos.length;
+      const videoEls = document.querySelectorAll('video');
+      const videoCount = videoEls.length;
       const elapsed = (Date.now() - start) / 1000;
 
       // Detect "high demand" / rate-limit error
@@ -441,13 +440,13 @@ const CampaignBot = {
       }
 
       // Keep waiting if loaders present OR not yet 120s
-      if (totalLoading > 0 || elapsed < 120) {
+      if (totalLoading > 0 || elapsed < 300) {
         await MC.sleep(8000);
         continue;
       }
 
-      // Give up: no loaders AND no new videos AND elapsed > 120
-      if (totalLoading === 0 && videoCount <= videosBefore && elapsed > 120) {
+      // Give up: no loaders AND no new videos AND elapsed > 300
+      if (totalLoading === 0 && videoCount <= videosBefore && elapsed > 300) {
         MC.log(`Animate gave up: no progress after ${elapsed.toFixed(0)}s`);
         return;
       }
