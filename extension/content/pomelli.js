@@ -501,7 +501,34 @@ const CampaignBot = {
         MC.log(`  [${i}] download failed: ${e.message}`);
       }
     }
-    MC.log(`Downloaded ${downloaded.length}/${srcs.length}`);
+    // Download videos (animated cards create new cards with <video>)
+    const videos = document.querySelectorAll('video');
+    for (const video of videos) {
+      const src = video.src || video.currentSrc || '';
+      if (src && src.startsWith('http')) {
+        try {
+          MC.log(`Downloading video: ${src.substring(0, 80)}...`);
+          const resp = await fetch(src, { credentials: 'include' });
+          const blob = await resp.blob();
+          const dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          await fetch(`${MC.SERVER}/api/ext/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: dataUri, index: downloaded.length, is_base64: true, job_id: jobId })
+          });
+          MC.log(`Video saved: ${blob.size} bytes`);
+          downloaded.push(src);
+        } catch (e) {
+          MC.log(`Video download failed: ${e.message}`);
+        }
+      }
+    }
+
+    MC.log(`Downloaded ${downloaded.length} total (images + videos)`);
     return downloaded;
   },
 
