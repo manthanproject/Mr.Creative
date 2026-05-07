@@ -110,7 +110,9 @@ async function checkForCommand() {
         if (!cmd || !cmd.job_id) return;
         console.log('[MC-BG] Received command:', cmd.job_type, cmd.job_id);
         await dispatchJob(cmd);
-    } catch (e) {}
+    } catch (e) {
+        console.error('[MC-BG] checkForCommand error:', e.message || e);
+    }
 }
 
 // ── Build landing URL preserving any /u/N/ prefix from an existing tab URL ──
@@ -130,19 +132,22 @@ function buildLandingUrl(jobType, existingTabUrl) {
 
 // ── Send the job to a tab + ACK ──
 async function sendJobToTab(tab, job) {
-    try {
-        await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job });
-        console.log('[MC-BG] Job dispatched to tab', tab.id);
-        await fetch(`${SERVER}/api/ext/ack`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ job_id: job.job_id, profile_id: profileId })
-        });
-    } catch (e) {
-        console.error('[MC-BG] Dispatch failed, retrying...', e);
-        await new Promise(r => setTimeout(r, 5000));
-        try { await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job }); } catch (e2) {}
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            await chrome.tabs.sendMessage(tab.id, { type: 'RUN_JOB', job });
+            console.log('[MC-BG] Job dispatched to tab', tab.id, 'attempt', attempt);
+            await fetch(`${SERVER}/api/ext/ack`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_id: job.job_id, profile_id: profileId })
+            });
+            return;  // success
+        } catch (e) {
+            console.warn(`[MC-BG] Dispatch attempt ${attempt}/3 failed:`, e.message);
+            if (attempt < 3) await new Promise(r => setTimeout(r, 5000));
+        }
     }
+    console.error('[MC-BG] All dispatch attempts failed for', job.job_id);
 }
 
 // ── Dispatch job to the right tab ──
@@ -173,7 +178,7 @@ async function dispatchJob(job) {
             console.log('[MC-BG] Tab on sub-page, navigating to landing:', targetUrl);
             await chrome.tabs.update(tab.id, { url: targetUrl });
             await waitForTabLoad(tab.id);
-            await new Promise(r => setTimeout(r, 5000));  // Angular bootstrap
+            await new Promise(r => setTimeout(r, 10000));  // Angular bootstrap + content script init
         }
     } else {
         const targetUrl = buildLandingUrl(job.job_type, null);
