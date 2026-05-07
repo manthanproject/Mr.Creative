@@ -417,9 +417,10 @@ const CampaignBot = {
       const videoCount = videoEls.length;
       const elapsed = (Date.now() - start) / 1000;
 
-      // Detect "high demand" / rate-limit error
-      const errBanner = Array.from(document.querySelectorAll('*'))
-        .some(el => el.textContent && /high demand|try again later|unusual activity/i.test(el.textContent.slice(0, 200)));
+      // Detect "high demand" / rate-limit error (check visible snackbars/banners only)
+      const bannerSels = 'snack-bar-container, .mat-mdc-snack-bar-container, [role="alert"], .error-banner, .cdk-overlay-pane';
+      const errBanner = Array.from(document.querySelectorAll(bannerSels))
+        .some(el => el.offsetParent !== null && /high demand|try again later|unusual activity/i.test(el.textContent || ''));
 
       if (Date.now() - lastLog > 8000) {
         MC.log(`Animate poll: shimmer=${shimmer}, spinner=${spinner}, progress=${progress}, videos=${videoCount}, elapsed=${elapsed.toFixed(0)}s`);
@@ -500,10 +501,23 @@ const CampaignBot = {
         MC.log(`  [${i}] download failed: ${e.message}`);
       }
     }
-    // Download videos (animated cards create new cards with <video>)
+    // Download videos — check <source> children too (same as Selenium)
+    window.scrollTo(0, 0);
+    await MC.sleep(1000);
+    window.scrollTo(0, document.body.scrollHeight / 2);
+    await MC.sleep(1000);
+    window.scrollTo(0, 0);
+    await MC.sleep(2000);
     const videos = document.querySelectorAll('video');
+    MC.log(`Found ${videos.length} video elements on page`);
     for (const video of videos) {
-      const src = video.src || video.currentSrc || '';
+      let src = video.src || video.currentSrc || '';
+        const sources = video.querySelectorAll('source');
+        for (const s of sources) {
+          if (s.src && s.src.startsWith('http')) { src = s.src; break; }
+        }
+      }
+      MC.log(`Video element: src=${src.substring(0, 80)}`);
       if (src && src.startsWith('http')) {
         try {
           MC.log(`Downloading video: ${src.substring(0, 80)}...`);
