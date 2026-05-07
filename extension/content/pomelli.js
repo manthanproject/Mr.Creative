@@ -611,70 +611,96 @@ const PhotoshootBot = {
         }
       }
 
-      // Step 5: Upload product image
+      // Step 5: Upload product image (click first button.edit-button)
       if (image_url) {
-        await MC.sendStatus(job_id, 'entering_prompt', `Uploading: ${image_filename}`);
-
-        // Click Product Image edit button (first edit)
-        const editBtns = document.querySelectorAll('button');
-        for (const btn of editBtns) {
-          if (btn.textContent.includes('edit') && btn.offsetHeight > 0) {
-            MC.click(btn);
-            break;
-          }
+        await MC.sendStatus(job_id, 'entering_prompt', 'Uploading product image...');
+        const editBtns = document.querySelectorAll('button.edit-button');
+        if (editBtns[0]) {
+          MC.click(editBtns[0]);
+          MC.log('Photoshoot: clicked Product Image edit');
+          await MC.sleep(2000);
         }
-        await MC.sleep(2000);
 
-        // Find file input
         const fileInput = document.querySelector(SEL.psFileInput);
         if (fileInput) {
           await MC.uploadFile(fileInput, image_url, image_filename);
           MC.log('Photoshoot: image uploaded');
           await MC.sleep(5000);
 
-          // Click Looks Good
-          const lgBtn = await MC.waitForText('button', 'Looks Good', 10000);
-          if (lgBtn) MC.click(lgBtn);
-          await MC.sleep(2000);
+          const lgBtn = await MC.waitForText('button', 'Looks Good', 15000);
+          if (lgBtn) { MC.click(lgBtn); MC.log('Photoshoot: Looks Good (image)'); }
+          await MC.sleep(3000);
         }
       }
 
-      // Step 6: Select templates
+      // Step 6: Select templates (click second button.edit-button)
       if (templates && templates.length) {
-        await MC.sendStatus(job_id, 'entering_prompt', `Selecting templates...`);
+        await MC.sendStatus(job_id, 'entering_prompt', 'Selecting templates...');
 
-        // Click Templates edit (second edit)
-        // Wait for Templates button to be enabled
-        await MC.sleep(3000);
-        const editBtns2 = document.querySelectorAll('button');
-        let clickedEdit = false;
-        for (const btn of editBtns2) {
-          if (btn.textContent.includes('edit') && btn.offsetHeight > 0 && !btn.disabled) {
-            MC.click(btn);
-            clickedEdit = true;
-            break;
+        // Wait for Templates ingredient to be enabled
+        for (let w = 0; w < 15; w++) {
+          if (!document.querySelector('.ingredient.disabled')) break;
+          await MC.sleep(1000);
+        }
+        await MC.sleep(1000);
+
+        // Click second edit button (Templates)
+        const editBtns2 = document.querySelectorAll('button.edit-button');
+        if (editBtns2[1]) {
+          MC.click(editBtns2[1]);
+          MC.log('Photoshoot: clicked Templates edit');
+          await MC.sleep(3000);
+        } else {
+          MC.log('Photoshoot: Templates edit button not found');
+        }
+
+        // Match user templates: deselect unwanted, select wanted
+        const wantSet = new Set(templates.map(t => t.toLowerCase().trim()));
+        const allCards = document.querySelectorAll('div.shot-thumbnail');
+        MC.log('Photoshoot: ' + allCards.length + ' template cards, want: ' + templates.join(', '));
+
+        for (const card of allCards) {
+          if (card.offsetHeight === 0) continue;
+          const label = card.textContent.replace('check', '').replace('arrow_drop_down', '').trim().toLowerCase();
+          const isSelected = card.classList.contains('selected');
+          const isDisabled = card.classList.contains('disabled');
+
+          if (isSelected && !wantSet.has(label)) {
+            MC.click(card);
+            MC.log('Photoshoot: deselected ' + label);
+            await MC.sleep(500);
+          } else if (!isSelected && !isDisabled && wantSet.has(label)) {
+            MC.click(card);
+            MC.log('Photoshoot: selected ' + label);
+            await MC.sleep(500);
           }
         }
-        if (!clickedEdit) MC.log('Photoshoot: edit button not found for templates');
-        await MC.sleep(3000);
 
-        // Read current templates and swap
-        await this._selectTemplates(templates);
-
-        // Click Looks Good
         const lgBtn2 = await MC.waitForText('button', 'Looks Good', 10000);
-        if (lgBtn2) MC.click(lgBtn2);
-        await MC.sleep(1000);
+        if (lgBtn2) { MC.click(lgBtn2); MC.log('Photoshoot: Looks Good (templates)'); }
+        await MC.sleep(2000);
       }
 
       // Step 7: Click Generate Photoshoot
       await MC.sendStatus(job_id, 'generating', 'Generating photoshoot...');
-      const genBtn = MC.btnByText('Generate Photoshoot') || MC.btnByText('Generate');
-      if (genBtn) MC.click(genBtn);
+      const genBtn = await MC.waitForText('button', 'Generate Photoshoot', 5000);
+      if (genBtn) { MC.click(genBtn); MC.log('Photoshoot: clicked Generate'); }
 
-      // Step 8: Wait for images
+      // Step 8: Wait for images (same shimmer check as campaign)
       await MC.sendStatus(job_id, 'generating', 'Waiting for images...');
-      await this._waitForImages();
+      const psStart = Date.now();
+      while (Date.now() - psStart < 300000) {
+        const shim = [...document.querySelectorAll('app-shimmer-loader')].filter(s => s.offsetParent).length;
+        const spin = [...document.querySelectorAll('mat-progress-spinner')].filter(s => s.offsetParent).length;
+        const prog = [...document.querySelectorAll('app-generation-progress-loader .text')].filter(t => t.offsetParent).length;
+        const elapsed = Math.round((Date.now() - psStart) / 1000);
+        MC.log('Photoshoot: shimmer=' + shim + ' spinner=' + spin + ' progress=' + prog + ' (' + elapsed + 's)');
+        if (shim === 0 && spin === 0 && prog === 0 && elapsed > 15) {
+          MC.log('Photoshoot: all images loaded');
+          break;
+        }
+        await MC.sleep(5000);
+      }
 
       // Step 9: Download via fetch+base64 (same as CampaignBot)
       await MC.sendStatus(job_id, 'downloading', 'Downloading...');
