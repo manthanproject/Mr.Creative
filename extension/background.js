@@ -148,6 +148,15 @@ async function sendJobToTab(tab, job) {
         }
     }
     console.error('[MC-BG] All dispatch attempts failed for', job.job_id);
+    // Put job back on server so content script can pick it up
+    try {
+        await fetch(SERVER + '/api/ext/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(job)
+        });
+        console.log('[MC-BG] Job returned to server for content script pickup');
+    } catch (e2) {}
 }
 
 // ── Dispatch job to the right tab ──
