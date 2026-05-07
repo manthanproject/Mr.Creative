@@ -676,20 +676,61 @@ const PhotoshootBot = {
       await MC.sendStatus(job_id, 'generating', 'Waiting for images...');
       await this._waitForImages();
 
-      // Step 9: Download
+      // Step 9: Download via fetch+base64 (same as CampaignBot)
       await MC.sendStatus(job_id, 'downloading', 'Downloading...');
-      const images = MC.getCardImages('img.thumbnail, img[class*="generated"]');
-      MC.log(`Photoshoot: ${images.length} images ready`);
+      window.scrollTo(0, document.body.scrollHeight);
+      await MC.sleep(1000);
+      window.scrollTo(0, 0);
+      await MC.sleep(1000);
 
-      for (let i = 0; i < images.length; i++) {
-        await fetch(`${MC.SERVER}/api/ext/download`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: images[i], index: i, job_id })
-        });
+      const cards = document.querySelectorAll('.creative-card-container, .shot-result-card, .generated-image');
+      const allImgs = cards.length > 0
+        ? [...cards].map(c => c.querySelector('img')).filter(i => i && i.src && (i.naturalWidth||0) > 0)
+        : [...document.querySelectorAll('img')].filter(i => i.offsetParent && i.src && (i.naturalWidth||0) > 200);
+      const uniqueSrcs = [...new Set(allImgs.map(i => i.src))];
+      MC.log(`Photoshoot: ${uniqueSrcs.length} images to download`);
+
+      const downloaded = [];
+      for (let i = 0; i < uniqueSrcs.length; i++) {
+        try {
+          const resp = await fetch(uniqueSrcs[i], { credentials: 'include' });
+          const blob = await resp.blob();
+          const dataUri = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          await fetch(`${MC.SERVER}/api/ext/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: dataUri, index: i, is_base64: true, job_id: job_id })
+          });
+          downloaded.push(uniqueSrcs[i]);
+          MC.log(`Photoshoot: saved image ${i+1}/${uniqueSrcs.length}`);
+        } catch (e) {
+          MC.log(`Photoshoot: download failed ${i}: ${e.message}`);
+        }
       }
 
-      await MC.sendStatus(job_id, 'complete', `Done! ${images.length} images downloaded.`);
+      // Save to collection
+      await MC.sendStatus(job_id, 'saving', 'Saving to collection...');
+      let collectionId = '';
+      try {
+        const finRes = await fetch(`${MC.SERVER}/api/ext/finalize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: job_id })
+        });
+        const finData = await finRes.json();
+        collectionId = finData.collection_id || '';
+        MC.log(`Photoshoot: saved to collection ${collectionId}`);
+      } catch (e) {
+        MC.log(`Photoshoot: finalize failed: ${e.message}`);
+      }
+
+      await MC.sendStatus(job_id, 'complete', `Done! ${downloaded.length} images downloaded.`, {
+        downloaded, collection_id: collectionId
+      });
 
     } catch (err) {
       MC.log('Photoshoot error:', err);
