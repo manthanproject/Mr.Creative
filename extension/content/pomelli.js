@@ -502,6 +502,7 @@ const CampaignBot = {
     MC.log(`Found ${videos.length} video elements on page`);
     for (const video of videos) {
       let src = video.src || video.currentSrc || '';
+      if (!src || src.startsWith('blob:') || src.startsWith('data:')) {
         const sources = video.querySelectorAll('source');
         for (const s of sources) {
           if (s.src && s.src.startsWith('http')) { src = s.src; break; }
