@@ -40,8 +40,17 @@ def get_command():
     """Extension polls this — returns job targeted at this profile or any available job."""
     profile_id = request.args.get('profile_id', 'unknown')
     with _lock:
-        # Update last_seen
-        if profile_id in _state['profiles']:
+        # Update last_seen — auto-register if not yet known (e.g. after server restart)
+        if profile_id not in _state['profiles']:
+            _state['profiles'][profile_id] = {
+                'account': 'auto-registered',
+                'capabilities': [],
+                'profile_dir': '',
+                'last_seen': datetime.now().isoformat(),
+                'cooldown_until': None
+            }
+            print(f"[Extension] Auto-registered profile: {profile_id}")
+        else:
             _state['profiles'][profile_id]['last_seen'] = datetime.now().isoformat()
 
         # Check for targeted command first
