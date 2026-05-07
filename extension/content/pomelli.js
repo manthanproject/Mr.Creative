@@ -710,9 +710,8 @@ const PhotoshootBot = {
       await MC.sleep(1000);
 
       const cards = document.querySelectorAll('.creative-card-container, .shot-result-card, .generated-image');
-      const allImgs = cards.length > 0
-        ? [...cards].map(c => c.querySelector('img')).filter(i => i && i.src && (i.naturalWidth||0) > 0)
-        : [...document.querySelectorAll('img')].filter(i => i.offsetParent && i.src && (i.naturalWidth||0) > 200);
+      const allImgs = [...document.querySelectorAll('img')].filter(i =>
+        i.offsetParent && i.src && i.src.includes('pomelli_downloads') && (i.naturalWidth||0) >= 1024);
       const uniqueSrcs = [...new Set(allImgs.map(i => i.src))];
       MC.log(`Photoshoot: ${uniqueSrcs.length} images to download`);
 
@@ -754,8 +753,13 @@ const PhotoshootBot = {
         MC.log(`Photoshoot: finalize failed: ${e.message}`);
       }
 
-      await MC.sendStatus(job_id, 'complete', `Done! ${downloaded.length} images downloaded.`, {
-        downloaded, collection_id: collectionId
+      // Navigate back to photoshoot landing
+      const m = location.pathname.match(/^\/u\/\d+/);
+      const prefix = m ? m[0] : '';
+      location.href = 'https://labs.google.com' + prefix + '/pomelli/photoshoot';
+
+      await MC.sendStatus(job_id, 'complete', 'Done! ' + downloaded.length + ' images downloaded.', {
+        downloaded: downloaded, collection_id: collectionId
       });
 
     } catch (err) {
