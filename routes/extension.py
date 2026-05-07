@@ -146,6 +146,7 @@ def update_status():
                 job['type'] = data.get('type', job.get('type', ''))
                 if 'ideas' in data: job['ideas'] = data['ideas']
                 if 'images' in data: job['images'] = data['images']
+                if 'collection_id' in data: job['collection_id'] = data['collection_id']
 
                 # Handle cooldown (rate limited)
                 msg_lower = data.get('message', '').lower()
