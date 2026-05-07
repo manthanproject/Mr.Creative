@@ -312,15 +312,17 @@ const CampaignBot = {
   // Fetches with credentials → blob → createImageBitmap → canvas thumbnail.
   // Avoids the cross-origin tainted-canvas error from drawing <img> directly.
   async _extractCreativeImages() {
-    const imgs = Array.from(document.querySelectorAll('img'))
-      .filter(img => {
-        if (!img.offsetParent || !img.src) return false;
-        const r = img.getBoundingClientRect();
-        if (r.width <= 100 || r.height <= 100 || r.left <= 0) return false;
-        if ((img.naturalWidth || 0) <= 200) return false;
-        return true;
-      })
-      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    // Trigger lazy-load for cards below the viewport
+    window.scrollTo(0, document.body.scrollHeight);
+    await MC.sleep(800);
+    window.scrollTo(0, 0);
+    await MC.sleep(500);
+
+    const cards = Array.from(document.querySelectorAll(SEL.creativeCard));
+    const imgs = cards
+      .map(c => c.querySelector('img'))
+      .filter(img => img && img.src && (img.naturalWidth || 0) > 0);
+    MC.log(`_extractCreativeImages: ${cards.length} cards, ${imgs.length} with imgs`);
 
     const dataUris = [];
     for (const img of imgs) {
@@ -401,19 +403,20 @@ const CampaignBot = {
   // Server can't fetch Pomelli URLs (auth-gated). Fetch with page cookies,
   // convert to base64 data URI, POST to server with is_base64 flag.
   async _downloadAllCards(jobId) {
+    // Trigger lazy-load for cards below the viewport
+    window.scrollTo(0, document.body.scrollHeight);
+    await MC.sleep(800);
+    window.scrollTo(0, 0);
+    await MC.sleep(500);
+
+    const cards = Array.from(document.querySelectorAll(SEL.creativeCard));
     const srcs = Array.from(new Set(
-      Array.from(document.querySelectorAll('img'))
-        .filter(img => {
-          if (!img.offsetParent || !img.src) return false;
-          const r = img.getBoundingClientRect();
-          if (r.width <= 100 || r.height <= 100 || r.left <= 0) return false;
-          if ((img.naturalWidth || 0) <= 200) return false;
-          return true;
-        })
-        .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
+      cards
+        .map(c => c.querySelector('img'))
+        .filter(img => img && img.src && (img.naturalWidth || 0) > 0)
         .map(img => img.src)
     ));
-    MC.log(`Downloading ${srcs.length} unique images...`);
+    MC.log(`Downloading ${srcs.length} unique images from ${cards.length} cards...`);
 
     const downloaded = [];
     for (let i = 0; i < srcs.length; i++) {
