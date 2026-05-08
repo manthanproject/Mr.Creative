@@ -561,7 +561,7 @@ def advance_queue():
     return jsonify({'ok': True})
 
 
-@bp.route('/api/ext/gemini-result', methods=['POST'])
+@bp.route('/gemini-result', methods=['POST'])
 def post_gemini_result():
     data = request.get_json(force=True)
     job_id = data.get('job_id')
@@ -577,7 +577,7 @@ def post_gemini_result():
     return jsonify({'ok': True})
 
 
-@bp.route('/api/ext/gemini-result/<job_id>', methods=['GET'])
+@bp.route('/gemini-result/<job_id>', methods=['GET'])
 def get_gemini_result(job_id):
     entry = gemini_results.get(job_id)
     if not entry:
