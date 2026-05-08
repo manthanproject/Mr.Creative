@@ -46,11 +46,11 @@ CRITICAL RULES FOR IMAGE PROMPTS:
 - Each image prompt must be COMPLETELY DIFFERENT — vary ALL of these: camera angle (macro/wide/overhead/45-degree), lighting style (studio/natural/dramatic/soft), background (marble/wood/fabric/gradient/contextual), composition (centered/rule-of-thirds/diagonal/flat-lay)
 - NEVER repeat similar setups across modules — if Module 1 uses a jacket flat-lay, NO other module should use clothing
 - Think like a creative director: each image tells a DIFFERENT story about the product
-- Module 1 (Hero Banner): Extreme macro close-up of the most striking product detail — fill the frame, dark background, cinematic rim lighting
-- Module 2 (Single Image & Sidebar): Back-view lifestyle shot showing product in use on clothing/gear — NO face visible, urban/premium setting, moody lighting
-- Module 3 (Three Image & Text): Three DIFFERENT feature close-ups — each highlighting one unique detail/texture/element with a short callout label (e.g. "Intricate Detail", "Premium Material", "Durable Build")
-- Module 4 (Single Image & Light Text): Artistic overhead flat-lay on premium surface (dark marble, brushed metal) with complementary props — styled product photography
-- Module 5 (Four Image & Text): Four technical/specification close-ups showing materials, construction quality, size reference, and application method — include a "Product Specifications" section with dimensions and features
+- Module 1 (Hero Banner): Product hero shot — choose the most impactful angle for THIS product type (macro detail for textured items, full product for sleek items, open/action shot for tools). Dark or gradient background, cinematic lighting
+- Module 2 (Single Image & Sidebar): Product in its natural usage context — on a vanity for beauty, on a desk for tech, on a surface for accessories. NO people. Show the product being "used" through context clues only (open lid, applied texture, etc.)
+- Module 3 (Three Image & Text): Three DIFFERENT product features — each a unique close-up highlighting one selling point (texture, mechanism, material, design element). Each with a short feature callout label
+- Module 4 (Single Image & Light Text): Artistic styled flat-lay on premium surface with complementary props relevant to the product category. Overhead angle, styled photography
+- Module 5 (Four Image & Text): Four detail shots — ingredients/materials, size/scale reference, packaging quality, and key differentiator. Include "Product Specifications" copy with dimensions and key features
 - Use cinematic lighting descriptions: golden hour, moody backlighting, soft diffused studio light, dramatic rim lighting
 - Suggest premium backgrounds: marble, dark wood, brushed metal, linen fabric, gradient studio
 
