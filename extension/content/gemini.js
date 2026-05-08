@@ -40,26 +40,21 @@ Format your response as a SINGLE code block with the complete prompt text. No ex
   flow: `You are an expert Amazon Listing Optimizer, Copywriter, and E-commerce Art Director. Analyze this product image and generate a complete Amazon A+ Content Layout prompt for FLOW AI.
 
 CRITICAL RULES FOR IMAGE PROMPTS:
-- NEVER include people, models, hands, or human figures in any image prompt — product-only shots always
-- NEVER use copyrighted character names (e.g. brand mascots, anime characters, movie heroes) in image prompts — describe the visual design instead (e.g. describe visual elements: "character with red eyes and dark cloak design")
-- Focus on: product close-ups, flat lays, lifestyle context shots (on surfaces, with props), macro detail shots, creative compositions
-- Each image prompt must be COMPLETELY DIFFERENT — vary ALL of these: camera angle (macro/wide/overhead/45-degree), lighting style (studio/natural/dramatic/soft), background (marble/wood/fabric/gradient/contextual), composition (centered/rule-of-thirds/diagonal/flat-lay)
-- NEVER repeat similar setups across modules — every module must have a completely different composition, angle, and context
-- Think like a creative director: each image tells a DIFFERENT story about the product
-- Module 1 (Hero Banner): Product hero shot — choose the most impactful angle for THIS product type (macro detail for textured items, full product for sleek items, open/action shot for tools). Dark or gradient background, cinematic lighting
-- Module 2 (Single Image & Sidebar): Product in its natural usage context — on a vanity for beauty, on a desk for tech, on a surface for accessories. NO people. Show the product being "used" through context clues only (open lid, applied texture, etc.)
-- Module 3 (Three Image & Text): Three DIFFERENT product features — each a unique close-up highlighting one selling point (texture, mechanism, material, design element). Each with a short feature callout label
-- Module 4 (Single Image & Light Text): Artistic styled flat-lay on premium surface with complementary props relevant to the product category. Overhead angle, styled photography
-- Module 5 (Four Image & Text): Four detail shots — ingredients/materials, size/scale reference, packaging quality, and key differentiator. Include "Product Specifications" copy with dimensions and key features
-- Use cinematic lighting descriptions: golden hour, moody backlighting, soft diffused studio light, dramatic rim lighting
-- Suggest premium backgrounds: marble, dark wood, brushed metal, linen fabric, gradient studio
+- NEVER include people, models, hands, or human figures — product-only shots always
+- NEVER use copyrighted character names — describe visual design elements instead
+- Each image prompt must describe ONE single cohesive photograph — NOT a collage or grid
+- Every image must be COMPLETELY DIFFERENT in angle, lighting, background, and composition
+- Use cinematic lighting: rim lighting, golden hour, moody backlighting, soft diffused studio light
+- Use premium backgrounds: marble, dark wood, brushed metal, linen fabric, gradient studio
 
 The prompt must include:
-- Product Description based on what you see (describe visuals without using copyrighted names)
+- Product Description based on what you see (describe visuals without copyrighted names)
 - Target Audience
 - Tone
-- 5 A+ Content Modules (Standard Company Logo/Hero Banner, Standard Single Image & Sidebar, Standard Three Image & Text, Standard Single Image & Light Text, Standard Four Image & Text)
-- For each module: Image Prompt (product-only, no people, no character names) + Copy instructions
+- A+ Content Modules with: image prompts + headline + body copy for each
+- Key product features and specifications
+
+Keep image prompts focused and specific — each one should paint a clear picture of a single premium product photograph.
 
 Format your response as a SINGLE code block with the complete prompt. No explanations outside the code block.`,
 
