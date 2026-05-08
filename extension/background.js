@@ -41,14 +41,15 @@ async function detectAccount() {
 
 // ── Detect what this profile can do ──
 async function detectCapabilities() {
-    const caps = [];
-    const pomelliTabs = await chrome.tabs.query({ url: 'https://labs.google.com/pomelli/*' });
-    const flowTabs = await chrome.tabs.query({ url: 'https://labs.google/fx/*' });
-
-    // If tabs exist or URLs are accessible, add capabilities
-    caps.push('campaign', 'photoshoot');  // Pomelli is always accessible
-    caps.push('flow');  // Flow too
-
+    const caps = ['campaign', 'photoshoot', 'flow'];
+    try {
+        const data = await chrome.storage.local.get('extraCapabilities');
+        if (data.extraCapabilities && Array.isArray(data.extraCapabilities)) {
+            for (const c of data.extraCapabilities) {
+                if (!caps.includes(c)) caps.push(c);
+            }
+        }
+    } catch (e) {}
     return caps;
 }
 
