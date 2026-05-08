@@ -10,7 +10,7 @@ const FSEL = {
   settingsBtn:    'button.sc-3bb56e4a-0',
   aspectRatio:    '.flow_tab_slider_trigger',
   fileInput:      'input[type="file"][accept="image/*"]',
-  resultImages:   'img[src*="blob:"], img[src*="lh3.google"], img[src*="generated"]',
+  resultImages:   'a[href*="/edit/"] img[src*="getMediaUrlRedirect"], img[src*="blob:"], img[src*="lh3.google"]',
   spinners:       '[class*="loading"], [class*="spinner"], mat-spinner, [class*="shimmer"]',
 };
 
@@ -122,17 +122,12 @@ const FlowBot = {
   },
 
   async _clickSubmit() {
-    var submitBtn = document.querySelector(FSEL.submitBtn);
+    // Match Selenium: find button with BOTH 'Create' AND 'arrow_forward', must be visible
+    var submitBtn = [...document.querySelectorAll('button')].find(function(b) {
+      return b.offsetParent && b.textContent.includes('Create') && b.textContent.includes('arrow_forward');
+    });
     if (!submitBtn) {
-      submitBtn = [...document.querySelectorAll('button')].find(function(b) {
-        return b.textContent.includes('arrow_forward') && b.textContent.includes('Create');
-      });
-    }
-    if (!submitBtn) {
-      submitBtn = [...document.querySelectorAll('button')].find(function(b) {
-        var t = b.textContent.trim();
-        return t.endsWith('Create') && t.includes('arrow');
-      });
+      submitBtn = document.querySelector(FSEL.submitBtn);
     }
     if (submitBtn) {
       MC.click(submitBtn);
