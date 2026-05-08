@@ -89,9 +89,28 @@ const GeminiBot = {
       const inputEl = document.querySelector(GSEL.inputField);
       if (!inputEl) throw new Error('Input field not found');
       inputEl.focus();
-      inputEl.innerHTML = '';
-      document.execCommand('insertText', false, fullPrompt);
+      await MC.sleep(500);
+
+      // Gemini uses a rich editor — execCommand doesn't work reliably
+      // Use paragraph insertion instead
+      inputEl.innerHTML = '<p>' + fullPrompt.replace(/\n/g, '</p><p>') + '</p>';
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
       await MC.sleep(1000);
+
+      // Verify text was entered
+      if (inputEl.textContent.trim().length < 20) {
+        MC.log('Gemini: paragraph method failed, trying clipboard paste');
+        inputEl.focus();
+        inputEl.innerHTML = '';
+        // Fallback: simulate paste
+        const clipData = new DataTransfer();
+        clipData.setData('text/plain', fullPrompt);
+        const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: clipData });
+        inputEl.dispatchEvent(pasteEvent);
+        await MC.sleep(1000);
+      }
+      MC.log('Gemini: input field text length:', inputEl.textContent.trim().length);
 
       await MC.sendStatus(job_id, 'generating', 'Sending to Gemini...');
       const sendBtn = document.querySelector(GSEL.sendBtn);
