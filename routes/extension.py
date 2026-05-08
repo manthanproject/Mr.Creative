@@ -162,7 +162,9 @@ def update_status():
                     job['completed_at'] = datetime.now().isoformat()
                 break
         # Capture gemini result if present in the complete status
-    _extra = data.get('data', {}) if isinstance(data.get('data'), dict) else {}
+    _extra = data.get('data', {})
+    if data.get('state') == 'complete':
+        print(f"[DEBUG-GEMINI] job={job_id} extra_keys={list(_extra.keys()) if isinstance(_extra, dict) else 'NOT_DICT'} has_result={'gemini_result' in _extra if isinstance(_extra, dict) else False}") if isinstance(data.get('data'), dict) else {}
     if data.get('state') == 'complete' and _extra.get('gemini_result'):
         gemini_results[job_id] = {
             'prompt_type': _extra.get('prompt_type', ''),

@@ -278,4 +278,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ── Auto-start ──
 registerWithServer();
 startPolling();
+
+// Re-register every 60s to survive server restarts
+setInterval(() => { registerWithServer(); }, 60000);
 console.log('[MC-BG] Mr.Creative background worker loaded');
