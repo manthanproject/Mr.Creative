@@ -72,7 +72,7 @@ def get_command():
             if cooldown and datetime.fromisoformat(cooldown) > datetime.now():
                 return ('', 204)  # This profile is in cooldown
 
-            if job.get('job_type') in caps or not caps:
+            if job.get('job_type') in caps or (not caps and job.get('job_type') != 'gemini'):
                 _state['pending_any'] = None
                 return jsonify(job)
 
@@ -278,7 +278,8 @@ def submit_job():
             if cooldown and datetime.fromisoformat(cooldown) > now:
                 continue
             caps = info.get('capabilities', [])
-            if job['job_type'] in caps or not caps:
+            # Gemini jobs require explicit 'gemini' capability — no empty-caps fallback
+            if job['job_type'] in caps or (not caps and job['job_type'] != 'gemini'):
                 # Prefer profile not currently busy
                 current = _state['current_jobs'].get(pid)
                 if not current or (isinstance(current, dict) and current.get('state') in ('complete', 'error', None)):
