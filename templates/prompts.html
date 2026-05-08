@@ -706,7 +706,16 @@ function escapeForJs(text) {
         var d=await res.json();
         bar.style.width=(GPCT[d.state]||5)+'%';
         txt.textContent=d.message||d.state||'';
-        if(d.state==='complete'){clearInterval(gPoll);_gFetchResult(jobId);}
+        if(d.state==='complete'){
+          clearInterval(gPoll);
+          if(d.gemini_result){
+            document.getElementById('gemini-result-text').value=d.gemini_result;
+            document.getElementById('gemini-result-area').style.display='block';
+            document.getElementById('gemini-status-text').textContent='Prompt generated successfully';
+            document.getElementById('gemini-status-text').style.color='var(--success)';
+            _geminiReset();
+          } else { _gFetchResult(jobId); }
+        }
         else if(d.state==='error'){clearInterval(gPoll);txt.style.color='var(--danger)';_gReset();}
       }catch(e){}
     },2000);

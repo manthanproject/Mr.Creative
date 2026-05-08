@@ -169,6 +169,11 @@ def update_status():
             'status': 'success',
             'timestamp': time.time()
         }
+        # Also include in current job data so job-status returns it
+        for pid2, cj in _state['current_jobs'].items():
+            if isinstance(cj, dict) and cj.get('job_id') == job_id:
+                cj['gemini_result'] = extra.get('gemini_result')
+                cj['gemini_prompt_type'] = extra.get('prompt_type', '')
 
     return jsonify({'ok': True})
 
