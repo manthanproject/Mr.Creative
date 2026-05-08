@@ -14,6 +14,19 @@ def create_app():
     CORS(app, resources={r"/api/ext/*": {"origins": "*"}})
 
     @app.after_request
+    # Direct gemini-result route (workaround for blueprint 404)
+    @app.route('/api/ext/gemini-result/<job_id>', methods=['GET'])
+    def app_get_gemini_result(job_id):
+        from routes.extension import gemini_results
+        entry = gemini_results.get(job_id)
+        if not entry:
+            return jsonify({'status': 'pending'})
+        from flask import jsonify as jf
+        result = dict(entry)
+        if result.get('status') == 'success':
+            del gemini_results[job_id]
+        return jf(result)
+
     def add_static_cors(response):
         """Allow extension to fetch uploaded images."""
         if '/static/uploads/' in request.path:
