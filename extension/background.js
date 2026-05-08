@@ -110,6 +110,22 @@ async function checkForCommand() {
         const cmd = await res.json();
         if (!cmd || !cmd.job_id) return;
         console.log('[MC-BG] Received command:', cmd.job_type, cmd.job_id);
+        // For flow jobs: only accept if this profile has flow_active (Flow tab open)
+        if (cmd.job_type === 'flow' || cmd.job_type === 'aplus') {
+            const data = await chrome.storage.local.get('extraCapabilities');
+            const extras = data.extraCapabilities || [];
+            if (!extras.includes('flow_active')) {
+                console.log('[MC-BG] No flow_active capability, skipping flow job');
+                try {
+                    await fetch(SERVER + '/api/ext/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(cmd)
+                    });
+                } catch(e) {}
+                return;
+            }
+        }
         await dispatchJob(cmd);
     } catch (e) {
         console.error('[MC-BG] checkForCommand error:', e.message || e);
@@ -178,37 +194,7 @@ async function dispatchJob(job) {
         return;
     }
 
-    // For flow jobs: check if we have a Flow tab. If not, put job back.
-    if (job.job_type === 'flow' || job.job_type === 'aplus') {
-        const flowTabs = await chrome.tabs.query({ url: 'https://labs.google/fx/tools/flow*' });
-        if (flowTabs.length === 0) {
-            console.log('[MC-BG] No Flow tab in this profile, re-submitting job');
-            try {
-                await fetch(SERVER + '/api/ext/submit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(job)
-                });
-            } catch (e) {}
-            return;
-        }
-    }
 
-    // For flow jobs: check if we have a Flow tab. If not, put job back.
-    if (job.job_type === 'flow' || job.job_type === 'aplus') {
-        const flowTabs = await chrome.tabs.query({ url: 'https://labs.google/fx/tools/flow*' });
-        if (flowTabs.length === 0) {
-            console.log('[MC-BG] No Flow tab in this profile, re-submitting job');
-            try {
-                await fetch(SERVER + '/api/ext/submit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(job)
-                });
-            } catch (e) {}
-            return;
-        }
-    }
 
     // Query both URL patterns (with and without /u/N/ prefix)
     const queries = [];

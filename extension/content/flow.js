@@ -15,6 +15,7 @@ const FSEL = {
 };
 
 MC.log('Flow content script loaded on:', location.href);
+try { chrome.runtime.sendMessage({ type: 'ADD_CAPABILITY', capability: 'flow_active' }); } catch(e) {}
 
 const FlowBot = {
   async run(job) {
