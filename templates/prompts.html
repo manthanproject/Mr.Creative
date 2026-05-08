@@ -9,7 +9,7 @@
             <p>Create, generate, and manage your creative prompts</p>
         </div>
         <div class="header-btns">
-            <button class="btn btn-secondary" onclick="document.getElementById('gemini-modal').style.display='flex'" style="background:linear-gradient(135deg,#4285f4,#a259ff);border:none;">&#129302; Gemini</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('gemini-modal').classList.add('active')" style="background:linear-gradient(135deg,#4285f4,#a259ff);border:none;">&#129302; Gemini</button>
             <button class="btn btn-secondary" onclick="generatePrompts()" id="genBtn">✦ AI Generate</button>
         </div>
     </div>
@@ -568,118 +568,189 @@ function escapeForJs(text) {
 }
 </script>
 
-<div id="gemini-section" style="margin:24px 0;">
-  <button id="gemini-open-btn" onclick="document.getElementById('gemini-modal').style.display='flex'"
-    style="background:linear-gradient(135deg,#4285f4,#a259ff);color:#fff;border:none;padding:12px 24px;
-    border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-    &#129302; Generate with Gemini
-  </button>
-</div>
-<div id="gemini-modal" style="display:none;position:fixed;inset:0;z-index:9999;
-  background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
-  <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;
-    padding:28px;width:460px;max-width:90vw;max-height:85vh;overflow-y:auto;color:#e0e0e0;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-      <h3 style="margin:0;font-size:18px;color:#fff;">Generate Prompt with Gemini</h3>
-      <button onclick="document.getElementById('gemini-modal').style.display='none'"
-        style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;">&times;</button>
+
+<!-- ═══ GEMINI PROMPT GENERATOR ═══ -->
+<div id="gemini-modal" class="modal-overlay" style="z-index:9999;">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h3><span style="margin-right:6px;">&#10024;</span> Generate with Gemini</h3>
+      <button class="btn-ghost" onclick="document.getElementById('gemini-modal').classList.remove('active')" style="font-size:1.2rem;padding:4px 8px;">&times;</button>
     </div>
-    <label style="font-size:13px;color:#aaa;margin-bottom:4px;display:block;">Prompt Type</label>
-    <div id="gemini-type-selector" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <button class="gtype-btn gtype-active" data-type="campaign"
-        style="padding:8px 14px;border-radius:8px;border:1px solid #4285f4;background:#4285f422;color:#8ab4f8;font-size:13px;cursor:pointer;">Campaign</button>
-      <button class="gtype-btn" data-type="photoshoot"
-        style="padding:8px 14px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;font-size:13px;cursor:pointer;">Photoshoot</button>
-      <button class="gtype-btn" data-type="flow"
-        style="padding:8px 14px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;font-size:13px;cursor:pointer;">Flow A+</button>
-      <button class="gtype-btn" data-type="social"
-        style="padding:8px 14px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;font-size:13px;cursor:pointer;">Social</button>
-    </div>
-    <label style="font-size:13px;color:#aaa;margin-bottom:4px;display:block;">Product Image</label>
-    <input type="file" id="gemini-image" accept="image/*" style="margin-bottom:16px;font-size:13px;color:#ccc;width:100%;" />
-    <label style="font-size:13px;color:#aaa;margin-bottom:4px;display:block;">Custom Instructions (optional)</label>
-    <textarea id="gemini-instructions" rows="3" placeholder="e.g. Focus on anti-aging benefits, target audience 25-35..."
-      style="width:100%;background:#0d0d1a;border:1px solid #333;border-radius:8px;padding:10px;color:#e0e0e0;font-size:13px;resize:vertical;margin-bottom:16px;box-sizing:border-box;"></textarea>
-    <div id="gemini-progress" style="display:none;margin-bottom:16px;">
-      <div style="background:#333;border-radius:6px;height:8px;overflow:hidden;">
-        <div id="gemini-progress-bar" style="height:100%;background:linear-gradient(90deg,#4285f4,#a259ff);width:0%;transition:width 0.5s;"></div>
+    <div class="modal-body">
+
+      <div class="form-group">
+        <label>Prompt Type</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+          <button class="tab active gtype-btn" data-type="campaign">&#128227; Campaign</button>
+          <button class="tab gtype-btn" data-type="photoshoot">&#128248; Photoshoot</button>
+          <button class="tab gtype-btn" data-type="flow">&#127912; Flow A+</button>
+          <button class="tab gtype-btn" data-type="social">&#128241; Social</button>
+        </div>
       </div>
-      <div id="gemini-status-text" style="font-size:12px;color:#888;margin-top:6px;"></div>
-    </div>
-    <div id="gemini-result-area" style="display:none;margin-bottom:16px;">
-      <label style="font-size:13px;color:#aaa;margin-bottom:4px;display:block;">Generated Prompt</label>
-      <textarea id="gemini-result-text" rows="10" readonly
-        style="width:100%;background:#0d0d1a;border:1px solid #333;border-radius:8px;padding:10px;color:#e0e0e0;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button id="gemini-copy-btn" style="flex:1;padding:8px;border-radius:8px;border:1px solid #4285f4;background:#4285f422;color:#8ab4f8;font-size:13px;cursor:pointer;">Copy to Clipboard</button>
-        <button id="gemini-use-btn" style="flex:1;padding:8px;border-radius:8px;border:none;background:linear-gradient(135deg,#4285f4,#a259ff);color:#fff;font-size:13px;cursor:pointer;font-weight:600;">Use as Prompt</button>
+
+      <div class="form-group">
+        <label>Product Image</label>
+        <div id="gemini-upload-zone" class="upload-zone" onclick="document.getElementById('gemini-image').click()" style="min-height:80px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+          <div id="gemini-upload-placeholder">
+            <span style="font-size:1.3rem;color:var(--text-muted);">&#128247;</span>
+            <p style="color:var(--text-secondary);font-size:0.8rem;margin-top:0.4rem;">Click to upload product image</p>
+          </div>
+          <div id="gemini-upload-preview" style="display:none;text-align:center;">
+            <img id="gemini-preview-img" style="max-height:100px;border-radius:var(--radius-sm);" alt="Preview">
+            <p id="gemini-file-name" style="color:var(--text-secondary);font-size:0.75rem;margin-top:0.4rem;"></p>
+          </div>
+          <input type="file" id="gemini-image" accept="image/*" style="display:none;">
+        </div>
       </div>
+
+      <div class="form-group">
+        <label>Custom Instructions (optional)</label>
+        <textarea id="gemini-instructions" class="textarea" rows="3" placeholder="e.g. Focus on anti-aging benefits, luxury positioning, target 25-35..." style="resize:vertical;"></textarea>
+      </div>
+
+      <div id="gemini-progress" style="display:none;margin-bottom:12px;">
+        <div style="background:var(--border);border-radius:var(--radius-full);height:6px;overflow:hidden;">
+          <div id="gemini-progress-bar" style="height:100%;background:var(--accent-gradient);width:0%;transition:width 0.5s var(--ease-smooth);border-radius:var(--radius-full);"></div>
+        </div>
+        <p id="gemini-status-text" style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;font-weight:500;letter-spacing:0.02em;"></p>
+      </div>
+
+      <div id="gemini-result-area" style="display:none;margin-bottom:12px;">
+        <div class="form-group">
+          <label>Generated Prompt</label>
+          <textarea id="gemini-result-text" class="textarea" rows="10" readonly style="resize:vertical;background:var(--bg-primary);"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button id="gemini-copy-btn" class="btn btn-secondary" style="flex:1;">&#128203; Copy</button>
+          <button id="gemini-use-btn" class="btn btn-primary" style="flex:1;">&#10003; Use as Prompt</button>
+        </div>
+      </div>
+
+      <button id="gemini-generate-btn" class="btn btn-primary" style="width:100%;padding:10px;font-size:0.88rem;">
+        &#10024; Generate
+      </button>
     </div>
-    <button id="gemini-generate-btn" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#4285f4,#a259ff);color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Generate</button>
   </div>
 </div>
+
 <script>
 (function(){
-  let geminiSelectedType='campaign',geminiJobId=null,geminiPollTimer=null,geminiResultTimer=null;
-  document.querySelectorAll('.gtype-btn').forEach(btn=>{
-    btn.addEventListener('click',function(){
-      document.querySelectorAll('.gtype-btn').forEach(b=>{b.style.border='1px solid #555';b.style.background='transparent';b.style.color='#aaa';b.classList.remove('gtype-active');});
-      this.style.border='1px solid #4285f4';this.style.background='#4285f422';this.style.color='#8ab4f8';this.classList.add('gtype-active');
-      geminiSelectedType=this.dataset.type;
+  var geminiType='campaign', geminiJobId=null, gPoll=null, gResultPoll=null;
+
+  // Image preview
+  document.getElementById('gemini-image').addEventListener('change', function(){
+    if(this.files.length>0){
+      var reader=new FileReader();
+      var file=this.files[0];
+      reader.onload=function(e){
+        document.getElementById('gemini-preview-img').src=e.target.result;
+        document.getElementById('gemini-file-name').textContent=file.name;
+        document.getElementById('gemini-upload-placeholder').style.display='none';
+        document.getElementById('gemini-upload-preview').style.display='block';
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Type selector — use native tab classes
+  document.querySelectorAll('.gtype-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.gtype-btn').forEach(function(b){ b.classList.remove('active'); });
+      this.classList.add('active');
+      geminiType=this.dataset.type;
     });
   });
-  document.getElementById('gemini-generate-btn').addEventListener('click',async function(){
-    const fileInput=document.getElementById('gemini-image'),instructions=document.getElementById('gemini-instructions').value.trim(),btn=this;
-    btn.disabled=true;btn.textContent='Uploading...';
-    let imageUrl='',imageFilename='';
+
+  // Generate
+  document.getElementById('gemini-generate-btn').addEventListener('click', async function(){
+    var fileInput=document.getElementById('gemini-image');
+    var instructions=document.getElementById('gemini-instructions').value.trim();
+    var btn=this;
+    btn.disabled=true; btn.innerHTML='&#9203; Uploading...';
+    var imageUrl='', imageFilename='';
+
     if(fileInput.files.length>0){
-      const file=fileInput.files[0];imageFilename=file.name;
-      const formData=new FormData();formData.append('image',file);
-      try{const upRes=await fetch('/api/ext/upload-image',{method:'POST',body:formData});const upData=await upRes.json();
-        if(upData.url)imageUrl=upData.url;else{alert('Image upload failed');btn.disabled=false;btn.textContent='Generate';return;}
-      }catch(e){alert('Upload error: '+e.message);btn.disabled=false;btn.textContent='Generate';return;}
+      var file=fileInput.files[0]; imageFilename=file.name;
+      var formData=new FormData(); formData.append('image',file);
+      try{
+        var upRes=await fetch('/api/ext/upload-image',{method:'POST',body:formData});
+        var upData=await upRes.json();
+        if(upData.url) imageUrl=upData.url;
+        else{alert('Image upload failed');btn.disabled=false;btn.innerHTML='&#10024; Generate';return;}
+      }catch(e){alert('Upload error: '+e.message);btn.disabled=false;btn.innerHTML='&#10024; Generate';return;}
     }
-    btn.textContent='Submitting...';
+
+    btn.innerHTML='&#9203; Submitting...';
     try{
-      const res=await fetch('/api/ext/submit',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({job_type:'gemini',prompt_type:geminiSelectedType,image_url:imageUrl,image_filename:imageFilename,custom_instructions:instructions})});
-      const data=await res.json();
-      if(data.job_id){geminiJobId=data.job_id;btn.style.display='none';document.getElementById('gemini-progress').style.display='block';document.getElementById('gemini-result-area').style.display='none';startGeminiPolling(geminiJobId);}
-      else{alert('Submit failed: '+(data.error||'unknown'));btn.disabled=false;btn.textContent='Generate';}
-    }catch(e){alert('Submit error: '+e.message);btn.disabled=false;btn.textContent='Generate';}
+      var res=await fetch('/api/ext/submit',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({job_type:'gemini',prompt_type:geminiType,image_url:imageUrl,image_filename:imageFilename,custom_instructions:instructions})});
+      var data=await res.json();
+      if(data.job_id){
+        geminiJobId=data.job_id;
+        btn.style.display='none';
+        document.getElementById('gemini-progress').style.display='block';
+        document.getElementById('gemini-result-area').style.display='none';
+        _gPoll(geminiJobId);
+      }else{alert('Submit failed: '+(data.error||'unknown'));btn.disabled=false;btn.innerHTML='&#10024; Generate';}
+    }catch(e){alert('Submit error: '+e.message);btn.disabled=false;btn.innerHTML='&#10024; Generate';}
   });
-  const STATUS_PCT={navigating:10,entering_prompt:25,generating:50,downloading:75,saving:90,complete:100,error:100};
-  function startGeminiPolling(jobId){
-    const bar=document.getElementById('gemini-progress-bar'),txt=document.getElementById('gemini-status-text');
-    geminiPollTimer=setInterval(async()=>{
-      try{const res=await fetch('/api/ext/job-status/'+jobId);const d=await res.json();const pct=STATUS_PCT[d.state]||5;
-        bar.style.width=pct+'%';txt.textContent=d.message||d.state||'';
-        if(d.state==='complete'){clearInterval(geminiPollTimer);fetchGeminiResult(jobId);}
-        else if(d.state==='error'){clearInterval(geminiPollTimer);txt.style.color='#f44';resetGeminiBtn();}
+
+  var GPCT={navigating:10,entering_prompt:25,generating:50,downloading:75,saving:90,complete:100,error:100};
+
+  function _gPoll(jobId){
+    var bar=document.getElementById('gemini-progress-bar');
+    var txt=document.getElementById('gemini-status-text');
+    gPoll=setInterval(async function(){
+      try{
+        var res=await fetch('/api/ext/job-status/'+jobId);
+        var d=await res.json();
+        bar.style.width=(GPCT[d.state]||5)+'%';
+        txt.textContent=d.message||d.state||'';
+        if(d.state==='complete'){clearInterval(gPoll);_gFetchResult(jobId);}
+        else if(d.state==='error'){clearInterval(gPoll);txt.style.color='var(--danger)';_gReset();}
       }catch(e){}
     },2000);
   }
-  function fetchGeminiResult(jobId){
-    let attempts=0;
-    geminiResultTimer=setInterval(async()=>{
+
+  function _gFetchResult(jobId){
+    var attempts=0;
+    gResultPoll=setInterval(async function(){
       attempts++;
-      try{const res=await fetch('/api/ext/gemini-result/'+jobId);const d=await res.json();
-        if(d.status==='success'&&d.result){clearInterval(geminiResultTimer);document.getElementById('gemini-result-text').value=d.result;
-          document.getElementById('gemini-result-area').style.display='block';document.getElementById('gemini-status-text').textContent='Done';resetGeminiBtn();}
-        else if(attempts>30){clearInterval(geminiResultTimer);document.getElementById('gemini-status-text').textContent='Timeout fetching result';resetGeminiBtn();}
+      try{
+        var res=await fetch('/api/ext/gemini-result/'+jobId);
+        var d=await res.json();
+        if(d.status==='success'&&d.result){
+          clearInterval(gResultPoll);
+          document.getElementById('gemini-result-text').value=d.result;
+          document.getElementById('gemini-result-area').style.display='block';
+          document.getElementById('gemini-status-text').textContent='Prompt generated successfully';
+          document.getElementById('gemini-status-text').style.color='var(--success)';
+          _gReset();
+        }else if(attempts>30){
+          clearInterval(gResultPoll);
+          document.getElementById('gemini-status-text').textContent='Timeout waiting for result';
+          _gReset();
+        }
       }catch(e){}
     },2000);
   }
-  function resetGeminiBtn(){const btn=document.getElementById('gemini-generate-btn');btn.style.display='block';btn.disabled=false;btn.textContent='Generate';}
-  document.getElementById('gemini-copy-btn').addEventListener('click',function(){
-    const text=document.getElementById('gemini-result-text').value;
-    navigator.clipboard.writeText(text).then(()=>{this.textContent='Copied';setTimeout(()=>this.textContent='Copy to Clipboard',2000);});
+
+  function _gReset(){
+    var btn=document.getElementById('gemini-generate-btn');
+    btn.style.display='block';btn.disabled=false;btn.innerHTML='&#10024; Generate';
+  }
+
+  document.getElementById('gemini-copy-btn').addEventListener('click', function(){
+    var text=document.getElementById('gemini-result-text').value;
+    var self=this;
+    navigator.clipboard.writeText(text).then(function(){self.innerHTML='&#9989; Copied';setTimeout(function(){self.innerHTML='&#128203; Copy';},2000);});
   });
-  document.getElementById('gemini-use-btn').addEventListener('click',function(){
-    const text=document.getElementById('gemini-result-text').value;
-    const mainPrompt=document.querySelector('#prompt-text, #prompt, textarea[name="prompt"]');
-    if(mainPrompt){mainPrompt.value=text;mainPrompt.dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('gemini-modal').style.display='none';}
-    else{navigator.clipboard.writeText(text);alert('Prompt copied to clipboard. Paste it into the prompt field on the Generate page.');document.getElementById('gemini-modal').style.display='none';}
+
+  document.getElementById('gemini-use-btn').addEventListener('click', function(){
+    var text=document.getElementById('gemini-result-text').value;
+    var ta=document.getElementById('promptText');
+    if(ta){ta.value=text;ta.dispatchEvent(new Event('input',{bubbles:true}));}
+    document.getElementById('gemini-modal').classList.remove('active');
   });
 })();
 </script>
