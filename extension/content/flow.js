@@ -1,200 +1,215 @@
 // ═══════════════════════════════════════════
 // Mr.Creative Extension — Flow Bot
 // Runs on: labs.google/fx/tools/flow*
-// Handles: A+ content / banner generation
+// DOM selectors verified May 8 2026
 // ═══════════════════════════════════════════
 
+const FSEL = {
+  promptInput:    'div[contenteditable="true"]',
+  submitBtn:      'button.sc-e5032833-5',
+  settingsBtn:    'button.sc-3bb56e4a-0',
+  aspectRatio:    '.flow_tab_slider_trigger',
+  fileInput:      'input[type="file"][accept="image/*"]',
+  resultImages:   'img[src*="blob:"], img[src*="lh3.google"], img[src*="generated"]',
+  spinners:       '[class*="loading"], [class*="spinner"], mat-spinner, [class*="shimmer"]',
+};
+
+MC.log('Flow content script loaded on:', location.href);
+
 const FlowBot = {
-
   async run(job) {
-    const { prompt_text, image_url, image_filename, aspect_ratio, count, reuse_project, job_id } = job;
-
+    var prompt_text = job.prompt_text, image_url = job.image_url, image_filename = job.image_filename;
+    var count = job.count, job_id = job.job_id;
     try {
-      // Step 1: Navigate if needed
-      if (!location.href.includes('/flow')) {
-        location.href = 'https://labs.google/fx/tools/flow';
-        await MC.sleep(5000);
+      MC.log('Flow: starting job', job_id, 'prompt length:', prompt_text ? prompt_text.length : 0);
+      await MC.sendStatus(job_id, 'navigating', 'Waiting for Flow page...');
+      await this._waitForPageReady();
+      if (image_url) {
+        await MC.sendStatus(job_id, 'entering_prompt', 'Uploading reference: ' + image_filename);
+        await this._uploadReferenceImage(image_url, image_filename);
       }
-
-      await MC.sendStatus(job_id, 'navigating', 'Flow page ready');
-
-      if (reuse_project) {
-        // Batch 2+: already on project page
-        await this._enterPromptAndGenerate(prompt_text, image_url, image_filename, job_id);
-      } else {
-        // Batch 1: create new project
-        await this._createNewProject(prompt_text, image_url, image_filename, aspect_ratio, job_id);
-      }
-
-      // Wait for images to generate
+      await MC.sendStatus(job_id, 'entering_prompt', 'Typing prompt...');
+      await this._typePrompt(prompt_text);
+      await MC.sendStatus(job_id, 'generating', 'Submitting to Flow...');
+      await this._clickSubmit();
       await MC.sendStatus(job_id, 'generating', 'Waiting for images...');
       await this._waitForResults(job_id);
-
-      // Download
       await MC.sendStatus(job_id, 'downloading', 'Downloading images...');
       await this._downloadResults(job_id, count || 4);
-
-      await MC.sendStatus(job_id, 'complete', 'Flow batch complete!');
-
+      await MC.sendStatus(job_id, 'complete', 'Flow generation complete!');
     } catch (err) {
       MC.log('Flow error:', err);
-      await MC.sendStatus(job_id, 'error', `Failed: ${err.message}`);
+      await MC.sendStatus(job_id, 'error', 'Failed: ' + err.message);
     }
   },
 
-  async _createNewProject(prompt, imageUrl, imageFilename, aspectRatio, jobId) {
-    await MC.sendStatus(jobId, 'entering_prompt', 'Creating new project...');
+  async _waitForPageReady() {
+    var el = await MC.waitFor(FSEL.promptInput, 30000);
+    MC.log('Flow: page ready, prompt input found');
+    await MC.sleep(1000);
+    return el;
+  },
 
-    // Find prompt input (textarea or contenteditable)
-    const promptEl = await MC.waitFor('textarea, [contenteditable="true"], input[type="text"]', 15000);
-    if (promptEl.tagName === 'TEXTAREA' || promptEl.tagName === 'INPUT') {
-      promptEl.value = prompt;
-      promptEl.dispatchEvent(new Event('input', { bubbles: true }));
-    } else {
+  async _typePrompt(prompt) {
+    var promptEl = document.querySelector(FSEL.promptInput);
+    if (!promptEl) throw new Error('Prompt input not found');
+    promptEl.focus();
+    await MC.sleep(300);
+    promptEl.innerHTML = '<p>' + prompt.replace(/\n/g, '</p><p>') + '</p>';
+    promptEl.dispatchEvent(new Event('input', { bubbles: true }));
+    promptEl.dispatchEvent(new Event('change', { bubbles: true }));
+    await MC.sleep(500);
+    var textLen = promptEl.textContent.trim().length;
+    MC.log('Flow: typed prompt, length:', textLen);
+    if (textLen < 20) {
       promptEl.textContent = prompt;
       promptEl.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    await MC.sleep(1000);
-
-    // Upload reference image if provided
-    if (imageUrl) {
-      await this._uploadReferenceImage(imageUrl, imageFilename, jobId);
-    }
-
-    // Click Create/Generate
-    const createBtn = MC.btnByText('Create') || MC.btnByText('Generate');
-    if (createBtn) {
-      MC.click(createBtn);
-      MC.log('Flow: clicked Create');
+      await MC.sleep(500);
     }
   },
 
-  async _enterPromptAndGenerate(prompt, imageUrl, imageFilename, jobId) {
-    await MC.sendStatus(jobId, 'entering_prompt', 'Entering prompt (batch 2+)...');
-
-    // Find prompt area on existing project
-    const promptEl = document.querySelector('textarea, [contenteditable="true"]');
-    if (promptEl) {
-      if (promptEl.tagName === 'TEXTAREA') {
-        promptEl.value = prompt;
-      } else {
-        promptEl.textContent = prompt;
-      }
-      promptEl.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    // Upload reference image (every batch)
-    if (imageUrl) {
-      await this._uploadReferenceImage(imageUrl, imageFilename, jobId);
-    }
-
-    // Click generate
-    await MC.sleep(1000);
-    const genBtn = MC.btnByText('Create') || MC.btnByText('Generate');
-    if (genBtn) MC.click(genBtn);
-  },
-
-  async _uploadReferenceImage(imageUrl, filename, jobId) {
-    await MC.sendStatus(jobId, 'entering_prompt', `Uploading reference: ${filename}`);
-
-    // Look for file input on page
-    const fileInput = document.querySelector('input[type="file"]');
+  async _uploadReferenceImage(imageUrl, filename) {
+    var fileInput = document.querySelector(FSEL.fileInput);
     if (fileInput) {
-      await MC.uploadFile(fileInput, imageUrl, filename);
-      MC.log('Flow: reference image uploaded via input');
-      await MC.sleep(3000);
-      return;
+      try {
+        var resp = await fetch(imageUrl);
+        var blob = await resp.blob();
+        var file = new File([blob], filename || 'product.jpg', { type: blob.type });
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        MC.log('Flow: reference image uploaded');
+        await MC.sleep(3000);
+        return;
+      } catch (e) { MC.log('Flow: upload failed:', e.message); }
     }
-
-    // If no file input visible, click + button to open upload panel
-    const addBtn = MC.btnByText('+') || document.querySelector('button[aria-label*="add"], button[aria-label*="upload"]');
+    var addBtn = [...document.querySelectorAll('button')].find(function(b) {
+      return b.textContent.includes('Add Media') || b.textContent.includes('addAdd');
+    });
     if (addBtn) {
       MC.click(addBtn);
       await MC.sleep(2000);
-
-      // Now find file input
-      const fi = document.querySelector('input[type="file"]');
+      var fi = document.querySelector(FSEL.fileInput);
       if (fi) {
-        await MC.uploadFile(fi, imageUrl, filename);
-        MC.log('Flow: reference image uploaded after clicking +');
-        await MC.sleep(3000);
+        try {
+          var r = await fetch(imageUrl);
+          var bl = await r.blob();
+          var f = new File([bl], filename || 'product.jpg', { type: bl.type });
+          var d = new DataTransfer();
+          d.items.add(f);
+          fi.files = d.files;
+          fi.dispatchEvent(new Event('change', { bubbles: true }));
+          MC.log('Flow: image uploaded after Add Media');
+          await MC.sleep(3000);
+        } catch (e) { MC.log('Flow: fallback upload failed:', e.message); }
       }
     }
   },
 
-  async _waitForResults(jobId, timeout = 300000) {
-    const start = Date.now();
-    let lastCount = 0;
+  async _clickSubmit() {
+    var submitBtn = document.querySelector(FSEL.submitBtn);
+    if (!submitBtn) {
+      submitBtn = [...document.querySelectorAll('button')].find(function(b) {
+        return b.textContent.includes('arrow_forward') && b.textContent.includes('Create');
+      });
+    }
+    if (!submitBtn) {
+      submitBtn = [...document.querySelectorAll('button')].find(function(b) {
+        var t = b.textContent.trim();
+        return t.endsWith('Create') && t.includes('arrow');
+      });
+    }
+    if (submitBtn) {
+      MC.click(submitBtn);
+      MC.log('Flow: clicked submit');
+      await MC.sleep(2000);
+    } else {
+      throw new Error('Submit/Create button not found');
+    }
+  },
 
+  async _waitForResults(jobId) {
+    var timeout = 300000;
+    var start = Date.now();
+    var lastCount = 0;
     while (Date.now() - start < timeout) {
-      // Count loaded images (not spinners)
-      const images = document.querySelectorAll('img[src*="blob:"], img[src*="lh3.google"]');
-      const spinners = document.querySelectorAll('[class*="loading"], [class*="spinner"], mat-spinner');
-
+      var images = document.querySelectorAll(FSEL.resultImages);
+      var spinners = [...document.querySelectorAll(FSEL.spinners)].filter(function(s) { return s.offsetHeight > 0; });
       if (images.length > lastCount) {
         lastCount = images.length;
-        await MC.sendStatus(jobId, 'generating', `${images.length} images loaded...`);
+        await MC.sendStatus(jobId, 'generating', images.length + ' images loaded...');
       }
-
-      if (images.length > 0 && spinners.length === 0) {
-        MC.log(`Flow: ${images.length} results ready`);
+      if (images.length > 0 && spinners.length === 0 && Date.now() - start > 15000) {
+        MC.log('Flow: ' + images.length + ' results ready');
         return;
       }
-
       await MC.sleep(5000);
     }
-    throw new Error('Flow results did not load');
+    throw new Error('Flow results did not load within timeout');
   },
 
   async _downloadResults(jobId, count) {
-    const images = document.querySelectorAll('img[src*="blob:"], img[src*="lh3.google"]');
-    let downloaded = 0;
-
-    for (let i = 0; i < Math.min(images.length, count); i++) {
+    var images = document.querySelectorAll(FSEL.resultImages);
+    var downloaded = 0;
+    MC.log('Flow: found ' + images.length + ' images to download');
+    for (var i = 0; i < Math.min(images.length, count); i++) {
       try {
-        // Try to find 2K download button
-        // Flow has a download dropdown with resolution options
-        const card = images[i].closest('[class*="card"], [class*="result"]');
+        var imgSrc = images[i].src;
+        if (!imgSrc || imgSrc === 'data:') continue;
+        var card = images[i].closest('[class*="card"], [class*="result"], [class*="item"]');
         if (card) {
-          const dlBtn = card.querySelector('button[aria-label*="ownload"]');
+          var dlBtn = card.querySelector('button[aria-label*="ownload"]');
           if (dlBtn) {
             MC.click(dlBtn);
-            await MC.sleep(1000);
-
-            // Look for 2K option in dropdown
-            const twoK = MC.btnByText('2K') || MC.btnByText('2048');
-            if (twoK) {
-              MC.click(twoK);
-              await MC.sleep(2000);
-            }
-            downloaded++;
-            continue;
+            await MC.sleep(1500);
+            var twoK = [...document.querySelectorAll('button, [role="menuitem"]')].find(function(b) {
+              return b.textContent.includes('2K') || b.textContent.includes('2048');
+            });
+            if (twoK) { MC.click(twoK); await MC.sleep(2000); downloaded++; continue; }
           }
         }
-
-        // Fallback: send URL to server
-        await fetch(`${MC.SERVER}/api/ext/download`, {
+        var resp = await fetch(imgSrc);
+        var blob = await resp.blob();
+        var reader = new FileReader();
+        var base64 = await new Promise(function(resolve) {
+          reader.onload = function() { resolve(reader.result); };
+          reader.readAsDataURL(blob);
+        });
+        await fetch(MC.SERVER + '/api/ext/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: images[i].src, index: i, job_id: jobId })
+          body: JSON.stringify({ url: imgSrc, data: base64, is_base64: true, index: i, job_id: jobId, filename: 'flow_' + (i+1) + '.png' })
         });
         downloaded++;
-      } catch (e) {
-        MC.log(`Flow download ${i} failed:`, e);
-      }
+        MC.log('Flow: downloaded image ' + (i+1));
+      } catch (e) { MC.log('Flow: download ' + i + ' failed:', e.message); }
     }
-
-    MC.log(`Flow: downloaded ${downloaded} images`);
+    MC.log('Flow: downloaded ' + downloaded + '/' + Math.min(images.length, count));
   }
 };
 
-// ── Command listener ──
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'RUN_JOB') {
+chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  if (msg.type === 'RUN_JOB' && (msg.job.job_type === 'flow' || msg.job.job_type === 'aplus')) {
     FlowBot.run(msg.job);
     sendResponse({ ok: true });
   }
   return true;
 });
 
-MC.log('Flow content script loaded on:', location.href);
+setTimeout(async function() {
+  try {
+    var res = await fetch(MC.SERVER + '/api/ext/pending-for-tab');
+    if (res.ok && res.status !== 204) {
+      var job = await res.json();
+      if (job && job.job_id && (job.job_type === 'flow' || job.job_type === 'aplus')) {
+        FlowBot.run(job);
+        await fetch(MC.SERVER + '/api/ext/ack', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: job.job_id, profile_id: 'flow-content' })
+        });
+      }
+    }
+  } catch (e) {}
+}, 3000);
