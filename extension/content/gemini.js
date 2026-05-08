@@ -39,12 +39,20 @@ Format your response as a SINGLE code block with the complete prompt text. No ex
 
   flow: `You are an expert Amazon Listing Optimizer, Copywriter, and E-commerce Art Director. Analyze this product image and generate a complete Amazon A+ Content Layout prompt for FLOW AI.
 
+CRITICAL RULES FOR IMAGE PROMPTS:
+- NEVER include people, models, hands, or human figures in any image prompt — product-only shots always
+- NEVER use copyrighted character names (e.g. "Itachi", "Naruto", "Marvel") in image prompts — describe the visual design instead (e.g. "anime-style warrior character with red eyes and black cloak")
+- Focus on: product close-ups, flat lays, lifestyle context shots (on surfaces, with props), macro detail shots, creative compositions
+- Each image prompt must be UNIQUE — different angles, lighting, backgrounds, and compositions
+- Use cinematic lighting descriptions: golden hour, moody backlighting, soft diffused studio light, dramatic rim lighting
+- Suggest premium backgrounds: marble, dark wood, brushed metal, linen fabric, gradient studio
+
 The prompt must include:
-- Product Description based on what you see in the image
+- Product Description based on what you see (describe visuals without using copyrighted names)
 - Target Audience
 - Tone
 - 5 A+ Content Modules (Standard Company Logo/Hero Banner, Standard Single Image & Sidebar, Standard Three Image & Text, Standard Single Image & Light Text, Standard Four Image & Text)
-- For each module: Image Prompt + Copy instructions
+- For each module: Image Prompt (product-only, no people, no character names) + Copy instructions
 
 Format your response as a SINGLE code block with the complete prompt. No explanations outside the code block.`,
 
