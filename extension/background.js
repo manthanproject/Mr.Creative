@@ -48,6 +48,7 @@ async function detectCapabilities() {
     // If tabs exist or URLs are accessible, add capabilities
     caps.push('campaign', 'photoshoot');  // Pomelli is always accessible
     caps.push('flow');  // Flow too
+    caps.push('gemini');  // Gemini prompt generation
 
     return caps;
 }
