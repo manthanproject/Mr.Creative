@@ -162,18 +162,20 @@ def update_status():
                     job['completed_at'] = datetime.now().isoformat()
                 break
         # Capture gemini result if present in the complete status
-    if state == 'complete' and extra.get('gemini_result'):
+    _extra = data.get('data', {}) if isinstance(data.get('data'), dict) else {}
+    if data.get('state') == 'complete' and _extra.get('gemini_result'):
         gemini_results[job_id] = {
-            'prompt_type': extra.get('prompt_type', ''),
-            'result': extra.get('gemini_result'),
+            'prompt_type': _extra.get('prompt_type', ''),
+            'result': _extra.get('gemini_result'),
             'status': 'success',
             'timestamp': time.time()
         }
         # Also include in current job data so job-status returns it
-        for pid2, cj in _state['current_jobs'].items():
-            if isinstance(cj, dict) and cj.get('job_id') == job_id:
-                cj['gemini_result'] = extra.get('gemini_result')
-                cj['gemini_prompt_type'] = extra.get('prompt_type', '')
+        with _lock:
+            for pid2, cj in _state['current_jobs'].items():
+                if isinstance(cj, dict) and cj.get('job_id') == job_id:
+                    cj['gemini_result'] = _extra.get('gemini_result')
+                    cj['gemini_prompt_type'] = _extra.get('prompt_type', '')
 
     return jsonify({'ok': True})
 
