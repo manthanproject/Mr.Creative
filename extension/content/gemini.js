@@ -123,14 +123,10 @@ const GeminiBot = {
       await MC.sendStatus(job_id, 'downloading', 'Extracting prompt...');
       const result = this._extractResponse();
 
-      await fetch(`${MC.SERVER}/api/ext/gemini-result`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id, prompt_type, result, status: 'success' })
-      });
-
       await MC.sendStatus(job_id, 'complete', 'Prompt generated successfully', {
-        result_preview: result.substring(0, 200)
+        result_preview: result.substring(0, 200),
+        gemini_result: result,
+        prompt_type: prompt_type
       });
     } catch (err) {
       MC.log('Gemini error:', err.message);

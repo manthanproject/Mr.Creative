@@ -161,6 +161,15 @@ def update_status():
                 if data.get('state') in ('complete', 'error'):
                     job['completed_at'] = datetime.now().isoformat()
                 break
+        # Capture gemini result if present in the complete status
+    if state == 'complete' and extra.get('gemini_result'):
+        gemini_results[job_id] = {
+            'prompt_type': extra.get('prompt_type', ''),
+            'result': extra.get('gemini_result'),
+            'status': 'success',
+            'timestamp': time.time()
+        }
+
     return jsonify({'ok': True})
 
 
