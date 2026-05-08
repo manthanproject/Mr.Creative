@@ -178,6 +178,22 @@ async function dispatchJob(job) {
         return;
     }
 
+    // For flow jobs: check if we have a Flow tab. If not, put job back.
+    if (job.job_type === 'flow' || job.job_type === 'aplus') {
+        const flowTabs = await chrome.tabs.query({ url: 'https://labs.google/fx/tools/flow*' });
+        if (flowTabs.length === 0) {
+            console.log('[MC-BG] No Flow tab in this profile, re-submitting job');
+            try {
+                await fetch(SERVER + '/api/ext/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(job)
+                });
+            } catch (e) {}
+            return;
+        }
+    }
+
     // Query both URL patterns (with and without /u/N/ prefix)
     const queries = [];
     if (job.job_type === 'flow' || job.job_type === 'aplus') {
