@@ -44,6 +44,20 @@ const FlowBot = {
   },
 
   async _waitForPageReady() {
+    // Check if on landing page (no prompt input) — click New Project
+    await MC.sleep(2000);
+    var promptEl = document.querySelector(FSEL.promptInput);
+    if (!promptEl) {
+      MC.log('Flow: on landing page, clicking New Project...');
+      var newBtn = [...document.querySelectorAll('button')].find(function(b) {
+        return b.textContent.includes('New project') || b.textContent.includes('new_project');
+      });
+      if (newBtn) {
+        MC.click(newBtn);
+        MC.log('Flow: clicked New Project');
+        await MC.sleep(5000);
+      }
+    }
     var el = await MC.waitFor(FSEL.promptInput, 30000);
     MC.log('Flow: page ready, prompt input found');
     await MC.sleep(1000);
