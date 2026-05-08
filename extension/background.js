@@ -161,6 +161,22 @@ async function sendJobToTab(tab, job) {
 
 // ── Dispatch job to the right tab ──
 async function dispatchJob(job) {
+    // ── Gemini jobs go to gemini.google.com ──
+    if (job.job_type === 'gemini') {
+        let tabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+        let tab;
+        if (tabs.length > 0) {
+            tab = tabs[0];
+            await chrome.tabs.update(tab.id, { active: true });
+        } else {
+            tab = await chrome.tabs.create({ url: 'https://gemini.google.com/app' });
+            await waitForTabLoad(tab.id);
+            await new Promise(r => setTimeout(r, 5000));
+        }
+        await sendJobToTab(tab, job);
+        return;
+    }
+
     // Query both URL patterns (with and without /u/N/ prefix)
     const queries = [];
     if (job.job_type === 'flow' || job.job_type === 'aplus') {
@@ -202,8 +218,10 @@ async function dispatchJob(job) {
 function getTargetUrl(jobType) {
     switch (jobType) {
         case 'campaign': return 'https://labs.google.com/pomelli/campaigns';
+    case 'gemini': return 'https://gemini.google.com/app';
         case 'photoshoot': return 'https://labs.google.com/pomelli/photoshoot';
         case 'flow': case 'aplus': return 'https://labs.google/fx/tools/flow';
+        case 'gemini': return 'https://gemini.google.com/app';
         default: return 'https://labs.google.com/pomelli/campaigns';
     }
 }

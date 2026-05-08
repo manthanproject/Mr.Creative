@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Mr.Creative Bot",
   "version": "1.0.0",
-  "description": "Automates Pomelli & Flow image generation — controlled from Mr.Creative dashboard",
+  "description": "Automates Pomelli & Flow image generation \u00e2\u20ac\u201d controlled from Mr.Creative dashboard",
   "permissions": [
     "activeTab",
     "tabs",
@@ -16,7 +16,8 @@
     "https://labs.google.com/u/*/pomelli/*",
     "https://labs.google/fx/tools/flow*",
     "http://localhost:5000/*",
-    "http://127.0.0.1:5000/*"
+    "http://127.0.0.1:5000/*",
+    "https://gemini.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -27,12 +28,30 @@
         "https://labs.google.com/pomelli/*",
         "https://labs.google.com/u/*/pomelli/*"
       ],
-      "js": ["lib/utils.js", "content/pomelli.js"],
+      "js": [
+        "lib/utils.js",
+        "content/pomelli.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://labs.google/fx/tools/flow*"],
-      "js": ["lib/utils.js", "content/flow.js"],
+      "matches": [
+        "https://labs.google/fx/tools/flow*"
+      ],
+      "js": [
+        "lib/utils.js",
+        "content/flow.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "lib/utils.js",
+        "content/gemini.js"
+      ],
       "run_at": "document_idle"
     }
   ],

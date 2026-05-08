@@ -18,6 +18,8 @@ from flask_login import login_required, current_user
 import os
 import requests  # type: ignore[import-untyped]
 import time
+
+gemini_results = {}
 from datetime import datetime, timedelta
 from threading import Lock
 
@@ -540,3 +542,30 @@ def advance_queue():
             next_job = jq.pop(0)
             _state['pending_any'] = next_job
     return jsonify({'ok': True})
+
+
+@bp.route('/api/ext/gemini-result', methods=['POST'])
+def post_gemini_result():
+    data = request.get_json(force=True)
+    job_id = data.get('job_id')
+    if not job_id:
+        return jsonify({'ok': False, 'error': 'missing job_id'}), 400
+    import time as _time
+    gemini_results[job_id] = {
+        'prompt_type': data.get('prompt_type'),
+        'result': data.get('result'),
+        'status': data.get('status', 'success'),
+        'timestamp': _time.time()
+    }
+    return jsonify({'ok': True})
+
+
+@bp.route('/api/ext/gemini-result/<job_id>', methods=['GET'])
+def get_gemini_result(job_id):
+    entry = gemini_results.get(job_id)
+    if not entry:
+        return jsonify({'status': 'pending'})
+    result = dict(entry)
+    if result.get('status') == 'success':
+        del gemini_results[job_id]
+    return jsonify(result)
