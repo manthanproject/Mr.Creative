@@ -11,7 +11,7 @@ const GSEL = {
   codeBlockPre:   'code-block pre',
   copyCodeBtn:    'button[aria-label="Copy code"]',
   responseText:   '.model-response-text',
-  loadingSpinner: '.avatar_spinner_animation',
+  loadingSpinner: '.loading-content-spinner-container',  // actual loading spinner, not avatar icon
 };
 
 const PROMPT_TEMPLATES = {
