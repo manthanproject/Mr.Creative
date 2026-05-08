@@ -43,7 +43,10 @@ CRITICAL RULES FOR IMAGE PROMPTS:
 - NEVER include people, models, hands, or human figures in any image prompt — product-only shots always
 - NEVER use copyrighted character names (e.g. "Itachi", "Naruto", "Marvel") in image prompts — describe the visual design instead (e.g. "anime-style warrior character with red eyes and black cloak")
 - Focus on: product close-ups, flat lays, lifestyle context shots (on surfaces, with props), macro detail shots, creative compositions
-- Each image prompt must be UNIQUE — different angles, lighting, backgrounds, and compositions
+- Each image prompt must be COMPLETELY DIFFERENT — vary ALL of these: camera angle (macro/wide/overhead/45-degree), lighting style (studio/natural/dramatic/soft), background (marble/wood/fabric/gradient/contextual), composition (centered/rule-of-thirds/diagonal/flat-lay)
+- NEVER repeat similar setups across modules — if Module 1 uses a jacket flat-lay, NO other module should use clothing
+- Think like a creative director: each image tells a DIFFERENT story about the product
+- Module 1: Hero/lifestyle context, Module 2: Extreme macro detail, Module 3: Three completely different use-cases, Module 4: Artistic/creative composition, Module 5: Four technical/feature close-ups
 - Use cinematic lighting descriptions: golden hour, moody backlighting, soft diffused studio light, dramatic rim lighting
 - Suggest premium backgrounds: marble, dark wood, brushed metal, linen fabric, gradient studio
 
