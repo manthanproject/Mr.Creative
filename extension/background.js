@@ -48,7 +48,6 @@ async function detectCapabilities() {
     // If tabs exist or URLs are accessible, add capabilities
     caps.push('campaign', 'photoshoot');  // Pomelli is always accessible
     caps.push('flow');  // Flow too
-    caps.push('gemini');  // Gemini prompt generation
 
     return caps;
 }
@@ -244,6 +243,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     else if (msg.type === 'STOP_POLLING') { stopPolling(); sendResponse({ polling: false }); }
     else if (msg.type === 'GET_STATUS') { sendResponse({ polling, profileId }); }
     return true;
+});
+
+// ── Handle capability registration from content scripts ──
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'ADD_CAPABILITY' && msg.capability) {
+        (async () => {
+            profileId = profileId || await getProfileId();
+            const account = await detectAccount();
+            const capabilities = await detectCapabilities();
+            if (!capabilities.includes(msg.capability)) capabilities.push(msg.capability);
+            try {
+                await fetch(`${SERVER}/api/ext/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profile_id: profileId, account, capabilities })
+                });
+                console.log('[MC-BG] Re-registered with capability:', msg.capability);
+            } catch (e) {}
+        })();
+        sendResponse({ ok: true });
+        return true;
+    }
 });
 
 // ── Auto-start ──

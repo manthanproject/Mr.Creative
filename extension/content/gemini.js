@@ -62,6 +62,11 @@ Format your response as a SINGLE code block. No explanations outside the code bl
 
 MC.log('Gemini content script loaded on:', location.href);
 
+// Register this profile as gemini-capable
+try {
+  chrome.runtime.sendMessage({ type: 'ADD_CAPABILITY', capability: 'gemini' });
+} catch (e) {}
+
 const GeminiBot = {
   async run(job) {
     const { prompt_type, image_url, image_filename, custom_instructions, job_id } = job;
