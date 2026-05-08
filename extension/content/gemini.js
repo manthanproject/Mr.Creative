@@ -41,10 +41,10 @@ Format your response as a SINGLE code block with the complete prompt text. No ex
 
 CRITICAL RULES FOR IMAGE PROMPTS:
 - NEVER include people, models, hands, or human figures in any image prompt — product-only shots always
-- NEVER use copyrighted character names (e.g. "Itachi", "Naruto", "Marvel") in image prompts — describe the visual design instead (e.g. "anime-style warrior character with red eyes and black cloak")
+- NEVER use copyrighted character names (e.g. brand mascots, anime characters, movie heroes) in image prompts — describe the visual design instead (e.g. describe visual elements: "character with red eyes and dark cloak design")
 - Focus on: product close-ups, flat lays, lifestyle context shots (on surfaces, with props), macro detail shots, creative compositions
 - Each image prompt must be COMPLETELY DIFFERENT — vary ALL of these: camera angle (macro/wide/overhead/45-degree), lighting style (studio/natural/dramatic/soft), background (marble/wood/fabric/gradient/contextual), composition (centered/rule-of-thirds/diagonal/flat-lay)
-- NEVER repeat similar setups across modules — if Module 1 uses a jacket flat-lay, NO other module should use clothing
+- NEVER repeat similar setups across modules — every module must have a completely different composition, angle, and context
 - Think like a creative director: each image tells a DIFFERENT story about the product
 - Module 1 (Hero Banner): Product hero shot — choose the most impactful angle for THIS product type (macro detail for textured items, full product for sleek items, open/action shot for tools). Dark or gradient background, cinematic lighting
 - Module 2 (Single Image & Sidebar): Product in its natural usage context — on a vanity for beauty, on a desk for tech, on a surface for accessories. NO people. Show the product being "used" through context clues only (open lid, applied texture, etc.)
