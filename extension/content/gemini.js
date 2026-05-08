@@ -46,7 +46,11 @@ CRITICAL RULES FOR IMAGE PROMPTS:
 - Each image prompt must be COMPLETELY DIFFERENT — vary ALL of these: camera angle (macro/wide/overhead/45-degree), lighting style (studio/natural/dramatic/soft), background (marble/wood/fabric/gradient/contextual), composition (centered/rule-of-thirds/diagonal/flat-lay)
 - NEVER repeat similar setups across modules — if Module 1 uses a jacket flat-lay, NO other module should use clothing
 - Think like a creative director: each image tells a DIFFERENT story about the product
-- Module 1: Hero/lifestyle context, Module 2: Extreme macro detail, Module 3: Three completely different use-cases, Module 4: Artistic/creative composition, Module 5: Four technical/feature close-ups
+- Module 1 (Hero Banner): Extreme macro close-up of the most striking product detail — fill the frame, dark background, cinematic rim lighting
+- Module 2 (Single Image & Sidebar): Back-view lifestyle shot showing product in use on clothing/gear — NO face visible, urban/premium setting, moody lighting
+- Module 3 (Three Image & Text): Three DIFFERENT feature close-ups — each highlighting one unique detail/texture/element with a short callout label (e.g. "Intricate Detail", "Premium Material", "Durable Build")
+- Module 4 (Single Image & Light Text): Artistic overhead flat-lay on premium surface (dark marble, brushed metal) with complementary props — styled product photography
+- Module 5 (Four Image & Text): Four technical/specification close-ups showing materials, construction quality, size reference, and application method — include a "Product Specifications" section with dimensions and features
 - Use cinematic lighting descriptions: golden hour, moody backlighting, soft diffused studio light, dramatic rim lighting
 - Suggest premium backgrounds: marble, dark wood, brushed metal, linen fabric, gradient studio
 
