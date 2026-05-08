@@ -226,6 +226,8 @@ def submit_job():
         'target_account': data.get('target_account'),  # Optional: route to specific account
         'collection_id': data.get('collection_id', ''),  # For finalize → save to collection
         'user_id': data.get('user_id', ''),
+        'prompt_type': data.get('prompt_type', ''),
+        'custom_instructions': data.get('custom_instructions', ''),
     }
 
     with _lock:
