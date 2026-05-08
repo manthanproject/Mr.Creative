@@ -567,8 +567,7 @@ function escapeForJs(text) {
     return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
 }
 </script>
-{% endblock %}
-<!-- GEMINI PROMPT GENERATOR -->
+
 <div id="gemini-section" style="margin:24px 0;">
   <button id="gemini-open-btn" onclick="document.getElementById('gemini-modal').style.display='flex'"
     style="background:linear-gradient(135deg,#4285f4,#a259ff);color:#fff;border:none;padding:12px 24px;
@@ -684,3 +683,5 @@ function escapeForJs(text) {
   });
 })();
 </script>
+
+{% endblock %}
