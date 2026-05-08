@@ -275,6 +275,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
+// ── Relay gemini results from content script to Flask ──
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'GEMINI_RESULT' && msg.result) {
+        fetch(`${SERVER}/api/ext/gemini-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                job_id: msg.job_id,
+                prompt_type: msg.prompt_type,
+                result: msg.result,
+                status: 'success'
+            })
+        }).then(() => console.log('[MC-BG] Gemini result relayed to server'))
+          .catch(e => console.error('[MC-BG] Failed to relay gemini result:', e));
+        sendResponse({ ok: true });
+        return true;
+    }
+});
+
 // ── Auto-start ──
 registerWithServer();
 startPolling();

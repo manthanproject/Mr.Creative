@@ -123,11 +123,14 @@ const GeminiBot = {
       await MC.sendStatus(job_id, 'downloading', 'Extracting prompt...');
       const result = this._extractResponse();
 
-      await MC.sendStatus(job_id, 'complete', 'Prompt generated successfully', {
-        result_preview: result.substring(0, 200),
-        gemini_result: result,
-        prompt_type: prompt_type
+      // Send result via background script to avoid CORS
+      chrome.runtime.sendMessage({
+        type: 'GEMINI_RESULT',
+        job_id: job_id,
+        prompt_type: prompt_type,
+        result: result
       });
+      await MC.sendStatus(job_id, 'complete', 'Prompt generated successfully');
     } catch (err) {
       MC.log('Gemini error:', err.message);
       await MC.sendStatus(job_id, 'error', 'Failed: ' + err.message);
