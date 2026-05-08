@@ -249,17 +249,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === 'ADD_CAPABILITY' && msg.capability) {
         (async () => {
+            // Persist to storage so it survives service worker restarts
+            const data = await chrome.storage.local.get('extraCapabilities');
+            const extras = data.extraCapabilities || [];
+            if (!extras.includes(msg.capability)) {
+                extras.push(msg.capability);
+                await chrome.storage.local.set({ extraCapabilities: extras });
+            }
+            // Re-register with server
             profileId = profileId || await getProfileId();
             const account = await detectAccount();
             const capabilities = await detectCapabilities();
-            if (!capabilities.includes(msg.capability)) capabilities.push(msg.capability);
             try {
                 await fetch(`${SERVER}/api/ext/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ profile_id: profileId, account, capabilities })
                 });
-                console.log('[MC-BG] Re-registered with capability:', msg.capability);
+                console.log('[MC-BG] Re-registered with capability:', msg.capability, capabilities);
             } catch (e) {}
         })();
         sendResponse({ ok: true });
