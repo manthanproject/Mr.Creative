@@ -149,18 +149,19 @@ def upload_reference():
     if not f.filename:
         return jsonify({'error': 'No file selected'}), 400
 
-    upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                              'static', 'uploads', 'references')
-    os.makedirs(upload_dir, exist_ok=True)
-
-    import uuid as _uuid
-    ext = os.path.splitext(f.filename)[1] or '.png'
-    filename = f"ref_{_uuid.uuid4().hex[:8]}{ext}"
-    filepath = os.path.join(upload_dir, filename)
-    f.save(filepath)
-
-    rel_path = f"uploads/references/{filename}"
-    return jsonify({'success': True, 'path': rel_path})
+    try:
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                  'static', 'uploads', 'references')
+        os.makedirs(upload_dir, exist_ok=True)
+        import uuid as _uuid
+        ext = os.path.splitext(f.filename)[1] or '.png'
+        filename = f"ref_{_uuid.uuid4().hex[:8]}{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        f.save(filepath)
+        rel_path = f"uploads/references/{filename}"
+        return jsonify({'success': True, 'path': rel_path})
+    except OSError:
+        return jsonify({'error': 'File uploads not available on hosted version. Use local server.'}), 400
 
 
 @agent_bp.route('/upload-logo', methods=['POST'])
@@ -172,18 +173,19 @@ def upload_logo():
     if not f.filename:
         return jsonify({'error': 'No file selected'}), 400
 
-    upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                              'static', 'uploads', 'logos')
-    os.makedirs(upload_dir, exist_ok=True)
-
-    import uuid
-    ext = os.path.splitext(f.filename)[1] or '.png'
-    filename = f"logo_{uuid.uuid4().hex[:8]}{ext}"
-    filepath = os.path.join(upload_dir, filename)
-    f.save(filepath)
-
-    rel_path = f"uploads/logos/{filename}"
-    return jsonify({'success': True, 'path': rel_path})
+    try:
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                  'static', 'uploads', 'logos')
+        os.makedirs(upload_dir, exist_ok=True)
+        import uuid
+        ext = os.path.splitext(f.filename)[1] or '.png'
+        filename = f"logo_{uuid.uuid4().hex[:8]}{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        f.save(filepath)
+        rel_path = f"uploads/logos/{filename}"
+        return jsonify({'success': True, 'path': rel_path})
+    except OSError:
+        return jsonify({'error': 'File uploads not available on hosted version. Use local server.'}), 400
 
 
 @agent_bp.route('/launch', methods=['POST'])
