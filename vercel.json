@@ -1,4 +1,11 @@
 {
+  "regions": ["sin1"],
+  "functions": {
+    "app.py": {
+      "maxDuration": 30,
+      "memory": 512
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ]
