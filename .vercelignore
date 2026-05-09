@@ -1,0 +1,13 @@
+modules/selenium_bot.py
+modules/flow_bot.py
+modules/chrome_launcher.py
+chrome_session/
+*.db
+__pycache__/
+.git/
+requirements-local.txt
+launch_profiles.*
+test_bot.py
+static/downloads/
+static/uploads/
+static/outputs/
