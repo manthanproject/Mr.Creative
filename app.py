@@ -211,9 +211,10 @@ def create_app():
 
 
 # Vercel needs a top-level app instance
+
 app = create_app()
 
 if __name__ == '__main__':
-    pass  # app already created above
-    app.run(debug=True, port=5000)
-app = create_app()
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
