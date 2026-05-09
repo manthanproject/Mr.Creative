@@ -216,3 +216,4 @@ app = create_app()
 if __name__ == '__main__':
     pass  # app already created above
     app.run(debug=True, port=5000)
+app = create_app()
