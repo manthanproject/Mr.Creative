@@ -749,42 +749,38 @@ def clear_jobs():
     return jsonify({'success': True})
 
 
+
 @generate_bp.route('/save-credentials', methods=['POST'])
 @login_required
 def save_credentials():
-    """Hot-swap Google credentials and save to accounts list."""
+    from models import SavedAccount, db
     data = request.get_json() or {}
     email = data.get('email', '').strip()
     password = data.get('password', '').strip()
-
     if not email:
         return jsonify({'error': 'Email is required'}), 400
-
-    # Update in-memory config (takes effect on next bot run)
     current_app.config['GOOGLE_EMAIL'] = email
     current_app.config['GOOGLE_PASSWORD'] = password
-
-    # Save to accounts file for future quick-switch
-    _save_account(email, password)
-
+    acct = SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli', email=email).first()
+    if acct:
+        acct.password_enc = password
+    else:
+        acct = SavedAccount(user_id=current_user.id, email=email, password_enc=password, service='pomelli')
+        db.session.add(acct)
+    SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli').update({'is_active': False})
+    acct.is_active = True
+    db.session.commit()
     return jsonify({'success': True, 'email': email})
 
 
 @generate_bp.route('/saved-accounts')
 @login_required
 def saved_accounts():
-    """List saved accounts for Pomelli (filter out Flow-only accounts)."""
-    accounts = _load_accounts()
+    from models import SavedAccount
+    accounts = SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli').all()
     active = current_app.config.get('GOOGLE_EMAIL', '')
-    # Pomelli accounts — exclude known Flow-only accounts
-    flow_only = {'crimsonbox69@gmail.com'}
-    filtered = [a for a in accounts if a['email'].lower() not in flow_only]
-    emails_in_list = {a['email'] for a in filtered}
-    # Always include the active account
-    if active and active not in emails_in_list and active.lower() not in flow_only:
-        filtered.insert(0, {'email': active, 'password': ''})
     return jsonify({
-        'accounts': [{'email': a['email'], 'active': a['email'] == active} for a in filtered],
+        'accounts': [{'email': a.email, 'active': a.is_active or a.email == active} for a in accounts],
         'active': active,
     })
 
@@ -792,108 +788,55 @@ def saved_accounts():
 @generate_bp.route('/switch-account', methods=['POST'])
 @login_required
 def switch_account():
-    """Quick-switch to a previously saved account."""
+    from models import SavedAccount, db
     data = request.get_json() or {}
     email = data.get('email', '').strip()
     if not email:
         return jsonify({'error': 'Email is required'}), 400
-
-    accounts = _load_accounts()
-    match = next((a for a in accounts if a['email'] == email), None)
-
+    match = SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli', email=email).first()
     if match:
-        current_app.config['GOOGLE_EMAIL'] = match['email']
-        current_app.config['GOOGLE_PASSWORD'] = match.get('password', '')
-        _save_active_account('pomelli', match['email'])
-        return jsonify({'success': True, 'email': match['email']})
-
-    # Account not in list — add it (no password needed with Chrome profiles)
-    accounts.append({'email': email, 'password': 'profile-session'})
-    _write_accounts(accounts)
+        SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli').update({'is_active': False})
+        match.is_active = True
+        db.session.commit()
+        current_app.config['GOOGLE_EMAIL'] = match.email
+        current_app.config['GOOGLE_PASSWORD'] = match.password_enc or ''
+        return jsonify({'success': True, 'email': match.email})
+    SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli').update({'is_active': False})
+    new_acct = SavedAccount(user_id=current_user.id, email=email, password_enc='profile-session', service='pomelli', is_active=True)
+    db.session.add(new_acct)
+    db.session.commit()
     current_app.config['GOOGLE_EMAIL'] = email
-    current_app.config['GOOGLE_PASSWORD'] = ''
-    _save_active_account('pomelli', email)
     return jsonify({'success': True, 'email': email})
 
 
 @generate_bp.route('/delete-account', methods=['POST'])
 @login_required
 def delete_account():
-    """Remove a saved account."""
+    from models import SavedAccount, db
     data = request.get_json() or {}
     email = data.get('email', '').strip()
     if not email:
         return jsonify({'error': 'Email is required'}), 400
-
-    accounts = _load_accounts()
-    accounts = [a for a in accounts if a['email'] != email]
-    _write_accounts(accounts)
+    SavedAccount.query.filter_by(user_id=current_user.id, service='pomelli', email=email).delete()
+    db.session.commit()
     return jsonify({'success': True})
 
 
-# ── Account storage helpers ──
-
-def _accounts_file():
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'saved_accounts.json')
-
-
 def _load_accounts():
-    path = _accounts_file()
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return []
-    return []
-
-
-def _write_accounts(accounts):
-    path = _accounts_file()
-    with open(path, 'w') as f:
-        json.dump(accounts, f, indent=2)
-
-
-def _active_accounts_file():
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'active_accounts.json')
-
-
-def _save_active_account(tool, email):
-    """Persist which account is active for each tool (pomelli/flow)."""
-    path = _active_accounts_file()
-    data = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                data = json.load(f)
-        except Exception:
-            pass
-    data[tool] = email
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=2)
-
-
-def _load_active_accounts():
-    """Load persisted active accounts for all tools."""
-    path = _active_accounts_file()
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
-
+    try:
+        from models import SavedAccount
+        return [{'email': a.email, 'password': a.password_enc} for a in SavedAccount.query.filter_by(service='pomelli').all()]
+    except Exception:
+        return []
 
 def _save_account(email, password):
-    accounts = _load_accounts()
-    # Update existing or add new
-    found = False
-    for a in accounts:
-        if a['email'] == email:
-            a['password'] = password
-            found = True
-            break
-    if not found:
-        accounts.append({'email': email, 'password': password})
-    _write_accounts(accounts)
+    pass
+
+def _save_active_account(tool, email):
+    pass
+
+def _load_active_accounts():
+    return {}
+
+def _write_accounts(accounts):
+    pass
