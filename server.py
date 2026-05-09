@@ -61,13 +61,7 @@ def create_app():
     try:
 
         try:
-            try:
-
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-            except OSError:
-
-                pass
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         except OSError:
             pass
 
@@ -77,13 +71,7 @@ def create_app():
     try:
 
         try:
-            try:
-
-                os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
-
-            except OSError:
-
-                pass
+            os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
         except OSError:
             pass
 
@@ -91,21 +79,9 @@ def create_app():
 
         pass
     try:
-
-        try:
-
-
             os.makedirs(app.config.get('DOWNLOAD_DIR', 'static/downloads')
-
-
         except OSError:
-
-
-            pass
-
-    except OSError:
-
-        pass, exist_ok=True)
+            pass, exist_ok=True)
 
     # Load persisted active accounts (survives restarts)
     active_accounts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'active_accounts.json')
