@@ -278,19 +278,11 @@ def _run_flow_bot(job_id, prompt, aspect_ratio, count, collection_id, user_id, f
 @banners_bp.route('/flow-accounts')
 @login_required
 def flow_accounts():
-    """List saved accounts for Flow."""
-    import json
-    accounts_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'saved_accounts.json')
-    accounts = []
-    if os.path.exists(accounts_file):
-        try:
-            with open(accounts_file, 'r') as f:
-                accounts = json.load(f)
-        except Exception:
-            pass
+    from models import SavedAccount
+    accounts = SavedAccount.query.filter_by(user_id=current_user.id, service='flow').all()
     active = current_app.config.get('FLOW_GOOGLE_EMAIL', '')
     return jsonify({
-        'accounts': [{'email': a['email'], 'active': a['email'] == active} for a in accounts],
+        'accounts': [{'email': a.email, 'active': a.is_active or a.email == active} for a in accounts],
         'active': active,
     })
 
@@ -298,38 +290,27 @@ def flow_accounts():
 @banners_bp.route('/flow-switch-account', methods=['POST'])
 @login_required
 def flow_switch_account():
-    """Switch the active Flow account."""
-    import json
+    from models import SavedAccount, db
     data = request.get_json() or {}
     email = data.get('email', '').strip()
     password = data.get('password', '').strip()
-
     if not email:
         return jsonify({'error': 'Email is required'}), 400
-
-    accounts_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'saved_accounts.json')
-    accounts = []
-    if os.path.exists(accounts_file):
-        try:
-            with open(accounts_file, 'r') as f:
-                accounts = json.load(f)
-        except Exception:
-            pass
-
-    match = next((a for a in accounts if a['email'] == email), None)
-
+    match = SavedAccount.query.filter_by(user_id=current_user.id, service='flow', email=email).first()
     if match:
-        current_app.config['FLOW_GOOGLE_EMAIL'] = match['email']
-        current_app.config['FLOW_GOOGLE_PASSWORD'] = match['password']
-        _save_flow_active(match['email'])
-        return jsonify({'success': True, 'email': match['email']})
+        SavedAccount.query.filter_by(user_id=current_user.id, service='flow').update({'is_active': False})
+        match.is_active = True
+        db.session.commit()
+        current_app.config['FLOW_GOOGLE_EMAIL'] = match.email
+        current_app.config['FLOW_GOOGLE_PASSWORD'] = match.password_enc
+        return jsonify({'success': True, 'email': match.email})
     elif password:
-        accounts.append({'email': email, 'password': password})
-        with open(accounts_file, 'w') as f:
-            json.dump(accounts, f, indent=2)
+        SavedAccount.query.filter_by(user_id=current_user.id, service='flow').update({'is_active': False})
+        new_acct = SavedAccount(user_id=current_user.id, email=email, password_enc=password, service='flow', is_active=True)
+        db.session.add(new_acct)
+        db.session.commit()
         current_app.config['FLOW_GOOGLE_EMAIL'] = email
         current_app.config['FLOW_GOOGLE_PASSWORD'] = password
-        _save_flow_active(email)
         return jsonify({'success': True, 'email': email})
     else:
         return jsonify({'error': 'Account not found. Provide password to save new account.'}), 404
@@ -338,46 +319,18 @@ def flow_switch_account():
 @banners_bp.route('/flow-delete-account', methods=['POST'])
 @login_required
 def flow_delete_account():
-    """Remove a saved account from Flow list."""
-    import json
+    from models import SavedAccount, db
     data = request.get_json() or {}
     email = data.get('email', '').strip()
     if not email:
         return jsonify({'error': 'Email is required'}), 400
-
-    accounts_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'saved_accounts.json')
-    accounts = []
-    if os.path.exists(accounts_file):
-        try:
-            with open(accounts_file, 'r') as f:
-                accounts = json.load(f)
-        except Exception:
-            pass
-
-    accounts = [a for a in accounts if a['email'] != email]
-    with open(accounts_file, 'w') as f:
-        json.dump(accounts, f, indent=2)
-
-    # If deleted account was the active Flow account, clear it
+    SavedAccount.query.filter_by(user_id=current_user.id, service='flow', email=email).delete()
+    db.session.commit()
     if current_app.config.get('FLOW_GOOGLE_EMAIL', '') == email:
         current_app.config['FLOW_GOOGLE_EMAIL'] = ''
         current_app.config['FLOW_GOOGLE_PASSWORD'] = ''
-        _save_flow_active('')
-
     return jsonify({'success': True})
 
 
 def _save_flow_active(email):
-    """Persist active Flow account to disk."""
-    import json
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'active_accounts.json')
-    data = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                data = json.load(f)
-        except Exception:
-            pass
-    data['flow'] = email
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=2)
+    pass

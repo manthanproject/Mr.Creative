@@ -316,3 +316,14 @@ class AgentJob(db.Model):
     error_message = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     completed_at = db.Column(db.DateTime, nullable=True)
+
+
+class SavedAccount(db.Model):
+    __tablename__ = 'saved_accounts'
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    email = db.Column(db.String(200), nullable=False)
+    password_enc = db.Column(db.String(500), default='')
+    service = db.Column(db.String(50), default='flow')
+    is_active = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)

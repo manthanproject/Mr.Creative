@@ -82,32 +82,19 @@ def create_app():
             except OSError:
                 pass
 
-    # Load persisted active accounts (survives restarts)
-    active_accounts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'active_accounts.json')
-    if os.path.exists(active_accounts_path):
-        try:
-            import json
-            with open(active_accounts_path, 'r') as f:
-                active = json.load(f)
-            saved_accounts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'saved_accounts.json')
-            saved = []
-            if os.path.exists(saved_accounts_path):
-                with open(saved_accounts_path, 'r') as f:
-                    saved = json.load(f)
-            # Restore Pomelli active account
-            if active.get('pomelli'):
-                match = next((a for a in saved if a['email'] == active['pomelli']), None)
-                if match:
-                    app.config['GOOGLE_EMAIL'] = match['email']
-                    app.config['GOOGLE_PASSWORD'] = match['password']
-            # Restore Flow active account
-            if active.get('flow'):
-                match = next((a for a in saved if a['email'] == active['flow']), None)
-                if match:
-                    app.config['FLOW_GOOGLE_EMAIL'] = match['email']
-                    app.config['FLOW_GOOGLE_PASSWORD'] = match['password']
-        except Exception:
-            pass
+    # Load active accounts from DB
+    try:
+        from models import SavedAccount
+        with app.app_context():
+            for acct in SavedAccount.query.filter_by(is_active=True).all():
+                if acct.service == 'flow':
+                    app.config['FLOW_GOOGLE_EMAIL'] = acct.email
+                    app.config['FLOW_GOOGLE_PASSWORD'] = acct.password_enc
+                elif acct.service == 'pomelli':
+                    app.config['GOOGLE_EMAIL'] = acct.email
+                    app.config['GOOGLE_PASSWORD'] = acct.password_enc
+    except Exception:
+        pass
 
     # Register blueprints
     from routes.auth import auth_bp
