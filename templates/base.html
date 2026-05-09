@@ -199,5 +199,24 @@
             setInterval(updateSchedulerBadge, 60000);
         })();
     </script>
+<style>
+#page-loader{position:fixed;top:0;left:0;width:0;height:3px;background:linear-gradient(90deg,#c1cd7d,#a0b050);z-index:99999;pointer-events:none}
+#page-loader.loading{width:70%;transition:width 8s cubic-bezier(.1,.05,.15,.95)}
+#page-loader.done{width:100%;opacity:0;transition:width .2s, opacity .3s .2s}
+</style>
+<div id="page-loader"></div>
+<script>
+(function(){
+  var loader=document.getElementById('page-loader');
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a[href]');
+    if(!a||a.target==='_blank'||a.href.startsWith('javascript')||a.href.startsWith('#')||a.download||a.href.includes('/static/'))return;
+    if(a.origin!==location.origin)return;
+    loader.className='';void loader.offsetWidth;loader.className='loading';
+  });
+  window.addEventListener('beforeunload',function(){loader.className='loading';});
+  window.addEventListener('pageshow',function(){loader.className='done';setTimeout(function(){loader.className='';},500);});
+})();
+</script>
 </body>
 </html>

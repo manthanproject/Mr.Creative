@@ -9,21 +9,19 @@ import os
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    # Serverless optimization: disable connection pooling (each request gets fresh connection)
+    # Serverless: NullPool = no connection pooling overhead, fresh connection per request
     if os.environ.get('VERCEL'):
+        from sqlalchemy.pool import NullPool
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_pre_ping': True,
-            'pool_recycle': 300,
-            'pool_size': 1,
-            'max_overflow': 0,
+            'poolclass': NullPool,
+            'connect_args': {'connect_timeout': 5},
         }
-    # Serverless optimization: disable connection pooling (each request gets fresh connection)
+    # Serverless: NullPool = no connection pooling overhead, fresh connection per request
     if os.environ.get('VERCEL'):
+        from sqlalchemy.pool import NullPool
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_pre_ping': True,
-            'pool_recycle': 300,
-            'pool_size': 1,
-            'max_overflow': 0,
+            'poolclass': NullPool,
+            'connect_args': {'connect_timeout': 5},
         }
     app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for base64 image uploads
 
@@ -50,10 +48,13 @@ def create_app():
                          download_name='mr-creative-extension.zip')
 
     @app.after_request
-    def add_static_cors(response):
-        """Allow extension to fetch uploaded images."""
+    def add_headers(response):
         if '/static/uploads/' in request.path:
             response.headers['Access-Control-Allow-Origin'] = '*'
+        if '/static/' in request.path:
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        elif response.content_type and 'text/html' in response.content_type:
+            response.headers['Cache-Control'] = 'public, s-maxage=60, stale-while-revalidate=300'
         return response
 
     # Initialize extensions
