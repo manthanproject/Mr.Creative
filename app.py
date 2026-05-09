@@ -165,6 +165,9 @@ def create_app():
     return app
 
 
+# Vercel needs a top-level app instance
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
+    pass  # app already created above
     app.run(debug=True, port=5000)
