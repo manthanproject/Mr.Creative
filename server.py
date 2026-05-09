@@ -57,19 +57,13 @@ def create_app():
     def unauthorized():
         return redirect(url_for('auth.login'))
 
-    # Ensure directories exist
-    try:
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        except OSError:
-            pass
-    try:
-            os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
-        except OSError:
-            pass
-    try:
-            os.makedirs(app.config.get('DOWNLOAD_DIR', 'static/downloads')
-        except OSError:
-            pass, exist_ok=True)
+    # Ensure directories exist (skip on read-only filesystems like Vercel)
+    for _dir in [app.config.get('UPLOAD_FOLDER', ''), app.config.get('OUTPUT_FOLDER', ''), app.config.get('DOWNLOAD_DIR', '')]:
+        if _dir:
+            try:
+                os.makedirs(_dir, exist_ok=True)
+            except OSError:
+                pass
 
     # Load persisted active accounts (survives restarts)
     active_accounts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'active_accounts.json')
