@@ -133,46 +133,44 @@ def create_app():
 
     # Create tables
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f"[DB] create_all failed: {e}")
 
-        # Auto-migrate: add new columns to existing tables
-        import sqlite3
-        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-        conn = sqlite3.connect(db_path)
-        migrations = [
-            ("agent_jobs", "aspect_ratio", "VARCHAR(10) DEFAULT 'mixed'"),
-            ("agent_jobs", "reference_image", "VARCHAR(255)"),
-            ("agent_jobs", "control_action", "VARCHAR(10) DEFAULT ''"),
-            ("agent_jobs", "llm_provider", "VARCHAR(20) DEFAULT ''"),
-            ("agent_jobs", "post_options", "TEXT DEFAULT '{}'"),
-        ]
-        for table, column, col_type in migrations:
+        # Auto-migrate (SQLite only)
+        if 'sqlite' in app.config.get('SQLALCHEMY_DATABASE_URI', ''):
             try:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-                print(f"[Migration] Added {table}.{column}")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-        conn.commit()
-        conn.close()
+                import sqlite3
+                db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+                conn = sqlite3.connect(db_path)
+                for table, column, col_type in [
+                    ("agent_jobs", "aspect_ratio", "VARCHAR(10) DEFAULT 'mixed'"),
+                    ("agent_jobs", "reference_image", "VARCHAR(255)"),
+                    ("agent_jobs", "control_action", "VARCHAR(10) DEFAULT ''"),
+                    ("agent_jobs", "llm_provider", "VARCHAR(20) DEFAULT ''"),
+                    ("agent_jobs", "post_options", "TEXT DEFAULT '{}'"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+                    except sqlite3.OperationalError:
+                        pass
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
 
-    # Clean up stale jobs from previous crashes/restarts
-    from routes.generate import cleanup_stale_jobs
-    cleanup_stale_jobs(app)
-
-    # Start auto-scheduler (checks for due jobs every 60s)
-    # Only start in the main process, not in Flask's reloader child process
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
-        from modules.auto_scheduler import init_scheduler
-        init_scheduler(app)
+    if not os.environ.get('VERCEL'):
+        try:
+            from routes.generate import cleanup_stale_jobs
+            cleanup_stale_jobs(app)
+        except Exception:
+            pass
+        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+            try:
+                from modules.auto_scheduler import init_scheduler
+                init_scheduler(app)
+            except Exception:
+                pass
 
     return app
-
-
-# Vercel needs a top-level app instance
-
-app = create_app()
-
-if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
