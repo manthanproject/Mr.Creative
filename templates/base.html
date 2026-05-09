@@ -92,6 +92,12 @@
                     Compare
                 </a>
 
+                <div class="nav-section-label">Extension</div>
+                <a href="/download-extension" class="nav-link" download>
+                    <span class="nav-icon">⬇</span>
+                    Download Extension
+                </a>
+
                 <div class="nav-section-label">Account</div>
                 <a href="{{ url_for('settings.index') }}" class="nav-link {% if request.endpoint and 'settings' in request.endpoint %}active{% endif %}" id="navSettings">
                     <span class="nav-icon">⚙</span>

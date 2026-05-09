@@ -13,6 +13,26 @@ def create_app():
 
     CORS(app, resources={r"/api/ext/*": {"origins": "*"}})
 
+    @app.route('/download-extension')
+    def download_extension():
+        import zipfile, io
+        from flask import send_file
+        ext_dir = os.path.join(app.root_path, 'extension')
+        if not os.path.exists(ext_dir):
+            return 'Extension folder not found', 404
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(ext_dir):
+                # Skip node_modules, .git, __pycache__
+                dirs[:] = [d for d in dirs if d not in ('node_modules', '.git', '__pycache__')]
+                for f in files:
+                    fpath = os.path.join(root, f)
+                    arcname = os.path.join('mr-creative-extension', os.path.relpath(fpath, ext_dir))
+                    zf.write(fpath, arcname)
+        buf.seek(0)
+        return send_file(buf, mimetype='application/zip', as_attachment=True,
+                         download_name='mr-creative-extension.zip')
+
     @app.after_request
     def add_static_cors(response):
         """Allow extension to fetch uploaded images."""
