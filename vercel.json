@@ -1,7 +1,7 @@
 {
   "regions": ["sin1"],
   "functions": {
-    "app.py": {
+    "api/index.py": {
       "maxDuration": 30,
       "memory": 512
     }
