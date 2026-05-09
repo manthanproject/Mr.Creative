@@ -9,6 +9,14 @@ import os
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    # Serverless optimization: disable connection pooling (each request gets fresh connection)
+    if os.environ.get('VERCEL'):
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_pre_ping': True,
+            'pool_recycle': 300,
+            'pool_size': 1,
+            'max_overflow': 0,
+        }
     app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for base64 image uploads
 
     CORS(app, resources={r"/api/ext/*": {"origins": "*"}})
