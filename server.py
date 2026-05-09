@@ -59,25 +59,13 @@ def create_app():
 
     # Ensure directories exist
     try:
-
-        try:
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         except OSError:
             pass
-
-    except OSError:
-
-        pass
     try:
-
-        try:
             os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
         except OSError:
             pass
-
-    except OSError:
-
-        pass
     try:
             os.makedirs(app.config.get('DOWNLOAD_DIR', 'static/downloads')
         except OSError:
