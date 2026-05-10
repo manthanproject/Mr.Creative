@@ -327,3 +327,51 @@ class SavedAccount(db.Model):
     service = db.Column(db.String(50), default='flow')
     is_active = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+# ── Night Orchestrator Models ──────────────────────────────────────
+
+class NightTrend(db.Model):
+    __tablename__ = 'night_trends'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    source = db.Column(db.String(50), nullable=False)        # pinterest, instagram, amazon
+    category = db.Column(db.String(100), default='')
+    trend_data = db.Column(db.Text, default='{}')            # JSON
+    score = db.Column(db.Float, default=0.0)
+    scanned_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class NightCompetitor(db.Model):
+    __tablename__ = 'night_competitors'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    platform = db.Column(db.String(50), nullable=False)      # instagram, pinterest
+    handle = db.Column(db.String(200), nullable=False)
+    page_url = db.Column(db.String(500), default='')
+    last_post_data = db.Column(db.Text, default='{}')        # JSON (latest posts, engagement)
+    follower_count = db.Column(db.Integer, default=0)
+    avg_engagement = db.Column(db.Float, default=0.0)
+    scanned_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class NightReport(db.Model):
+    __tablename__ = 'night_reports'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    report_type = db.Column(db.String(50), nullable=False)   # trend, competitor, performance, plan, morning
+    report_data = db.Column(db.Text, default='{}')           # JSON
+    summary = db.Column(db.Text, default='')
+    status = db.Column(db.String(20), default='completed')   # running, completed, failed
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class ContentPlan(db.Model):
+    __tablename__ = 'content_plans'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    plan_date = db.Column(db.Date, nullable=False)
+    plan_data = db.Column(db.Text, default='{}')             # JSON (what to create, products, style)
+    status = db.Column(db.String(20), default='pending')     # pending, approved, executed
+    source_report_id = db.Column(db.String(36), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)

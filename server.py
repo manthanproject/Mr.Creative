@@ -130,6 +130,9 @@ def create_app():
     from routes.extension import bp as extension_bp
     app.register_blueprint(extension_bp)
 
+    from routes.night_ops import night_ops_bp
+    app.register_blueprint(night_ops_bp)
+
     # Root route
     @app.route('/')
     def index():
@@ -174,6 +177,11 @@ def create_app():
             try:
                 from modules.auto_scheduler import init_scheduler
                 init_scheduler(app)
+            except Exception:
+                pass
+            try:
+                from modules.night_orchestrator.orchestrator import init_night_scheduler
+                init_night_scheduler(app)
             except Exception:
                 pass
 

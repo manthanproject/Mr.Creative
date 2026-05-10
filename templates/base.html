@@ -93,6 +93,10 @@
                 </a>
 
                 <div class="nav-section-label">Extension</div>
+                <a href="{{ url_for('night_ops.index') }}" class="nav-link {% if request.endpoint and 'night_ops' in request.endpoint %}active{% endif %}">
+                    <span class="nav-icon">🌙</span>
+                    Night Ops
+                </a>
                 <a href="/download-extension" class="nav-link" download>
                     <span class="nav-icon">⬇</span>
                     Download Extension
