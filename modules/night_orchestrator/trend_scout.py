@@ -95,7 +95,10 @@ def scan_pinterest_trends(queries: list[str] | None = None, max_per_query: int =
 
                 # Scroll down to load more pins
                 for _ in range(2):
-                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+                    try:
+                        driver.execute_script("window.scrollTo(0, document.body?.scrollHeight || 0)")
+                    except Exception:
+                        pass
                     time.sleep(1.5)
 
                 # Extract pin data from rendered DOM
