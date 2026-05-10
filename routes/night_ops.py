@@ -60,7 +60,8 @@ def start_cycle():
     if is_running():
         return jsonify({'error': 'Cycle already running'}), 409
 
-    result = run_nightly_cycle_async(current_app._get_current_object(), manual=True)
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    result = run_nightly_cycle_async(app, manual=True)
     return jsonify(result)
 
 
