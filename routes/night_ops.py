@@ -72,6 +72,34 @@ def cycle_status():
     return jsonify(get_cycle_status())
 
 
+@night_ops_bp.route('/api/reset', methods=['POST'])
+@login_required
+def reset_dashboard():
+    """Clear all night ops data and reset cycle state."""
+    from models import db, NightTrend, NightCompetitor, NightReport, ContentPlan
+    from modules.night_orchestrator.orchestrator import _current_cycle
+
+    deleted = {}
+    for model, name in [
+        (NightTrend, 'trends'),
+        (NightCompetitor, 'competitors'),
+        (NightReport, 'reports'),
+        (ContentPlan, 'plans'),
+    ]:
+        count = model.query.count()
+        model.query.delete()
+        deleted[name] = count
+
+    db.session.commit()
+
+    _current_cycle.update({
+        'running': False, 'status': 'idle', 'current_agent': None,
+        'started_at': None, 'progress': 0, 'log': [], 'result': None,
+    })
+
+    return jsonify({'status': 'reset', 'deleted': deleted})
+
+
 @night_ops_bp.route('/api/report/<report_id>')
 @login_required
 def get_report(report_id):

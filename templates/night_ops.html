@@ -9,6 +9,9 @@
             <p>Overnight intelligence — trends, competitors, content plans</p>
         </div>
         <div class="header-btns">
+            <button class="btn btn-ghost" onclick="resetDashboard()" title="Clear all data & reset">
+                ↺ Reset
+            </button>
             <button class="btn btn-primary" id="btnStartCycle" onclick="startCycle()">
                 ▶ Run Night Cycle
             </button>
@@ -188,6 +191,17 @@
 </style>
 
 <script>
+// ── Reset ──
+function resetDashboard() {
+    if (!confirm('Clear ALL night ops data (trends, competitors, reports, plans)?')) return;
+    fetch('/night-ops/api/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'reset') location.reload();
+        })
+        .catch(err => alert('Reset failed: ' + err));
+}
+
 // ── Cycle Control ──
 let _pollInterval = null;
 
