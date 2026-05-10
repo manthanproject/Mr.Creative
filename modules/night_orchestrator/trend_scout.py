@@ -1,7 +1,6 @@
 """
 Night Orchestrator — TrendScout
-Scrapes trending content from Pinterest and Amazon bestsellers.
-Uses requests + BeautifulSoup (no Selenium overhead for public pages).
+Scrapes trending content from Pinterest (Selenium) and Amazon bestsellers (requests+BS4).
 """
 
 import json
@@ -69,46 +68,62 @@ def _polite_delay(min_s=1.5, max_s=3.5):
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  PINTEREST TREND SCANNER
+#  PINTEREST TREND SCANNER (Selenium — JS-rendered)
 # ═══════════════════════════════════════════════════════════════════
 
 def scan_pinterest_trends(queries: list[str] | None = None, max_per_query: int = 10) -> list[dict]:
     """
-    Scrape Pinterest search results for trending pins.
-    Returns list of trend dicts: {title, description, image_url, pin_url, query, score}
+    Scrape Pinterest search results using headless Chrome.
+    Pinterest is fully React-rendered — BS4 gets nothing, Selenium gets everything.
+    Returns list of trend dicts.
     """
     queries = queries or PINTEREST_SEARCH_QUERIES
     all_trends = []
-    session = _get_session()
+    driver = None
 
-    for query in queries:
-        try:
-            logger.info(f"[TrendScout] Pinterest search: {query}")
-            url = f'https://www.pinterest.com/search/pins/?q={requests.utils.quote(query)}'
-            resp = session.get(url, timeout=15)
+    try:
+        from modules.night_orchestrator.browser import create_headless_driver
+        driver = create_headless_driver()
+        logger.info("[TrendScout] Headless Chrome started for Pinterest")
 
-            if resp.status_code != 200:
-                logger.warning(f"[TrendScout] Pinterest {resp.status_code} for '{query}'")
-                _polite_delay()
+        for query in queries:
+            try:
+                logger.info(f"[TrendScout] Pinterest search: {query}")
+                url = f'https://www.pinterest.com/search/pins/?q={requests.utils.quote(query)}'
+                driver.get(url)
+                time.sleep(random.uniform(3, 5))  # Wait for React render
+
+                # Scroll down to load more pins
+                for _ in range(2):
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+                    time.sleep(1.5)
+
+                # Extract pin data from rendered DOM
+                trends = _extract_pins_from_dom(driver, query)
+                all_trends.extend(trends[:max_per_query])
+
+                logger.info(f"[TrendScout] Found {len(trends)} pins for '{query}'")
+                _polite_delay(2, 4)
+
+            except Exception as e:
+                logger.error(f"[TrendScout] Pinterest error for '{query}': {e}")
                 continue
 
-            # Pinterest renders via React — HTML has limited data in initial load
-            # Try to extract from embedded JSON state
-            trends = _parse_pinterest_html(resp.text, query)
-            all_trends.extend(trends[:max_per_query])
-
-            logger.info(f"[TrendScout] Found {len(trends)} pins for '{query}'")
-            _polite_delay()
-
-        except Exception as e:
-            logger.error(f"[TrendScout] Pinterest error for '{query}': {e}")
-            continue
+    except Exception as e:
+        logger.error(f"[TrendScout] Pinterest Selenium init error: {e}")
+    finally:
+        if driver:
+            try:
+                driver.quit()
+                logger.info("[TrendScout] Headless Chrome closed")
+            except Exception:
+                pass
 
     # Deduplicate by title
     seen = set()
     unique = []
     for t in all_trends:
-        key = t.get('title', '')[:50].lower()
+        key = t.get('title', '')[:50].lower().strip()
         if key and key not in seen:
             seen.add(key)
             unique.append(t)
@@ -117,98 +132,62 @@ def scan_pinterest_trends(queries: list[str] | None = None, max_per_query: int =
     return unique
 
 
-def _parse_pinterest_html(html: str, query: str) -> list[dict]:
-    """
-    Extract pin data from Pinterest HTML.
-    Pinterest embeds JSON resource data in script tags.
-    """
+def _extract_pins_from_dom(driver, query: str) -> list[dict]:
+    """Extract pin data from Pinterest's rendered DOM."""
     trends = []
 
-    # Strategy 1: Parse __PWS_DATA__ JSON blob (Pinterest's embedded state)
-    pws_match = re.search(r'<script[^>]*id="__PWS_DATA__"[^>]*>(.+?)</script>', html, re.DOTALL)
-    if pws_match:
-        try:
-            data = json.loads(pws_match.group(1))
-            pins = _extract_pins_from_pws(data)
-            for pin in pins:
-                pin['query'] = query
-                pin['source'] = 'pinterest'
-                trends.append(pin)
-            if trends:
-                return trends
-        except (json.JSONDecodeError, KeyError):
-            pass
+    try:
+        # Strategy 1: Pin containers with alt text on images
+        pins = driver.find_elements('css selector', 'div[data-test-id="pin"] img, div[role="listitem"] img')
+        for img in pins:
+            try:
+                alt = img.get_attribute('alt') or ''
+                src = img.get_attribute('src') or ''
+                if alt and len(alt) > 5 and 'pinimg.com' in src:
+                    # Try to get parent link for pin URL
+                    pin_url = ''
+                    try:
+                        parent_link = img.find_element('xpath', './ancestor::a[contains(@href,"/pin/")]')
+                        pin_url = parent_link.get_attribute('href') or ''
+                    except Exception:
+                        pass
 
-    # Strategy 2: Look for JSON in other script tags
-    for match in re.finditer(r'<script[^>]*type="application/json"[^>]*>(.+?)</script>', html, re.DOTALL):
-        try:
-            data = json.loads(match.group(1))
-            pins = _extract_pins_from_pws(data)
-            for pin in pins:
-                pin['query'] = query
-                pin['source'] = 'pinterest'
-                trends.append(pin)
-            if trends:
-                return trends
-        except (json.JSONDecodeError, KeyError):
-            pass
+                    trends.append({
+                        'title': alt.strip()[:200],
+                        'description': '',
+                        'image_url': src,
+                        'pin_url': pin_url,
+                        'query': query,
+                        'source': 'pinterest',
+                        'score': 0.7,
+                    })
+            except Exception:
+                continue
 
-    # Strategy 3: Fallback to basic HTML parsing (limited data)
-    soup = BeautifulSoup(html, 'html.parser')
-    for img in soup.select('img[src*="pinimg.com"]'):
-        title = img.get('alt', '').strip()
-        if title and len(title) > 5:
-            trends.append({
-                'title': title,
-                'description': '',
-                'image_url': img.get('src', ''),
-                'pin_url': '',
-                'query': query,
-                'source': 'pinterest',
-                'score': 0.5,
-            })
+        # Strategy 2: If strategy 1 got nothing, try broader selectors
+        if not trends:
+            all_imgs = driver.find_elements('css selector', 'img[src*="pinimg.com"]')
+            for img in all_imgs:
+                try:
+                    alt = img.get_attribute('alt') or ''
+                    src = img.get_attribute('src') or ''
+                    if alt and len(alt) > 5:
+                        trends.append({
+                            'title': alt.strip()[:200],
+                            'description': '',
+                            'image_url': src,
+                            'pin_url': '',
+                            'query': query,
+                            'source': 'pinterest',
+                            'score': 0.5,
+                        })
+                except Exception:
+                    continue
+
+    except Exception as e:
+        logger.error(f"[TrendScout] DOM extraction error: {e}")
 
     return trends
-
-
-def _extract_pins_from_pws(data: dict | list, depth: int = 0) -> list[dict]:
-    """Recursively extract pin objects from Pinterest's nested JSON state."""
-    if depth > 8:
-        return []
-
-    pins = []
-
-    if isinstance(data, dict):
-        # Check if this dict looks like a pin
-        if data.get('type') == 'pin' or ('grid_title' in data) or ('closeup_description' in data):
-            pin = {
-                'title': data.get('grid_title', '') or data.get('title', ''),
-                'description': data.get('closeup_description', '') or data.get('description', ''),
-                'image_url': '',
-                'pin_url': f"https://www.pinterest.com/pin/{data['id']}/" if data.get('id') else '',
-                'score': min(1.0, (data.get('repin_count', 0) + data.get('comment_count', 0)) / 100),
-            }
-            # Extract image URL
-            images = data.get('images', {}) or data.get('image_medium_size_pixels', {})
-            if isinstance(images, dict):
-                for key in ['orig', '736x', '564x', '474x', '236x']:
-                    if key in images and isinstance(images[key], dict):
-                        pin['image_url'] = images[key].get('url', '')
-                        break
-            if pin['title']:
-                pins.append(pin)
-
-        # Recurse into values
-        for v in data.values():
-            if isinstance(v, (dict, list)):
-                pins.extend(_extract_pins_from_pws(v, depth + 1))
-
-    elif isinstance(data, list):
-        for item in data:
-            if isinstance(item, (dict, list)):
-                pins.extend(_extract_pins_from_pws(item, depth + 1))
-
-    return pins
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -339,9 +318,18 @@ def run_trend_scan(app) -> dict:
         pinterest_trends = scan_pinterest_trends()
         amazon_products = scan_amazon_bestsellers()
 
+        # Global deduplication by title (fixes Amazon dupes across categories)
+        seen_titles = set()
+        all_items = []
+        for item in pinterest_trends + amazon_products:
+            key = item.get('title', '')[:60].lower().strip()
+            if key and key not in seen_titles:
+                seen_titles.add(key)
+                all_items.append(item)
+
         # Save to DB
         saved_count = 0
-        for item in pinterest_trends + amazon_products:
+        for item in all_items:
             try:
                 trend = NightTrend(
                     source=item.get('source', 'unknown'),
@@ -357,7 +345,7 @@ def run_trend_scan(app) -> dict:
                 continue
 
         db.session.commit()
-        logger.info(f"[TrendScout] Saved {saved_count} trends to DB")
+        logger.info(f"[TrendScout] Saved {saved_count} trends to DB (deduped from {len(pinterest_trends) + len(amazon_products)})")
 
         return {
             'pinterest_count': len(pinterest_trends),
