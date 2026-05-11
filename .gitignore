@@ -61,3 +61,4 @@ scan_result.png
 *.tmp
 *.bak
 .claude/
+.env 

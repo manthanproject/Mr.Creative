@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, redirect, url_for, request
 from flask_login import LoginManager
 from flask_cors import CORS  # type: ignore[import-untyped]
