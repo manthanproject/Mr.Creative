@@ -137,6 +137,37 @@ def approve_plan(plan_id):
     return jsonify({'status': 'approved', 'id': plan.id})
 
 
+@night_ops_bp.route('/api/plan/<plan_id>/auto-post', methods=['POST'])
+@login_required
+def auto_post_plan(plan_id):
+    data = request.get_json() or {}
+    board_id = data.get('board_id', '').strip()
+    link = data.get('link', '').strip()
+
+    if not board_id:
+        return jsonify({'error': 'Select a Pinterest board'}), 400
+
+    from modules.night_orchestrator.pinterest_poster import auto_post_from_plan
+    result = auto_post_from_plan(
+        current_app._get_current_object(),
+        plan_id=plan_id,
+        board_id=board_id,
+        user_id=current_user.id,
+        link=link,
+    )
+    status_code = 200 if result.get('success') else 400
+    return jsonify(result), status_code
+
+
+@night_ops_bp.route('/api/pinterest-boards')
+@login_required
+def pinterest_boards():
+    from modules.night_orchestrator.pinterest_poster import get_boards
+    result = get_boards(current_app._get_current_object())
+    status_code = 200 if result.get('success') else 400
+    return jsonify(result), status_code
+
+
 @night_ops_bp.route('/api/trends')
 @login_required
 def get_trends():

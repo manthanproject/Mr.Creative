@@ -163,6 +163,13 @@
                     ✓ Approve Plan
                 </button>
                 {% endif %}
+                {% if plan.status in ('approved', 'pending') %}
+                <button class="btn btn-secondary btn-sm" style="margin-top:12px;margin-left:6px;" onclick="openAutoPostModal('{{ plan.id }}')">
+                    Auto-Post to Pinterest
+                </button>
+                {% elif plan.status == 'executed' %}
+                <span class="badge badge-success" style="margin-top:12px;">Posted to Pinterest</span>
+                {% endif %}
             </div>
             {% else %}
             <p style="color:var(--text-muted);">No content plan available. Run a night cycle to generate one.</p>
@@ -440,6 +447,89 @@ function approvePlan(planId) {
         });
 }
 
+// Pinterest Auto-Post
+let _autoPostPlanId = '';
+
+function openAutoPostModal(planId) {
+    _autoPostPlanId = planId;
+    const modal = document.getElementById('pinterestPostModal');
+    modal.style.display = 'flex';
+    document.getElementById('pinPostStatus').style.display = 'none';
+    document.getElementById('pinPostBtn').disabled = false;
+    document.getElementById('pinPostBtn').textContent = 'Schedule Posts';
+
+    const sel = document.getElementById('pinBoardSelect');
+    sel.innerHTML = '<option value="">Loading boards...</option>';
+    fetch('/night-ops/api/pinterest-boards')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.boards && data.boards.length) {
+                sel.innerHTML = data.boards.map(b =>
+                    `<option value="${b.id}">${b.name} (${b.pin_count} pins)</option>`
+                ).join('');
+            } else {
+                sel.innerHTML = '<option value="">No boards found</option>';
+            }
+        })
+        .catch(() => { sel.innerHTML = '<option value="">Error loading boards</option>'; });
+}
+
+function closePinModal() {
+    document.getElementById('pinterestPostModal').style.display = 'none';
+}
+
+function submitAutoPost() {
+    const boardId = document.getElementById('pinBoardSelect').value;
+    const link = document.getElementById('pinLink').value.trim();
+    const statusEl = document.getElementById('pinPostStatus');
+    const btn = document.getElementById('pinPostBtn');
+
+        statusEl.style.display = 'block';
+        statusEl.style.background = 'rgba(220,50,50,0.15)';
+        statusEl.style.color = '#f66';
+        statusEl.textContent = 'Please select a board';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating posts...';
+    statusEl.style.display = 'block';
+    statusEl.style.background = 'rgba(193,205,125,0.15)';
+    statusEl.style.color = 'var(--accent)';
+    statusEl.textContent = 'Generating captions and scheduling posts...';
+
+    fetch(`/night-ops/api/plan/${_autoPostPlanId}/auto-post`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ board_id: boardId, link: link })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusEl.style.background = 'rgba(50,200,80,0.15)';
+            statusEl.style.color = '#4c4';
+            statusEl.textContent = `Created ${data.created_posts} scheduled posts! Check Social page.`;
+            if (data.errors && data.errors.length) {
+                statusEl.textContent += ` (${data.errors.length} skipped)`;
+            }
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            statusEl.style.background = 'rgba(220,50,50,0.15)';
+            statusEl.style.color = '#f66';
+            statusEl.textContent = data.error || 'Failed to create posts';
+            btn.disabled = false;
+            btn.textContent = 'Schedule Posts';
+        }
+    })
+    .catch(err => {
+        statusEl.style.background = 'rgba(220,50,50,0.15)';
+        statusEl.style.color = '#f66';
+        statusEl.textContent = 'Network error: ' + err.message;
+        btn.disabled = false;
+        btn.textContent = 'Schedule Posts';
+    });
+}
+
 // ── Trends (with source filter) ──
 let _currentTrendSource = 'all';
 function loadTrends(source) {
@@ -590,5 +680,27 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 <div style="margin-top:20px;"><div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;">Currently Watching</div><div id="watchedList" style="max-height:200px;overflow-y:auto;"></div></div>
 </div></div>
+
+
+<div id="pinterestPostModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:90%;max-width:420px;">
+<h3 style="margin:0 0 16px;">Auto-Post to Pinterest</h3>
+<div style="margin-bottom:12px;">
+<label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">Select Board</label>
+<select id="pinBoardSelect" class="form-input" style="width:100%;">
+<option value="">Loading boards...</option>
+</select>
+</div>
+<div style="margin-bottom:16px;">
+<label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">Product Link (optional)</label>
+<input type="text" id="pinLink" class="form-input" placeholder="https://dropy.in/products/..." style="width:100%;" value="https://dropy.in">
+</div>
+<div id="pinPostStatus" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:8px;font-size:0.85rem;"></div>
+<div style="display:flex;gap:8px;justify-content:flex-end;">
+<button class="btn btn-ghost" onclick="closePinModal()">Cancel</button>
+<button class="btn btn-primary" id="pinPostBtn" onclick="submitAutoPost()">Schedule Posts</button>
+</div>
+</div>
+</div>
 
 {% endblock %}
