@@ -1,21 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Night Ops — Mr.Creative
-<div id="addCompModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1001;padding:30px;overflow-y:auto;" onclick="if(event.target===this)this.style.display='none'">
-<div style="max-width:500px;margin:40px auto;background:var(--bg-white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3>Add Competitor</h3><button class="btn btn-ghost btn-sm" onclick="document.getElementById('addCompModal').style.display='none'">X</button></div>
-<div style="display:flex;flex-direction:column;gap:12px;">
-<div style="display:flex;gap:8px;">
-<select id="addCompPlatform" style="padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"><option value="instagram">Instagram</option><option value="pinterest">Pinterest</option></select>
-<input id="addCompHandle" type="text" placeholder="handle (without @)" style="flex:1;padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"/>
-</div>
-<select id="addCompNiche" style="padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"><option value="">All Niches</option><option value="skincare">Skincare</option><option value="haircare">Hair Care</option><option value="beauty">Beauty</option><option value="personal_care">Personal Care</option><option value="health">Health</option></select>
-<label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-muted);"><input type="checkbox" id="addCompOwn"/> This is my own page</label>
-<button class="btn btn-primary" onclick="submitCompetitor()">Add Competitor</button>
-</div>
-<div style="margin-top:20px;"><div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;">Currently Watching</div><div id="watchedList" style="max-height:200px;overflow-y:auto;"></div></div>
-</div></div>
-
-{% endblock %}
+{% block title %}Night Ops — Mr.Creative{% endblock %}
 
 {% block content %}
 <div class="page-header">
