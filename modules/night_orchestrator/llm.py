@@ -51,7 +51,7 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
     genai.configure(api_key=api_key)
 
     model = genai.GenerativeModel(
-        model_name='gemini-2.0-flash',
+        model_name='gemini-2.5-flash',
         system_instruction=system if system else None,
         generation_config=genai.GenerationConfig(
             temperature=temperature,
