@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Competitor Analytics — Night Ops{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>Competitor Analytics</h1>
+            <p>Engagement, trends, and post performance across competitors</p>
+        </div>
+        <div class="header-btns">
+            <a href="/night-ops/" class="btn btn-ghost">Back to Night Ops</a>
+        </div>
+    </div>
+</div>
+
+<div id="loadingMsg" style="text-align:center;padding:60px;color:var(--text-muted);">
+    <div style="width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
+    Loading competitor data...
+</div>
+
+<div id="chartsArea" style="display:none;">
+
+    <!-- Summary Stats -->
+    <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card animate-fade-up delay-1">
+            <div class="stat-icon" style="background:var(--accent-glow);color:var(--accent);">C</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Competitors Tracked</div>
+        </div>
+        <div class="stat-card animate-fade-up delay-2">
+            <div class="stat-icon" style="background:var(--info-bg);color:var(--info);">F</div>
+            <div class="stat-value" id="statFollowers">0</div>
+            <div class="stat-label">Total Reach</div>
+        </div>
+        <div class="stat-card animate-fade-up delay-3">
+            <div class="stat-icon" style="background:var(--success-bg);color:var(--success);">E</div>
+            <div class="stat-value" id="statEngagement">0%</div>
+            <div class="stat-label">Avg Engagement</div>
+        </div>
+        <div class="stat-card animate-fade-up delay-4">
+            <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);">P</div>
+            <div class="stat-value" id="statPosts">0</div>
+            <div class="stat-label">Posts Scraped</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="card animate-fade-up delay-5">
+            <div class="card-header"><h3>Followers Comparison</h3></div>
+            <div class="card-body" style="padding:16px 20px;"><canvas id="followersChart" height="220"></canvas></div>
+        </div>
+        <div class="card animate-fade-up delay-6">
+            <div class="card-header"><h3>Niche Distribution</h3></div>
+            <div class="card-body" style="display:flex;justify-content:center;padding:16px;"><canvas id="nicheChart" height="220" style="max-width:280px;"></canvas></div>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="card animate-fade-up delay-7">
+            <div class="card-header"><h3>Engagement Rate</h3></div>
+            <div class="card-body" style="padding:16px 20px;"><canvas id="engagementChart" height="200"></canvas></div>
+        </div>
+        <div class="card animate-fade-up delay-8">
+            <div class="card-header"><h3>Content Volume</h3></div>
+            <div class="card-body" style="padding:16px 20px;"><canvas id="postsChart" height="200"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Competitor Detail Cards -->
+    <div style="margin-bottom:8px;"><h2 style="font-size:1.1rem;font-weight:600;">Competitor Profiles</h2></div>
+    <div id="compCards" style="display:flex;flex-direction:column;gap:12px;"></div>
+
+    <!-- AI Insights -->
+    <div class="card" style="margin-top:16px;border-left:3px solid var(--accent);">
+        <div class="card-header">
+            <h3>AI Competitive Intelligence</h3>
+            <button class="btn btn-primary btn-sm" id="aiBtn" onclick="runAIInsights()">Generate Insights</button>
+        </div>
+        <div class="card-body">
+            <div id="aiInsights" style="line-height:1.8;color:var(--text-secondary);white-space:pre-wrap;">Click "Generate Insights" for Groq-powered competitive analysis covering strengths, gaps, and counter-strategies.</div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+.post-card{background:var(--bg-hover);border-radius:var(--radius-sm);overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;}
+.post-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);}
+.post-card img{width:100%;height:110px;object-fit:cover;display:block;}
+.post-card .post-info{padding:8px 10px;}
+.post-card .post-title{font-size:0.75rem;line-height:1.3;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.6em;}
+.post-card .post-saves{font-size:0.7rem;color:var(--accent);margin-top:4px;font-weight:500;}
+.comp-stat{background:var(--bg-hover);padding:10px 16px;border-radius:var(--radius-sm);text-align:center;min-width:90px;}
+.comp-stat .cs-value{font-weight:700;font-size:1.15rem;color:var(--text-primary);}
+.comp-stat .cs-label{font-size:0.7rem;color:var(--text-muted);margin-top:2px;}
+.comp-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.comp-header .platform-tag{font-size:0.65rem;padding:3px 8px;background:var(--bg-active);border-radius:var(--radius-full);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+.comp-header .niche-tag{font-size:0.65rem;padding:3px 8px;background:var(--accent-glow);border-radius:var(--radius-full);color:var(--accent);font-weight:500;}
+.comp-header .handle-link{font-weight:600;font-size:1rem;color:var(--text-primary);text-decoration:none;}
+.comp-header .handle-link:hover{color:var(--accent);}
+.comp-header .scan-date{font-size:0.75rem;color:var(--text-muted);margin-left:auto;}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+var _compData=[], _watchedData=[];
+var COLORS={accent:'#c1cd7d',info:'#60a5fa',warning:'#fbbf24',danger:'#f87171',success:'#4ade80',purple:'#a78bfa',pink:'#f472b6',orange:'#f97316',teal:'#34d399',indigo:'#818cf8'};
+var palette=[COLORS.accent,COLORS.info,COLORS.orange,COLORS.purple,COLORS.success,COLORS.pink,COLORS.warning,COLORS.teal,COLORS.danger,COLORS.indigo];
+var gridColor='rgba(255,255,255,0.05)';
+var tickColor='#919282';
+Chart.defaults.font.family="'DM Sans',sans-serif";
+
+function init(){
+    Promise.all([
+        fetch('/night-ops/api/competitors').then(function(r){return r.json()}),
+        fetch('/night-ops/api/watched-competitors').then(function(r){return r.json()})
+    ]).then(function(res){
+        _compData=res[0];_watchedData=res[1];
+        document.getElementById('loadingMsg').style.display='none';
+        document.getElementById('chartsArea').style.display='block';
+        renderStats();renderCharts();renderCompCards();
+    });
+}
+
+function renderStats(){
+    var totalF=_compData.reduce(function(s,c){return s+(c.followers||0)},0);
+    var totalP=_compData.reduce(function(s,c){var d=c.data||{};return s+(d.recent_pins||[]).length+(d.recent_posts||[]).length},0);
+    var avgE=_compData.length?(_compData.reduce(function(s,c){return s+(c.engagement||0)},0)/_compData.length).toFixed(1):'0';
+    document.getElementById('statTotal').textContent=_compData.length;
+    document.getElementById('statFollowers').textContent=totalF.toLocaleString();
+    document.getElementById('statEngagement').textContent=avgE+'%';
+    document.getElementById('statPosts').textContent=totalP;
+}
+
+function renderCharts(){
+    var lb=_compData.map(function(c){return '@'+c.handle});
+    var fl=_compData.map(function(c){return c.followers||0});
+    var eg=_compData.map(function(c){return c.engagement||0});
+    var pc=_compData.map(function(c){var d=c.data||{};return(d.recent_pins||[]).length+(d.recent_posts||[]).length});
+    var ttOpts={backgroundColor:'#1a1a1a',titleColor:'#e5e3d9',bodyColor:'#c7c8b6',borderColor:'#333',borderWidth:1,cornerRadius:8,padding:10};
+
+    new Chart(document.getElementById('followersChart'),{
+        type:'bar',
+        data:{labels:lb,datasets:[{label:'Followers',data:fl,backgroundColor:palette.slice(0,lb.length),borderRadius:8,borderSkipped:false}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:ttOpts},scales:{x:{ticks:{color:tickColor},grid:{color:gridColor}},y:{ticks:{color:tickColor,font:{weight:'500'}},grid:{display:false}}}}
+    });
+
+    new Chart(document.getElementById('engagementChart'),{
+        type:'bar',
+        data:{labels:lb,datasets:[{label:'Engagement %',data:eg,backgroundColor:palette.map(function(c){return c+'cc'}),borderColor:palette,borderWidth:1,borderRadius:8,borderSkipped:false}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:ttOpts},scales:{x:{ticks:{color:tickColor,maxRotation:45},grid:{display:false}},y:{ticks:{color:tickColor,callback:function(v){return v+'%'}},grid:{color:gridColor}}}}
+    });
+
+    var nm={};_watchedData.forEach(function(w){var n=w.niche||'other';nm[n]=(nm[n]||0)+1});
+    new Chart(document.getElementById('nicheChart'),{
+        type:'doughnut',
+        data:{labels:Object.keys(nm),datasets:[{data:Object.values(nm),backgroundColor:palette,borderColor:'#0a0a0a',borderWidth:3,hoverOffset:8}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{color:tickColor,padding:12,usePointStyle:true,pointStyleWidth:8,font:{size:11}}}}}
+    });
+
+    new Chart(document.getElementById('postsChart'),{
+        type:'bar',
+        data:{labels:lb,datasets:[{label:'Posts',data:pc,backgroundColor:COLORS.accent+'99',borderColor:COLORS.accent,borderWidth:1,borderRadius:8,borderSkipped:false}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:ttOpts},scales:{x:{ticks:{color:tickColor,maxRotation:45},grid:{display:false}},y:{ticks:{color:tickColor},grid:{color:gridColor}}}}
+    });
+}
+
+function renderCompCards(){
+    var el=document.getElementById('compCards');
+    el.innerHTML=_compData.map(function(c,i){
+        var d=c.data||{},pins=d.recent_pins||[],posts=d.recent_posts||[],all=pins.concat(posts),niche='';
+        _watchedData.forEach(function(w){if(w.handle===c.handle)niche=w.niche||''});
+
+        var stats='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">'
+            +'<div class="comp-stat"><div class="cs-value">'+(c.followers||0).toLocaleString()+'</div><div class="cs-label">Followers</div></div>'
+            +'<div class="comp-stat"><div class="cs-value">'+(c.engagement||0)+'%</div><div class="cs-label">Engagement</div></div>'
+            +'<div class="comp-stat"><div class="cs-value">'+all.length+'</div><div class="cs-label">Posts Scraped</div></div>';
+        if(d.following_count)stats+='<div class="comp-stat"><div class="cs-value">'+(d.following_count||0).toLocaleString()+'</div><div class="cs-label">Following</div></div>';
+        if(d.pin_count)stats+='<div class="comp-stat"><div class="cs-value">'+(d.pin_count||0).toLocaleString()+'</div><div class="cs-label">Total Pins</div></div>';
+        stats+='</div>';
+
+        var ph='';
+        if(all.length>0){
+            ph='<div style="font-weight:600;font-size:0.85rem;margin-bottom:10px;color:var(--text-muted);">Recent Content</div>'
+            +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">'
+            +all.slice(0,12).map(function(p){
+                var img=p.image||p.image_url||'',title=p.title||p.caption||'Untitled',sv=p.saves||p.likes||0,lbl=p.saves!==undefined?'saves':'likes';
+                var url=p.url||(p.shortcode?'https://www.instagram.com/p/'+p.shortcode+'/':'');
+                return '<'+(url?'a href="'+url+'" target="_blank" style="text-decoration:none;color:inherit;"':'div')+' class="post-card">'
+                +(img?'<img src="'+img+'" onerror="this.remove()"/>':'<div style="height:60px;background:var(--bg-active);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.7rem;">No preview</div>')
+                +'<div class="post-info"><div class="post-title">'+title.slice(0,90)+'</div>'
+                +(sv>0?'<div class="post-saves">'+sv.toLocaleString()+' '+lbl+'</div>':'')
+                +'</div></'+(url?'a':'div')+'>';
+            }).join('')+'</div>';
+        } else {
+            ph='<div style="padding:20px;text-align:center;color:var(--text-muted);background:var(--bg-hover);border-radius:var(--radius-sm);">No post data yet. Run a Night Cycle to scrape posts.</div>';
+        }
+
+        return '<div class="card animate-fade-up"><div class="card-header"><div class="comp-header">'
+            +'<span class="platform-tag">'+c.platform+'</span>'
+            +'<a href="'+c.page_url+'" target="_blank" class="handle-link">@'+c.handle+'</a>'
+            +(niche?'<span class="niche-tag">'+niche+'</span>':'')
+            +'<span class="scan-date">Scanned '+new Date(c.scanned_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</span>'
+            +'</div></div><div class="card-body">'+stats+ph+'</div></div>';
+    }).join('');
+}
+
+function runAIInsights(){
+    var btn=document.getElementById('aiBtn');
+    btn.disabled=true;btn.textContent='Analyzing...';
+    document.getElementById('aiInsights').textContent='Generating competitive intelligence...';
+    var sd=_compData.map(function(c){var d=c.data||{};return{handle:c.handle,platform:c.platform,followers:c.followers,engagement:c.engagement,pins:(d.recent_pins||[]).length,pin_titles:(d.recent_pins||[]).slice(0,5).map(function(p){return p.title||''})};});
+    fetch('/night-ops/api/competitor-insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({competitors:sd})})
+    .then(function(r){return r.json()})
+    .then(function(data){
+        btn.disabled=false;btn.textContent='Generate Insights';
+        var text=data.insights||data.error||'No insights available.';
+        document.getElementById('aiInsights').innerHTML=text.replace(/\n/g,'<br>');
+    })
+    .catch(function(e){btn.disabled=false;btn.textContent='Generate Insights';alert('Error: '+e);});
+}
+
+document.addEventListener('DOMContentLoaded',init);
+</script>
+{% endblock %}
