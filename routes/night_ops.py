@@ -6,6 +6,7 @@ Dashboard for morning reports, manual cycle triggers, competitor management.
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required
 import json
+import re
 from datetime import datetime, timedelta
 
 night_ops_bp = Blueprint('night_ops', __name__, url_prefix='/night-ops')
