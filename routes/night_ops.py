@@ -168,6 +168,49 @@ def pinterest_boards():
     return jsonify(result), status_code
 
 
+@night_ops_bp.route('/api/pinterest-analytics')
+@login_required
+def pinterest_analytics():
+    from datetime import date, timedelta
+    token = current_app.config.get('PINTEREST_ACCESS_TOKEN', '')
+    if not token:
+        return jsonify({'error': 'Pinterest token not configured'}), 400
+    from modules.pinterest_api import PinterestAPI
+    api = PinterestAPI(token)
+    days = request.args.get('days', 30, type=int)
+    end = date.today().isoformat()
+    start = (date.today() - timedelta(days=days)).isoformat()
+    try:
+        account = api.get_user_account()
+        metrics = ['IMPRESSION', 'SAVE', 'PIN_CLICK', 'OUTBOUND_CLICK', 'ENGAGEMENT']
+        analytics = api.get_account_analytics(start, end, metric_types=metrics)
+        boards = api.list_boards()
+        totals = {m: 0 for m in metrics}
+        if isinstance(analytics, dict):
+            for key, val in analytics.items():
+                if isinstance(val, dict) and 'daily_metrics' in val:
+                    for day in val['daily_metrics']:
+                        dm = day.get('metrics', {})
+                        for m in metrics:
+                            totals[m] += dm.get(m, 0)
+                elif isinstance(val, dict) and 'summary_metrics' in val:
+                    for m in metrics:
+                        totals[m] += val['summary_metrics'].get(m, 0)
+        impressions = totals.get('IMPRESSION', 0)
+        engagement = totals.get('ENGAGEMENT', 0)
+        top_pins = []
+        try:
+            top = api.get_top_pins(start, end, sort_by='IMPRESSION', num_pins=5)
+            if isinstance(top, dict) and 'pins' in top:
+                for pin in top['pins'][:5]:
+                    top_pins.append({'id': pin.get('id',''), 'title': (pin.get('title') or '')[:60], 'image': pin.get('media',{}).get('images',{}).get('150x150',{}).get('url',''), 'metrics': pin.get('metrics',{})})
+        except Exception:
+            pass
+        return jsonify({'success': True, 'account': {'username': account.get('username',''), 'business_name': account.get('business_name',''), 'follower_count': account.get('follower_count',0), 'pin_count': account.get('pin_count',0), 'monthly_views': account.get('monthly_views',0)}, 'period': f'{start} to {end}', 'totals': totals, 'engagement_rate': round((engagement/impressions*100),2) if impressions>0 else 0, 'top_pins': top_pins, 'boards': boards})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 @night_ops_bp.route('/api/trends')
 @login_required
 def get_trends():

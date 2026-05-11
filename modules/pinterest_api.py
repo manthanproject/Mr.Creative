@@ -97,3 +97,32 @@ class PinterestAPI:
             return {'success': False, 'error': result.get('message', 'Unknown error')}
         except Exception as e:
             return {'success': False, 'error': str(e)}
+    def get_account_analytics(self, start_date, end_date, metric_types=None):
+        params = {
+            'start_date': start_date, 'end_date': end_date,
+            'app_types': 'ALL', 'pin_format': 'ALL',
+            'from_claimed_content': 'BOTH', 'split_field': 'NO_SPLIT',
+        }
+        if metric_types:
+            params['metric_types'] = ','.join(metric_types)
+        return self._get('user_account/analytics', params=params)
+
+    def get_top_pins(self, start_date, end_date, sort_by='IMPRESSION', num_pins=10):
+        params = {
+            'start_date': start_date, 'end_date': end_date,
+            'sort_by': sort_by, 'num_of_pins': min(num_pins, 25),
+            'pin_format': 'ALL', 'app_types': 'ALL', 'from_claimed_content': 'BOTH',
+        }
+        return self._get('user_account/top_pins/analytics', params=params)
+
+    def get_pin_analytics(self, pin_id, start_date, end_date, metric_types=None):
+        params = {'start_date': start_date, 'end_date': end_date, 'app_types': 'ALL'}
+        if metric_types:
+            params['metric_types'] = ','.join(metric_types)
+        return self._get(f'pins/{pin_id}/analytics', params=params)
+
+    def get_board_pins(self, board_id, page_size=25):
+        return self._get(f'boards/{board_id}/pins', params={'page_size': page_size})
+
+    def get_user_account(self):
+        return self._get('user_account')

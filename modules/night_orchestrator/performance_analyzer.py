@@ -166,27 +166,49 @@ def _analyze_internal_stats(app) -> dict:
 def _analyze_social_performance(app) -> dict:
     """
     Analyze external social media performance.
-    For now, uses competitor_watcher to scan own profiles.
+    Uses Pinterest API for real analytics data.
     """
-    from modules.night_orchestrator.competitor_watcher import scrape_instagram_profile, _get_session
-
-    session = _get_session()
-    own_profiles = {
-        'instagram': {},
-        'pinterest': {},
-    }
-
-    # Scan own Instagram
+    from datetime import date
+    own_profiles = {'pinterest': {}}
     try:
-        ig_data = scrape_instagram_profile(session, 'dropy.in', 'https://www.instagram.com/dropy.in/')
-        own_profiles['instagram'] = {
-            'followers': ig_data.get('follower_count', 0),
-            'posts': ig_data.get('post_count', 0),
-            'avg_engagement': ig_data.get('avg_engagement', 0.0),
-            'recent_posts': ig_data.get('recent_posts', [])[:3],
-            'error': ig_data.get('error'),
-        }
+        token = app.config.get('PINTEREST_ACCESS_TOKEN', '')
+        if token:
+            from modules.pinterest_api import PinterestAPI
+            api = PinterestAPI(token)
+            account = api.get_user_account()
+            own_profiles['pinterest']['account'] = {
+                'username': account.get('username', ''),
+                'follower_count': account.get('follower_count', 0),
+                'pin_count': account.get('pin_count', 0),
+                'monthly_views': account.get('monthly_views', 0),
+            }
+            end = date.today().isoformat()
+            start = (date.today() - timedelta(days=30)).isoformat()
+            metrics = ['IMPRESSION', 'SAVE', 'PIN_CLICK', 'OUTBOUND_CLICK', 'ENGAGEMENT']
+            analytics = api.get_account_analytics(start, end, metric_types=metrics)
+            totals = {m: 0 for m in metrics}
+            if isinstance(analytics, dict):
+                for key, val in analytics.items():
+                    if isinstance(val, dict) and 'daily_metrics' in val:
+                        for day in val['daily_metrics']:
+                            for m in metrics:
+                                totals[m] += day.get('metrics', {}).get(m, 0)
+                    elif isinstance(val, dict) and 'summary_metrics' in val:
+                        for m in metrics:
+                            totals[m] += val['summary_metrics'].get(m, 0)
+            own_profiles['pinterest']['analytics_30d'] = totals
+            impressions = totals.get('IMPRESSION', 0)
+            engagement = totals.get('ENGAGEMENT', 0)
+            own_profiles['pinterest']['engagement_rate'] = round(
+                (engagement / impressions * 100), 2) if impressions > 0 else 0
+            try:
+                boards = api.list_boards()
+                own_profiles['pinterest']['boards'] = boards[:10]
+            except Exception:
+                pass
+        else:
+            own_profiles['pinterest'] = {'error': 'Pinterest token not configured'}
     except Exception as e:
-        own_profiles['instagram'] = {'error': str(e)}
-
+        logger.error(f'[PerfAnalyzer] Pinterest analytics error: {e}')
+        own_profiles['pinterest'] = {'error': str(e)}
     return own_profiles
