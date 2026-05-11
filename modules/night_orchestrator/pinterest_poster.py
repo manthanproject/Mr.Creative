@@ -83,6 +83,7 @@ def auto_post_from_plan(app, plan_id, board_id, user_id, link=''):
                     hashtags=hashtags,
                     pin_link=link or 'https://dropy.in',
                     board_id=board_id,
+                    board_name=board_name,
                     scheduled_at=schedule_times[i] if i < len(schedule_times) else None,
                     status='scheduled' if i < len(schedule_times) else 'draft',
                 )
