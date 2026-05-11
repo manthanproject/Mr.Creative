@@ -54,8 +54,9 @@ def generate_morning_report(
 
         # ── Generate executive summary via Groq (if key available) ──
         groq_key = Config.GROQ_API_KEY
-        if groq_key:
-            report['executive_summary'] = _generate_executive_summary(groq_key, report)
+        gemini_key = Config.GEMINI_API_KEY
+        if groq_key or gemini_key:
+            report['executive_summary'] = _generate_executive_summary(report)
         else:
             report['executive_summary'] = _fallback_summary(report)
 
@@ -203,10 +204,10 @@ def _collect_issues(trends, competitors, performance, plan, meta) -> list:
     return issues
 
 
-def _generate_executive_summary(api_key: str, report: dict) -> str:
-    """Use Groq to generate a concise morning briefing."""
+def _generate_executive_summary(report: dict) -> str:
+    """Use LLM to generate a concise morning briefing."""
     try:
-        from groq import Groq
+        from modules.night_orchestrator.llm import call_llm
 
         # Build a concise data summary for the LLM
         sections = report.get('sections', {})
@@ -235,15 +236,8 @@ Issues: {len(issues)} ({', '.join(i['message'][:50] for i in issues[:3]) or 'Non
 Write a brief, actionable morning briefing. Be direct. Mention what to focus on today.
 Respond ONLY with the briefing text, no JSON, no markdown."""
 
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model='llama-3.3-70b-versatile',
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.5,
-            max_tokens=500,
-        )
-        summary = (response.choices[0].message.content or '').strip()
-        logger.info("[ReportGen] Executive summary generated via Groq")
+        summary = call_llm(prompt, temperature=0.5, max_tokens=500)
+        logger.info("[ReportGen] Executive summary generated via LLM")
         return summary
 
     except Exception as e:

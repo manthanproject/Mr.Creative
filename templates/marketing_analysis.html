@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Marketing Analysis — Night Ops{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-actions">
+        <div>
+            <h1>Marketing Analysis</h1>
+            <p>SWOT, audience personas, content strategy, SEO, ad campaigns, and 30-day action plan</p>
+        </div>
+        <div class="header-btns">
+            <a href="/night-ops/" class="btn btn-ghost">Back to Night Ops</a>
+            <a href="/night-ops/analytics" class="btn btn-ghost">Competitor Analytics</a>
+        </div>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="card" style="margin-bottom:12px;">
+    <div class="card-body" style="padding:12px 16px;display:flex;align-items:center;gap:12px;">
+        <span style="font-weight:600;font-size:0.9rem;">Generate Report</span>
+        <select id="reportNiche" style="padding:6px 10px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);">
+            <option value="all">All Niches</option>
+            <option value="skincare">Skincare</option>
+            <option value="haircare">Hair Care</option>
+            <option value="beauty">Beauty</option>
+            <option value="personal_care">Personal Care</option>
+            <option value="health">Health</option>
+        </select>
+        <button class="btn btn-primary" id="genBtn" onclick="generateReport()">Generate Full Report</button>
+        <span id="genSpinner" style="display:none;color:var(--text-muted);font-size:0.85rem;">Analyzing market data with AI...</span>
+    </div>
+</div>
+
+<div id="reportArea"></div>
+
+<style>
+.section-card{margin-bottom:12px;}
+.section-card .card-header h3{font-size:0.95rem;}
+.mini-card{background:var(--bg-hover);padding:10px 14px;border-radius:var(--radius-sm);}
+.mini-card .mc-label{font-size:0.7rem;color:var(--text-muted);margin-bottom:2px;}
+.mini-card .mc-value{font-weight:600;font-size:0.9rem;}
+.tag{display:inline-block;padding:2px 8px;border-radius:var(--radius-full);font-size:0.65rem;font-weight:600;text-transform:uppercase;}
+.tag-green{background:var(--success-bg);color:var(--success);}
+.tag-yellow{background:var(--warning-bg);color:var(--warning);}
+.tag-red{background:var(--danger-bg);color:var(--danger);}
+.tag-blue{background:var(--info-bg);color:var(--info);}
+.tag-accent{background:var(--accent-glow);color:var(--accent);}
+.swot-box{padding:14px;border-radius:var(--radius-sm);min-height:100px;}
+.swot-box .swot-title{font-weight:700;font-size:0.8rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;}
+.swot-box .swot-item{font-size:0.8rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);color:var(--text-secondary);}
+.week-card{background:var(--bg-hover);padding:12px;border-radius:var(--radius-sm);border-left:3px solid var(--accent);}
+.week-card .week-num{font-weight:700;font-size:0.75rem;color:var(--accent);margin-bottom:6px;}
+.week-card .week-action{font-size:0.8rem;padding:3px 0;color:var(--text-secondary);}
+</style>
+
+<script>
+function generateReport(){
+    var btn=document.getElementById('genBtn');
+    var spinner=document.getElementById('genSpinner');
+    var niche=document.getElementById('reportNiche').value;
+    btn.disabled=true;spinner.style.display='inline';
+    document.getElementById('reportArea').innerHTML='';
+
+    fetch('/night-ops/api/marketing-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:niche})})
+    .then(function(r){return r.json()})
+    .then(function(d){
+        btn.disabled=false;spinner.style.display='none';
+        if(d.error){document.getElementById('reportArea').innerHTML='<div class="card"><div class="card-body"><p style="color:var(--danger);">'+d.error+'</p></div></div>';return;}
+        renderReport(d);
+    })
+    .catch(function(e){btn.disabled=false;spinner.style.display='none';alert('Error: '+e);});
+}
+
+function renderReport(d){
+    var h='';
+
+    // Executive Summary
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Executive Summary</h3><span class="tag tag-accent">'+(d.niche||'All')+'</span></div>';
+    h+='<div class="card-body"><p style="line-height:1.7;color:var(--text-secondary);font-size:0.95rem;">'+(d.executive_summary||'')+'</p></div></div>';
+
+    // SWOT
+    var sw=d.swot||{};
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>SWOT Analysis</h3></div><div class="card-body">';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    h+='<div class="swot-box" style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.15);"><div class="swot-title" style="color:var(--success);">Strengths</div>'+(sw.strengths||[]).map(function(s){return '<div class="swot-item">'+s+'</div>'}).join('')+'</div>';
+    h+='<div class="swot-box" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);"><div class="swot-title" style="color:var(--warning);">Weaknesses</div>'+(sw.weaknesses||[]).map(function(s){return '<div class="swot-item">'+s+'</div>'}).join('')+'</div>';
+    h+='<div class="swot-box" style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.15);"><div class="swot-title" style="color:var(--info);">Opportunities</div>'+(sw.opportunities||[]).map(function(s){return '<div class="swot-item">'+s+'</div>'}).join('')+'</div>';
+    h+='<div class="swot-box" style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.15);"><div class="swot-title" style="color:var(--danger);">Threats</div>'+(sw.threats||[]).map(function(s){return '<div class="swot-item">'+s+'</div>'}).join('')+'</div>';
+    h+='</div></div></div>';
+
+    // Market Opportunities
+    var mo=d.market_opportunities||[];
+    if(mo.length){
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Market Opportunities</h3></div><div class="card-body">';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">';
+    h+=mo.map(function(m){var cc=m.competition==='low'?'green':m.competition==='medium'?'yellow':'red';
+    return '<div class="mini-card"><div style="font-weight:600;font-size:0.9rem;margin-bottom:4px;">'+m.segment+'</div><div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">'+m.size+'</div><span class="tag tag-'+cc+'">'+m.competition+' competition</span><div style="font-size:0.8rem;color:var(--text-secondary);margin-top:8px;">'+m.recommendation+'</div></div>'}).join('');
+    h+='</div></div></div>';}
+
+    // Audience Personas
+    var ap=d.audience_personas||[];
+    if(ap.length){
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Audience Personas</h3></div><div class="card-body">';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;">';
+    h+=ap.map(function(p){return '<div class="mini-card" style="border-left:3px solid var(--accent);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-weight:700;font-size:0.95rem;">'+p.name+'</span><span class="tag tag-accent">'+p.age+'</span></div><div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;">'+p.profile+'</div><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">Pain points: '+(p.pain_points||[]).join(', ')+'</div><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">Channels: '+(p.channels||[]).join(', ')+'</div><div style="font-size:0.75rem;color:var(--accent);">Triggers: '+(p.buying_triggers||[]).join(', ')+'</div></div>'}).join('');
+    h+='</div></div></div>';}
+
+    // Content Strategy
+    var cs=d.content_strategy||{};
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Content Strategy</h3></div><div class="card-body">';
+    if(cs.pillars){h+='<div style="margin-bottom:12px;"><div style="font-weight:600;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">CONTENT PILLARS</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+(cs.pillars||[]).map(function(p){return '<span class="tag tag-accent" style="font-size:0.75rem;padding:4px 12px;">'+p+'</span>'}).join('')+'</div></div>';}
+    if(cs.weekly_plan){h+='<div style="margin-bottom:12px;"><div style="font-weight:600;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">WEEKLY PLAN</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">'+(cs.weekly_plan||[]).map(function(w){return '<div class="mini-card"><div style="font-weight:600;font-size:0.8rem;">'+w.day+'</div><div style="display:flex;gap:4px;margin-top:4px;"><span class="tag tag-blue">'+w.content_type+'</span><span class="tag tag-accent">'+w.platform+'</span></div><div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">'+w.topic+'</div></div>'}).join('')+'</div></div>';}
+    if(cs.hashtag_strategy){h+='<div><div style="font-weight:600;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">HASHTAGS</div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+(cs.hashtag_strategy||[]).map(function(t){return '<span style="font-size:0.8rem;color:var(--accent);">#'+t+'</span>'}).join('')+'</div></div>';}
+    h+='</div></div>';
+
+    // SEO Keywords
+    var sk=d.seo_keywords||[];
+    if(sk.length){
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>SEO / Keyword Strategy</h3></div><div class="card-body">';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">';
+    h+=sk.map(function(k){var vc=k.volume_estimate==='high'?'green':k.volume_estimate==='medium'?'yellow':'red';var dc=k.difficulty==='easy'?'green':k.difficulty==='medium'?'yellow':'red';
+    return '<div class="mini-card"><div style="font-weight:600;font-size:0.9rem;margin-bottom:4px;">'+k.keyword+'</div><div style="display:flex;gap:4px;margin-bottom:6px;"><span class="tag tag-'+vc+'">vol: '+k.volume_estimate+'</span><span class="tag tag-'+dc+'">diff: '+k.difficulty+'</span><span class="tag tag-blue">'+k.intent+'</span></div><div style="font-size:0.8rem;color:var(--text-secondary);">'+k.content_idea+'</div></div>'}).join('');
+    h+='</div></div></div>';}
+
+    // Ad Campaigns
+    var ac=d.ad_campaigns||[];
+    if(ac.length){
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Ad Campaign Ideas</h3></div><div class="card-body">';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;">';
+    h+=ac.map(function(a){var oc=a.objective==='conversions'?'green':a.objective==='traffic'?'blue':'yellow';
+    return '<div class="mini-card" style="border-left:3px solid var(--info);"><div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">'+a.name+'</div><div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"><span class="tag tag-'+oc+'">'+a.objective+'</span><span class="tag tag-blue">'+a.platform+'</span><span class="tag tag-accent">'+a.budget_range+'</span></div><div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:4px;"><strong>Target:</strong> '+a.target_audience+'</div><div style="font-size:0.85rem;background:var(--bg-subtle);padding:8px;border-radius:6px;margin-bottom:4px;">'+a.ad_copy+'</div><div style="font-size:0.75rem;color:var(--accent);font-weight:600;">CTA: '+a.cta+'</div></div>'}).join('');
+    h+='</div></div></div>';}
+
+    // Pricing + Positioning side by side
+    var pi=d.pricing_insights||{};
+    var cp=d.competitive_positioning||{};
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Pricing Intelligence</h3></div><div class="card-body"><div class="mini-card" style="margin-bottom:8px;"><div class="mc-label">Strategy</div><div style="font-size:0.85rem;color:var(--text-secondary);">'+(pi.strategy||'')+'</div></div><div class="mini-card" style="margin-bottom:8px;"><div class="mc-label">Competitive Range</div><div style="font-size:0.85rem;color:var(--text-secondary);">'+(pi.competitive_range||'')+'</div></div>'+(pi.recommendations||[]).map(function(r){return '<div style="font-size:0.8rem;padding:4px 0;border-bottom:1px solid var(--border-light);color:var(--text-secondary);">'+r+'</div>'}).join('')+'</div></div>';
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>Competitive Positioning</h3></div><div class="card-body"><div class="mini-card" style="margin-bottom:8px;"><div class="mc-label">Current</div><div style="font-size:0.85rem;color:var(--text-secondary);">'+(cp.current_position||'')+'</div></div><div class="mini-card" style="margin-bottom:8px;"><div class="mc-label">Target</div><div style="font-size:0.85rem;color:var(--accent);">'+(cp.desired_position||'')+'</div></div><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">Differentiators: '+(cp.differentiators||[]).join(', ')+'</div><div style="font-size:0.75rem;color:var(--warning);">Gaps: '+(cp.gaps_to_close||[]).join(', ')+'</div></div></div>';
+    h+='</div>';
+
+    // 30-Day Action Plan
+    var ap30=d.action_plan_30_days||[];
+    if(ap30.length){
+    h+='<div class="card section-card animate-fade-up"><div class="card-header"><h3>30-Day Action Plan</h3></div><div class="card-body">';
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">';
+    h+=ap30.map(function(w){return '<div class="week-card"><div class="week-num">WEEK '+w.week+'</div>'+(w.actions||[]).map(function(a){return '<div class="week-action">'+a+'</div>'}).join('')+'</div>'}).join('');
+    h+='</div></div></div>';}
+
+    document.getElementById('reportArea').innerHTML=h;
+}
+</script>
+{% endblock %}

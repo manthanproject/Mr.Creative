@@ -257,9 +257,7 @@ def run_niche_analysis():
     niche = request.json.get('niche', '')
     if not niche or niche not in NICHE_MAP:
         return jsonify({'error': 'Invalid niche'}), 400
-    groq_key = Config.GROQ_API_KEY
-    if not groq_key:
-        return jsonify({'error': 'No GROQ_API_KEY configured'}), 500
+    # LLM key check handled by llm.py
     since = datetime.now() - timedelta(days=7)
     all_trends = NightTrend.query.filter(NightTrend.scanned_at >= since).all()
     niche_trends = []
@@ -288,10 +286,8 @@ Provide a focused analysis as JSON:
 
 Be specific to Indian market. Focus on actionable items. Respond ONLY with valid JSON."""
     try:
-        from groq import Groq
-        client = Groq(api_key=groq_key)
-        response = client.chat.completions.create(model='llama-3.3-70b-versatile', messages=[{"role": "user", "content": prompt}], temperature=0.6, max_tokens=2000)
-        result_text = (response.choices[0].message.content or '').strip()
+        from modules.night_orchestrator.llm import call_llm
+        result_text = call_llm(prompt)
         result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
         result_text = re.sub(r'\s*```$', '', result_text)
         analysis = json.loads(result_text)
@@ -363,9 +359,7 @@ def analytics():
 @login_required
 def competitor_insights():
     from config import Config
-    groq_key = Config.GROQ_API_KEY
-    if not groq_key:
-        return jsonify({'error': 'No GROQ_API_KEY configured'}), 500
+    # LLM key check handled by llm.py
 
     data = request.json or {}
     competitors = data.get('competitors', [])
@@ -387,14 +381,8 @@ Provide your analysis covering:
 Be specific, data-driven, and actionable. Format with clear sections. Keep it under 400 words."""
 
     try:
-        from groq import Groq
-        client = Groq(api_key=groq_key)
-        response = client.chat.completions.create(
-            model='llama-3.3-70b-versatile',
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6, max_tokens=2000,
-        )
-        insights = (response.choices[0].message.content or '').strip()
+        from modules.night_orchestrator.llm import call_llm
+        insights = call_llm(prompt)
         return jsonify({'insights': insights})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -406,9 +394,7 @@ def generate_leads():
     from models import db, NightTrend, NightCompetitor, NightReport
     from config import Config
 
-    groq_key = Config.GROQ_API_KEY
-    if not groq_key:
-        return jsonify({'error': 'No GROQ_API_KEY configured'}), 500
+    # LLM key check handled by llm.py
 
     niche = (request.json or {}).get('niche', 'all')
     since = datetime.now() - timedelta(days=7)
@@ -482,14 +468,8 @@ Generate 3-5 items per category. Be SPECIFIC to Indian market and dropy.in produ
 Respond ONLY with valid JSON."""
 
     try:
-        from groq import Groq
-        client = Groq(api_key=groq_key)
-        response = client.chat.completions.create(
-            model='llama-3.3-70b-versatile',
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7, max_tokens=3000,
-        )
-        result_text = (response.choices[0].message.content or '').strip()
+        from modules.night_orchestrator.llm import call_llm
+        result_text = call_llm(prompt)
         result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
         result_text = re.sub(r'\s*```$', '', result_text)
 
@@ -516,6 +496,96 @@ Respond ONLY with valid JSON."""
         leads['niche'] = niche_label
         leads['trend_count'] = len(trend_items)
         return jsonify(leads)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@night_ops_bp.route('/marketing-analysis')
+@login_required
+def marketing_analysis():
+    return render_template('marketing_analysis.html')
+
+
+@night_ops_bp.route('/api/marketing-report', methods=['POST'])
+@login_required
+def generate_marketing_report():
+    """Generate comprehensive marketing analysis via Groq."""
+    from models import NightTrend, NightCompetitor, NightReport, db
+    from config import Config
+
+    # LLM key check handled by llm.py
+
+    niche = (request.json or {}).get('niche', 'all')
+    since = datetime.now() - timedelta(days=7)
+
+    trends = NightTrend.query.filter(NightTrend.scanned_at >= since).order_by(NightTrend.score.desc()).limit(30).all()
+    trend_items = []
+    for t_item in trends:
+        try:
+            data = json.loads(t_item.trend_data) if t_item.trend_data else {}
+        except Exception:
+            data = {}
+        title = data.get('title', '') or t_item.category or ''
+        if niche != 'all':
+            combined = (t_item.category + ' ' + title).lower()
+            niche_kw = NICHE_MAP.get(niche, [])
+            if not any(kw in combined for kw in niche_kw):
+                continue
+        trend_items.append({'source': t_item.source, 'title': title[:60], 'price': data.get('price', ''), 'score': t_item.score})
+
+    comps = NightCompetitor.query.filter(NightCompetitor.scanned_at >= since).all()
+    comp_items = []
+    for c in comps:
+        try:
+            cdata = json.loads(c.last_post_data) if c.last_post_data else {}
+        except Exception:
+            cdata = {}
+        pins = [p.get('title', '')[:50] for p in (cdata.get('recent_pins', []) or [])[:5]]
+        comp_items.append({'handle': c.handle, 'platform': c.platform, 'followers': c.follower_count, 'engagement': c.avg_engagement, 'top_content': pins})
+
+    niche_label = NICHE_LABELS.get(niche, 'All Niches') if niche != 'all' else 'All Niches'
+
+    prompt = f"""You are a senior marketing strategist analyzing the Indian e-commerce market for dropy.in.
+
+dropy.in sells imported beauty, health, skincare, and personal care products (CeraVe, Korean beauty, imported brands) through Shopify + marketplaces. Based in Navi Mumbai. Target: 18-35 urban Indian women.
+
+=== MARKET DATA ({niche_label}) ===
+Trending Products ({len(trend_items)}): {json.dumps(trend_items[:15], indent=1)}
+Competitors ({len(comp_items)}): {json.dumps(comp_items, indent=1)}
+
+Generate a COMPREHENSIVE marketing analysis as JSON:
+{{"executive_summary":"3-4 sentence overview","swot":{{"strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"opportunities":["o1","o2","o3"],"threats":["t1","t2","t3"]}},"market_opportunities":[{{"segment":"name","size":"potential","competition":"low|medium|high","recommendation":"action"}}],"audience_personas":[{{"name":"persona","age":"range","profile":"description","pain_points":["p1","p2"],"channels":["ch1"],"buying_triggers":["b1"]}}],"content_strategy":{{"pillars":["p1","p2","p3"],"weekly_plan":[{{"day":"Monday","content_type":"carousel|reel|story|pin","topic":"topic","platform":"instagram|pinterest|both"}}],"hashtag_strategy":["h1","h2","h3","h4","h5"]}},"seo_keywords":[{{"keyword":"term","volume_estimate":"high|medium|low","difficulty":"easy|medium|hard","intent":"buy|research|compare","content_idea":"what to create"}}],"ad_campaigns":[{{"name":"campaign","objective":"awareness|traffic|conversions","platform":"google|instagram|facebook","budget_range":"INR daily","target_audience":"who","ad_copy":"headline + desc","cta":"action"}}],"pricing_insights":{{"strategy":"recommendation","competitive_range":"observation","recommendations":["r1","r2"]}},"competitive_positioning":{{"current_position":"where now","desired_position":"where to be","differentiators":["d1","d2","d3"],"gaps_to_close":["g1","g2"]}},"action_plan_30_days":[{{"week":1,"actions":["a1","a2","a3"]}},{{"week":2,"actions":["a1","a2"]}},{{"week":3,"actions":["a1","a2"]}},{{"week":4,"actions":["a1","a2"]}}]}}
+
+Be SPECIFIC to Indian market and dropy.in. No generic advice. Respond ONLY with valid JSON."""
+
+    try:
+        from modules.night_orchestrator.llm import call_llm
+        result_text = call_llm(prompt)
+        result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+        result_text = re.sub(r'\s*```$', '', result_text)
+
+        try:
+            report = json.loads(result_text)
+        except json.JSONDecodeError:
+            start = result_text.find('{')
+            end = result_text.rfind('}')
+            if start != -1 and end > start:
+                report = json.loads(result_text[start:end + 1])
+            else:
+                return jsonify({'error': 'Failed to parse', 'raw': result_text[:500]}), 500
+
+        db_report = NightReport(
+            report_type='marketing',
+            report_data=json.dumps(report, ensure_ascii=False),
+            summary=report.get('executive_summary', '')[:200],
+            status='completed',
+        )
+        db.session.add(db_report)
+        db.session.commit()
+
+        report['niche'] = niche_label
+        return jsonify(report)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

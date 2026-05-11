@@ -82,9 +82,10 @@ def run_content_planning(app, trend_data: dict, competitor_data: dict, performan
         from config import Config
 
         groq_key = Config.GROQ_API_KEY
-        if not groq_key:
-            logger.error("[ContentPlanner] No GROQ_API_KEY configured")
-            return {'error': 'No GROQ_API_KEY', 'plan': None}
+        gemini_key = Config.GEMINI_API_KEY
+        if not groq_key and not gemini_key:
+            logger.error("[ContentPlanner] No LLM API key configured")
+            return {'error': 'No LLM API key (GEMINI or GROQ)', 'plan': None}
 
         # Build the analysis prompt
         tomorrow = (date.today() + timedelta(days=1)).isoformat()
@@ -93,7 +94,8 @@ def run_content_planning(app, trend_data: dict, competitor_data: dict, performan
 
         # Call Groq
         try:
-            plan_json = _call_groq(groq_key, user_prompt)
+            from modules.night_orchestrator.llm import call_llm
+            plan_json = call_llm(user_prompt, system=PLAN_SYSTEM_PROMPT)
             plan_data = json.loads(plan_json)
         except json.JSONDecodeError as e:
             logger.error(f"[ContentPlanner] Groq returned invalid JSON: {e}")
