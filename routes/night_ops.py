@@ -195,3 +195,108 @@ def get_competitors():
             }
 
     return jsonify(list(seen.values()))
+
+
+# -- Niche category mapping --
+NICHE_MAP = {
+    'skincare': ['skin_care', 'skincare', 'cerave', 'korean beauty', 'face wash', 'moisturizer', 'serum', 'sunscreen', 'cleanser'],
+    'haircare': ['hair_care', 'hair care', 'shampoo', 'conditioner', 'hair oil', 'hair'],
+    'beauty': ['beauty', 'makeup', 'cosmetic', 'lipstick', 'foundation', 'nail', 'aesthetic'],
+    'personal_care': ['health_personal_care', 'personal care', 'body wash', 'soap', 'deodorant', 'bath', 'body'],
+    'health': ['health', 'wellness', 'supplement', 'vitamin', 'fitness', 'lifestyle'],
+}
+
+NICHE_LABELS = {
+    'skincare': 'Skincare',
+    'haircare': 'Hair Care',
+    'beauty': 'Beauty & Makeup',
+    'personal_care': 'Personal Care',
+    'health': 'Health & Wellness',
+}
+
+
+def _match_niche(category_text: str, niche: str) -> bool:
+    text = (category_text or '').lower()
+    keywords = NICHE_MAP.get(niche, [])
+    return any(kw in text for kw in keywords)
+
+
+@night_ops_bp.route('/api/niche-trends')
+@login_required
+def get_niche_trends():
+    from models import NightTrend
+    niche = request.args.get('niche', '')
+    days = int(request.args.get('days', 7))
+    limit = int(request.args.get('limit', 30))
+    if not niche or niche not in NICHE_MAP:
+        return jsonify({'error': 'Invalid niche', 'valid': list(NICHE_MAP.keys())}), 400
+    since = datetime.now() - timedelta(days=days)
+    all_trends = NightTrend.query.filter(NightTrend.scanned_at >= since).order_by(NightTrend.score.desc()).all()
+    filtered = []
+    for t in all_trends:
+        cat = t.category or ''
+        try:
+            data = json.loads(t.trend_data) if t.trend_data else {}
+        except (json.JSONDecodeError, TypeError):
+            data = {}
+        title = data.get('title', '') or data.get('query', '')
+        if _match_niche(f"{cat} {title}", niche):
+            filtered.append({'id': t.id, 'source': t.source, 'category': t.category, 'data': data, 'score': t.score})
+            if len(filtered) >= limit:
+                break
+    return jsonify({'niche': niche, 'label': NICHE_LABELS.get(niche, niche), 'count': len(filtered), 'trends': filtered})
+
+
+@night_ops_bp.route('/api/niche-analysis', methods=['POST'])
+@login_required
+def run_niche_analysis():
+    from models import NightTrend, NightCompetitor
+    from config import Config
+    niche = request.json.get('niche', '')
+    if not niche or niche not in NICHE_MAP:
+        return jsonify({'error': 'Invalid niche'}), 400
+    groq_key = Config.GROQ_API_KEY
+    if not groq_key:
+        return jsonify({'error': 'No GROQ_API_KEY configured'}), 500
+    since = datetime.now() - timedelta(days=7)
+    all_trends = NightTrend.query.filter(NightTrend.scanned_at >= since).all()
+    niche_trends = []
+    for t in all_trends:
+        cat = t.category or ''
+        try:
+            data = json.loads(t.trend_data) if t.trend_data else {}
+        except (json.JSONDecodeError, TypeError):
+            data = {}
+        title = data.get('title', '') or data.get('query', '')
+        if _match_niche(f"{cat} {title}", niche):
+            niche_trends.append({'source': t.source, 'title': title[:80], 'category': cat, 'score': t.score})
+    comps = NightCompetitor.query.filter(NightCompetitor.scanned_at >= since).all()
+    comp_summary = [{'platform': c.platform, 'handle': c.handle, 'followers': c.follower_count} for c in comps]
+    label = NICHE_LABELS.get(niche, niche)
+    prompt = f"""Analyze the {label} niche for an Indian e-commerce brand selling imported beauty/health products (dropy.in).
+
+=== {label.upper()} TRENDS ({len(niche_trends)} items) ===
+{json.dumps(niche_trends[:15], indent=1)}
+
+=== COMPETITORS ===
+{json.dumps(comp_summary, indent=1)}
+
+Provide a focused analysis as JSON:
+{{"niche": "{niche}", "summary": "3-4 sentence analysis", "top_opportunities": ["opp1","opp2","opp3"], "trending_products": ["prod1","prod2","prod3"], "content_suggestions": [{{"type": "carousel|campaign|story|pin", "idea": "specific idea", "product": "target product", "reason": "why now"}}], "risk_factors": ["risk1","risk2"], "score": 0.8}}
+
+Be specific to Indian market. Focus on actionable items. Respond ONLY with valid JSON."""
+    try:
+        from groq import Groq
+        client = Groq(api_key=groq_key)
+        response = client.chat.completions.create(model='llama-3.3-70b-versatile', messages=[{"role": "user", "content": prompt}], temperature=0.6, max_tokens=2000)
+        result_text = (response.choices[0].message.content or '').strip()
+        result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+        result_text = re.sub(r'\s*```$', '', result_text)
+        analysis = json.loads(result_text)
+    except json.JSONDecodeError:
+        analysis = {'summary': result_text, 'error': 'Failed to parse JSON'}
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    analysis['trend_count'] = len(niche_trends)
+    analysis['label'] = label
+    return jsonify(analysis)
