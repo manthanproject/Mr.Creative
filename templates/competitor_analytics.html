@@ -80,10 +80,10 @@ var s='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">'
 var ph='';
 if(all.length>0){ph='<div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;">Recent Posts</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">'
 +all.slice(0,12).map(function(p){var img=p.image||p.image_url||'',title=p.title||p.caption||'',sv=p.saves||p.likes||0;
-return '<div style="background:var(--bg-hover);border-radius:6px;overflow:hidden;">'
-+(img?'<img src="'+img+'" style="width:100%;height:100px;object-fit:cover;" onerror="this.remove()"/>':'')
+var purl=p.url||c.page_url||'#';return '<a href="'+purl+'" target="_blank" style="text-decoration:none;color:inherit;display:block;background:var(--bg-hover);border-radius:6px;overflow:hidden;transition:transform 0.2s;"><style>.pcard:hover{transform:translateY(-2px)}</style>'
++(img?'<img src="'+img+'" style="width:100%;height:100px;object-fit:cover;display:block;" onerror="this.remove()"/>':'')
 +'<div style="padding:6px;"><div style="font-size:0.75rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">'+title.slice(0,80)+'</div>'
-+(sv>0?'<div style="font-size:0.65rem;color:var(--accent);margin-top:3px;">'+sv.toLocaleString()+' saves</div>':'')+'</div></div>';}).join('')+'</div>';}
++(sv>0?'<div style="font-size:0.65rem;color:var(--accent);margin-top:3px;">'+sv.toLocaleString()+' saves</div>':'')+'</div></a>';}).join('')+'</div>';}
 else{ph='<p style="color:var(--text-muted);font-size:0.85rem;">No post data yet. Run a Night Cycle.</p>';}
 return '<div class="card"><div class="card-header"><h3><span style="font-size:0.7rem;padding:2px 6px;background:var(--bg-hover);border-radius:4px;margin-right:8px;">'+c.platform+'</span><a href="'+c.page_url+'" target="_blank" style="font-weight:600;">@'+c.handle+'</a>'
 +(niche?' <span style="font-size:0.7rem;padding:2px 6px;background:var(--bg-subtle);border-radius:4px;margin-left:8px;">'+niche+'</span>':'')
