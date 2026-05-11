@@ -32,7 +32,7 @@ def index():
 
     # Today's content plan
     today = datetime.now().date()
-    todays_plan = ContentPlan.query.filter_by(plan_date=today).first()
+    todays_plan = ContentPlan.query.filter_by(plan_date=today).first() or ContentPlan.query.filter_by(plan_date=today + timedelta(days=1)).first()
     tomorrows_plan = ContentPlan.query.filter_by(
         plan_date=today + timedelta(days=1)
     ).first()
