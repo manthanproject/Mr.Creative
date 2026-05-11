@@ -28,6 +28,7 @@
             <button class="btn btn-ghost" onclick="resetDashboard()" title="Clear all data & reset">
                 ↺ Reset
             </button>
+            <select id="cycleNiche" style="padding:6px 10px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;"><option value="all">All Niches</option><option value="skincare">Skincare</option><option value="haircare">Hair Care</option><option value="beauty">Beauty</option><option value="personal_care">Personal Care</option><option value="health">Health</option></select>
             <button class="btn btn-primary" id="btnStartCycle" onclick="startCycle()">
                 ▶ Run Night Cycle
             </button>
@@ -348,7 +349,7 @@ function startCycle() {
     btn.disabled = true;
     btn.textContent = '⏳ Starting...';
 
-    fetch('/night-ops/api/start-cycle', { method: 'POST' })
+    fetch('/night-ops/api/start-cycle', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({niche: document.getElementById('cycleNiche').value}) })
         .then(r => r.json())
         .then(data => {
             if (data.error) {

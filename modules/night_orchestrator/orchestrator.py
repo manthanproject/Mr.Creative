@@ -50,7 +50,7 @@ def _log(agent: str, message: str):
 #  NIGHTLY CYCLE
 # ═══════════════════════════════════════════════════════════════════
 
-def run_nightly_cycle(app, manual: bool = False):
+def run_nightly_cycle(app, manual: bool = False, niche: str = 'all'):
     """
     Full nightly cycle. Runs in a background thread.
     Call from APScheduler or manually from dashboard.
@@ -72,7 +72,7 @@ def run_nightly_cycle(app, manual: bool = False):
 
         start_time = time.time()
         trigger = 'manual' if manual else 'scheduled'
-        _log('Orchestrator', f'Night cycle started ({trigger})')
+        _log('Orchestrator', f'Night cycle started ({trigger}, niche={niche})')
 
         errors = []
         trend_data = {}
@@ -87,7 +87,7 @@ def run_nightly_cycle(app, manual: bool = False):
             _log('TrendScout', 'Starting trend scan...')
 
             from modules.night_orchestrator.trend_scout import run_trend_scan
-            trend_data = run_trend_scan(app)
+            trend_data = run_trend_scan(app, niche=niche)
 
             _current_cycle['progress'] = 25
             _log('TrendScout', f"Done — {trend_data.get('total_saved', 0)} trends saved")
@@ -102,7 +102,7 @@ def run_nightly_cycle(app, manual: bool = False):
             _log('CompetitorWatcher', 'Starting competitor scan...')
 
             from modules.night_orchestrator.competitor_watcher import run_competitor_scan
-            competitor_data = run_competitor_scan(app)
+            competitor_data = run_competitor_scan(app, niche=niche)
 
             _current_cycle['progress'] = 50
             _log('CompetitorWatcher', f"Done — {competitor_data.get('total_scanned', 0)} profiles scanned")
@@ -206,12 +206,12 @@ def run_nightly_cycle(app, manual: bool = False):
         _cycle_lock.release()
 
 
-def run_nightly_cycle_async(app, manual: bool = False):
+def run_nightly_cycle_async(app, manual: bool = False, niche: str = 'all'):
     """Run nightly cycle in a background thread."""
     thread = threading.Thread(
         target=run_nightly_cycle,
         args=(app,),
-        kwargs={'manual': manual},
+        kwargs={'manual': manual, 'niche': niche},
         daemon=True,
         name='night-orchestrator',
     )

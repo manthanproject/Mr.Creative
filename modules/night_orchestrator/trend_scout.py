@@ -49,6 +49,22 @@ AMAZON_BESTSELLER_URLS = [
 ]
 
 
+NICHE_PINTEREST_QUERIES = {
+    'skincare': ['skincare routine trending 2026', 'CeraVe skincare', 'Korean skincare products', 'face wash trending', 'serum skincare', 'moisturizer trending', 'sunscreen skincare'],
+    'haircare': ['hair care products trending', 'shampoo trending 2026', 'hair oil treatment', 'hair care routine', 'conditioner trending', 'hair growth products'],
+    'beauty': ['beauty products trending 2026', 'makeup trending', 'cosmetics aesthetic', 'lipstick trending', 'beauty routine', 'nail art trending'],
+    'personal_care': ['personal care products trending', 'body wash trending', 'soap aesthetic', 'bath products trending', 'deodorant natural', 'body lotion trending'],
+    'health': ['health wellness products 2026', 'supplements trending', 'vitamins health', 'fitness products trending', 'lifestyle wellness', 'protein supplements India'],
+}
+
+NICHE_AMAZON_URLS = {
+    'skincare': [('https://www.amazon.in/gp/bestsellers/beauty/1374407031/', 'skin_care')],
+    'haircare': [('https://www.amazon.in/gp/bestsellers/beauty/1374340031/', 'hair_care')],
+    'beauty': [('https://www.amazon.in/gp/bestsellers/beauty/', 'beauty')],
+    'personal_care': [('https://www.amazon.in/gp/bestsellers/hpc/', 'health_personal_care')],
+    'health': [('https://www.amazon.in/gp/bestsellers/hpc/', 'health_personal_care')],
+}
+
 def _get_session():
     """Create a requests session with random UA and common headers."""
     s = requests.Session()
@@ -308,7 +324,7 @@ def _parse_amazon_bestsellers(html: str, category: str) -> list[dict]:
 #  MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
 
-def run_trend_scan(app) -> dict:
+def run_trend_scan(app, niche: str = 'all') -> dict:
     """
     Full trend scan: Pinterest + Amazon.
     Saves results to night_trends table.
@@ -318,8 +334,10 @@ def run_trend_scan(app) -> dict:
         from models import db, NightTrend
 
         scan_time = datetime.now()
-        pinterest_trends = scan_pinterest_trends()
-        amazon_products = scan_amazon_bestsellers()
+        p_queries = NICHE_PINTEREST_QUERIES.get(niche) if niche != 'all' else None
+        pinterest_trends = scan_pinterest_trends(queries=p_queries)
+        a_urls = NICHE_AMAZON_URLS.get(niche) if niche != 'all' else None
+        amazon_products = scan_amazon_bestsellers(urls=a_urls)
 
         # Global deduplication by title (fixes Amazon dupes across categories)
         seen_titles = set()

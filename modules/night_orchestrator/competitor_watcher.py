@@ -309,7 +309,7 @@ def _get_session():
 #  MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
 
-def run_competitor_scan(app, competitors: list[tuple] | None = None) -> dict:
+def run_competitor_scan(app, competitors: list[tuple] | None = None, niche: str = 'all') -> dict:
     """
     Full competitor scan using a single shared headless Chrome.
     Saves results to night_competitors table.
@@ -321,7 +321,10 @@ def run_competitor_scan(app, competitors: list[tuple] | None = None) -> dict:
         if competitors is None:
             try:
                 from models import WatchedCompetitor
-                watched = WatchedCompetitor.query.all()
+                q = WatchedCompetitor.query
+                if niche != 'all':
+                    q = q.filter((WatchedCompetitor.niche == niche) | (WatchedCompetitor.niche == '') | (WatchedCompetitor.is_own == True))
+                watched = q.all()
                 if watched:
                     competitors = [(w.platform, w.handle, w.page_url) for w in watched]
                 else:

@@ -62,7 +62,8 @@ def start_cycle():
         return jsonify({'error': 'Cycle already running'}), 409
 
     app = current_app._get_current_object()  # type: ignore[attr-defined]
-    result = run_nightly_cycle_async(app, manual=True)
+    niche = (request.json or {}).get('niche', 'all')
+    result = run_nightly_cycle_async(app, manual=True, niche=niche)
     return jsonify(result)
 
 
