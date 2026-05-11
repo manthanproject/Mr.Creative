@@ -352,3 +352,49 @@ def remove_competitor(comp_id):
     db.session.commit()
     return jsonify({'status': 'removed', 'id': comp_id})
 
+@night_ops_bp.route('/analytics')
+@login_required
+def analytics():
+    return render_template('competitor_analytics.html')
+
+
+@night_ops_bp.route('/api/competitor-insights', methods=['POST'])
+@login_required
+def competitor_insights():
+    from config import Config
+    groq_key = Config.GROQ_API_KEY
+    if not groq_key:
+        return jsonify({'error': 'No GROQ_API_KEY configured'}), 500
+
+    data = request.json or {}
+    competitors = data.get('competitors', [])
+
+    prompt = f"""You are a competitive intelligence analyst for dropy.in, an Indian e-commerce brand selling imported beauty, health, and skincare products.
+
+Analyze these competitors and provide actionable insights:
+
+{json.dumps(competitors, indent=1)}
+
+Provide your analysis covering:
+1. Who is the strongest competitor and why
+2. Content gaps we can exploit (what are they NOT doing)
+3. Engagement patterns (what type of content gets most engagement)
+4. Recommended counter-strategy for each competitor
+5. Quick wins we can implement this week
+6. Products/topics we should create content about based on competitor activity
+
+Be specific, data-driven, and actionable. Format with clear sections. Keep it under 400 words."""
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=groq_key)
+        response = client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6, max_tokens=2000,
+        )
+        insights = (response.choices[0].message.content or '').strip()
+        return jsonify({'insights': insights})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+\n
