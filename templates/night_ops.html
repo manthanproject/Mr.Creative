@@ -489,6 +489,7 @@ function submitAutoPost() {
     const statusEl = document.getElementById('pinPostStatus');
     const btn = document.getElementById('pinPostBtn');
 
+    if (!boardId) {
         statusEl.style.display = 'block';
         statusEl.style.background = 'rgba(220,50,50,0.15)';
         statusEl.style.color = '#f66';
