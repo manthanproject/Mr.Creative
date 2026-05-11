@@ -110,6 +110,69 @@ def scrape_pinterest_profile_selenium(driver, handle: str, page_url: str) -> dic
 
         logger.info(f"[CompetitorWatcher] Pinterest @{handle}: {result['follower_count']} followers")
 
+        # ── Extract recent pins with engagement data ──
+        try:
+            # Scroll to load pins
+            for _ in range(3):
+                try:
+                    driver.execute_script("window.scrollTo(0, document.body?.scrollHeight || 0)")
+                except Exception:
+                    pass
+                time.sleep(1.5)
+
+            # Extract pins from DOM
+            pin_elements = driver.find_elements('css selector', 'div[data-test-id="pin"], div[role="listitem"]')
+            if not pin_elements:
+                pin_elements = driver.find_elements('css selector', 'a[href*="/pin/"]')
+
+            for pin_el in pin_elements[:12]:
+                try:
+                    pin_data = {}
+
+                    # Get pin link
+                    try:
+                        link_el = pin_el if pin_el.tag_name == 'a' else pin_el.find_element('css selector', 'a[href*="/pin/"]')
+                        pin_data['url'] = link_el.get_attribute('href') or ''
+                    except Exception:
+                        pin_data['url'] = ''
+
+                    # Get image
+                    try:
+                        img_el = pin_el.find_element('css selector', 'img[src*="pinimg.com"]')
+                        pin_data['image'] = img_el.get_attribute('src') or ''
+                        pin_data['title'] = (img_el.get_attribute('alt') or '').strip()[:150]
+                    except Exception:
+                        pin_data['image'] = ''
+                        pin_data['title'] = ''
+
+                    # Get save/repin count if visible
+                    try:
+                        pin_text = pin_el.text
+                        save_match = re.search(r'([\d,.]+[KkMm]?)\s*(?:saves?|repins?)', pin_text, re.IGNORECASE)
+                        if save_match:
+                            pin_data['saves'] = _parse_count(save_match.group(1))
+                        else:
+                            pin_data['saves'] = 0
+                    except Exception:
+                        pin_data['saves'] = 0
+
+                    if pin_data.get('title') or pin_data.get('image'):
+                        result['recent_pins'].append(pin_data)
+
+                except Exception:
+                    continue
+
+            # Calculate avg engagement from saves
+            if result['recent_pins'] and result['follower_count'] > 0:
+                total_saves = sum(p.get('saves', 0) for p in result['recent_pins'])
+                result['avg_engagement'] = round(
+                    (total_saves / len(result['recent_pins'])) / max(result['follower_count'], 1) * 100, 2
+                )
+
+            logger.info(f"[CompetitorWatcher] Pinterest @{handle}: {len(result['recent_pins'])} pins extracted")
+        except Exception as e:
+            logger.warning(f"[CompetitorWatcher] Pinterest pin extraction error for {handle}: {e}")
+
     except Exception as e:
         result['error'] = str(e)
         logger.error(f"[CompetitorWatcher] Pinterest error for {handle}: {e}")

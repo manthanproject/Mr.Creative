@@ -149,11 +149,15 @@
         </div>
     </div>
 
-    <!-- Trends Preview -->
+    <!-- Trends with source tabs -->
     <div class="card animate-fade-up delay-8">
         <div class="card-header">
             <h3>🔥 Latest Trends</h3>
-            <button class="btn btn-ghost btn-sm" onclick="loadTrends()">Refresh</button>
+            <div style="display:flex;gap:4px;">
+                <button class="btn btn-ghost btn-sm" onclick="loadTrends('all')" id="trendTabAll" style="font-weight:600;">All</button>
+                <button class="btn btn-ghost btn-sm" onclick="loadTrends('pinterest')" id="trendTabPinterest">Pinterest</button>
+                <button class="btn btn-ghost btn-sm" onclick="loadTrends('amazon_in')" id="trendTabAmazon">Amazon</button>
+            </div>
         </div>
         <div class="card-body" id="trendsContainer">
             <p style="color:var(--text-muted);">Loading...</p>
@@ -171,6 +175,22 @@
         </div>
     </div>
 
+</div>
+
+<!-- Competitor Detail Modal -->
+<div id="compModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;padding:30px;overflow-y:auto;"
+     onclick="if(event.target===this)this.style.display='none'">
+    <div style="max-width:800px;margin:0 auto;background:var(--bg-white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 id="compModalTitle">Competitor Details</h3>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('compModal').style.display='none'">✕</button>
+        </div>
+        <!-- Stats row -->
+        <div id="compModalStats" style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;"></div>
+        <!-- Recent posts grid -->
+        <h4 style="margin-bottom:12px;font-size:0.9rem;color:var(--text-muted);">Recent Posts</h4>
+        <div id="compModalPins" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;"></div>
+    </div>
 </div>
 
 <!-- Report Detail Modal -->
@@ -301,20 +321,32 @@ function approvePlan(planId) {
         });
 }
 
-// ── Trends ──
-function loadTrends() {
-    fetch('/night-ops/api/trends?limit=10')
+// ── Trends (with source filter) ──
+let _currentTrendSource = 'all';
+function loadTrends(source) {
+    source = source || 'all';
+    _currentTrendSource = source;
+    // Update tab styles
+    ['All','Pinterest','Amazon'].forEach(t => {
+        const btn = document.getElementById('trendTab' + t);
+        if (btn) btn.style.fontWeight = (t.toLowerCase() === source || (source === 'all' && t === 'All') || (source === 'amazon_in' && t === 'Amazon')) ? '600' : '400';
+    });
+
+    const params = source === 'all' ? 'limit=20' : `source=${source}&limit=20`;
+    fetch(`/night-ops/api/trends?${params}`)
         .then(r => r.json())
         .then(trends => {
             const el = document.getElementById('trendsContainer');
             if (!trends.length) { el.innerHTML = '<p style="color:var(--text-muted);">No trends yet.</p>'; return; }
-            el.innerHTML = trends.slice(0, 8).map(t => {
+            el.innerHTML = trends.slice(0, 12).map(t => {
                 const d = t.data || {};
                 const title = d.title || d.query || t.category || 'Unknown';
+                const img = d.image_url || '';
                 return `<div style="padding:6px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:0.75rem;padding:2px 6px;background:var(--bg-hover);border-radius:4px;">${t.source}</span>
-                    <span style="flex:1;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title.slice(0,60)}</span>
-                    <span style="font-size:0.8rem;color:var(--accent);">${(t.score * 100).toFixed(0)}%</span>
+                    ${img ? `<img src="${img}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'"/>` : ''}
+                    <span style="font-size:0.7rem;padding:2px 6px;background:var(--bg-hover);border-radius:4px;white-space:nowrap;">${t.source}</span>
+                    <span style="flex:1;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title.slice(0,70)}</span>
+                    <span style="font-size:0.8rem;color:var(--accent);white-space:nowrap;">${(t.score * 100).toFixed(0)}%</span>
                 </div>`;
             }).join('');
         })
@@ -323,25 +355,88 @@ function loadTrends() {
         });
 }
 
-// ── Competitors ──
+// ── Competitors (with expandable detail) ──
+let _competitorData = [];
 function loadCompetitors() {
     fetch('/night-ops/api/competitors')
         .then(r => r.json())
         .then(comps => {
+            _competitorData = comps;
             const el = document.getElementById('competitorsContainer');
             if (!comps.length) { el.innerHTML = '<p style="color:var(--text-muted);">No data yet.</p>'; return; }
-            el.innerHTML = comps.map(c => `
-                <div style="padding:8px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:0.75rem;padding:2px 6px;background:var(--bg-hover);border-radius:4px;">${c.platform}</span>
-                    <a href="${c.page_url}" target="_blank" style="font-weight:500;">@${c.handle}</a>
-                    <span style="margin-left:auto;font-size:0.85rem;color:var(--text-muted);">${(c.followers || 0).toLocaleString()} followers</span>
-                    <span style="font-size:0.8rem;color:var(--accent);">${c.engagement || 0}%</span>
-                </div>
-            `).join('');
+            el.innerHTML = comps.map((c, i) => {
+                const pinCount = (c.data?.recent_pins || []).length;
+                const postCount = (c.data?.recent_posts || []).length;
+                const contentCount = pinCount + postCount;
+                const contentLabel = contentCount > 0 ? `${contentCount} posts` : '';
+                return `
+                <div style="padding:10px 0;border-bottom:1px solid var(--border-light);cursor:pointer;" onclick="showCompDetail(${i})">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:0.7rem;padding:2px 6px;background:var(--bg-hover);border-radius:4px;">${c.platform}</span>
+                        <a href="${c.page_url}" target="_blank" style="font-weight:500;" onclick="event.stopPropagation()">@${c.handle}</a>
+                        <span style="margin-left:auto;font-size:0.85rem;color:var(--text-muted);">${(c.followers || 0).toLocaleString()} followers</span>
+                        <span style="font-size:0.8rem;color:var(--accent);">${c.engagement || 0}%</span>
+                    </div>
+                    ${contentLabel ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;margin-left:54px;">📌 ${contentLabel} scraped — click for details</div>` : ''}
+                </div>`;
+            }).join('');
         })
         .catch(() => {
             document.getElementById('competitorsContainer').innerHTML = '<p style="color:var(--text-muted);">Failed to load.</p>';
         });
+}
+
+function showCompDetail(index) {
+    const c = _competitorData[index];
+    if (!c) return;
+    const data = c.data || {};
+
+    // Title
+    document.getElementById('compModalTitle').textContent = `${c.platform} / @${c.handle}`;
+
+    // Stats
+    const statsEl = document.getElementById('compModalStats');
+    const stats = [
+        { label: 'Followers', value: (c.followers || 0).toLocaleString() },
+        { label: 'Following', value: (data.following_count || 0).toLocaleString() },
+        { label: c.platform === 'pinterest' ? 'Pins' : 'Posts', value: (data.pin_count || data.post_count || 0).toLocaleString() },
+        { label: 'Engagement', value: (c.engagement || 0) + '%' },
+    ];
+    if (data.bio) stats.push({ label: 'Bio', value: data.bio.slice(0, 80) });
+    statsEl.innerHTML = stats.map(s => `
+        <div style="background:var(--bg-hover);padding:10px 14px;border-radius:var(--radius-sm);min-width:80px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);">${s.label}</div>
+            <div style="font-weight:600;font-size:1rem;">${s.value}</div>
+        </div>
+    `).join('');
+
+    // Recent pins/posts
+    const pinsEl = document.getElementById('compModalPins');
+    const pins = data.recent_pins || [];
+    const posts = data.recent_posts || [];
+    const allContent = [...pins, ...posts];
+
+    if (!allContent.length) {
+        pinsEl.innerHTML = '<p style="color:var(--text-muted);grid-column:1/-1;">No post data scraped. Pinterest profiles show pins here; Instagram needs Graph API for post details.</p>';
+    } else {
+        pinsEl.innerHTML = allContent.slice(0, 12).map(p => {
+            const img = p.image || p.image_url || '';
+            const title = p.title || p.caption || '';
+            const saves = p.saves || p.likes || 0;
+            const saveLabel = p.saves !== undefined ? 'saves' : 'likes';
+            const url = p.url || (p.shortcode ? `https://www.instagram.com/p/${p.shortcode}/` : '');
+            return `
+            <div style="background:var(--bg-hover);border-radius:var(--radius-sm);overflow:hidden;">
+                ${img ? `<a href="${url || '#'}" target="_blank"><img src="${img}" style="width:100%;height:120px;object-fit:cover;" onerror="this.parentElement.style.display='none'"/></a>` : '<div style="height:60px;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.8rem;">No image</div>'}
+                <div style="padding:8px;">
+                    <div style="font-size:0.8rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${title || 'Untitled'}</div>
+                    ${saves > 0 ? `<div style="font-size:0.7rem;color:var(--accent);margin-top:4px;">❤ ${saves.toLocaleString()} ${saveLabel}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    document.getElementById('compModal').style.display = 'block';
 }
 
 // ── Report Modal ──
