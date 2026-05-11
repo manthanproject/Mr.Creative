@@ -301,3 +301,54 @@ Be specific to Indian market. Focus on actionable items. Respond ONLY with valid
     analysis['trend_count'] = len(niche_trends)
     analysis['label'] = label
     return jsonify(analysis)
+
+@night_ops_bp.route('/api/watched-competitors')
+@login_required
+def list_watched():
+    from models import WatchedCompetitor
+    comps = WatchedCompetitor.query.order_by(WatchedCompetitor.added_at.desc()).all()
+    return jsonify([{
+        'id': c.id, 'platform': c.platform, 'handle': c.handle,
+        'page_url': c.page_url, 'niche': c.niche, 'is_own': c.is_own,
+    } for c in comps])
+
+
+@night_ops_bp.route('/api/competitor/add', methods=['POST'])
+@login_required
+def add_competitor():
+    from models import db, WatchedCompetitor
+    data = request.json or {}
+    platform = data.get('platform', '').strip().lower()
+    handle = data.get('handle', '').strip().lstrip('@')
+    niche = data.get('niche', '').strip()
+    is_own = data.get('is_own', False)
+
+    if platform not in ('instagram', 'pinterest'):
+        return jsonify({'error': 'Platform must be instagram or pinterest'}), 400
+    if not handle:
+        return jsonify({'error': 'Handle is required'}), 400
+
+    existing = WatchedCompetitor.query.filter_by(platform=platform, handle=handle).first()
+    if existing:
+        return jsonify({'error': f'@{handle} on {platform} already exists'}), 409
+
+    if platform == 'instagram':
+        page_url = f'https://www.instagram.com/{handle}/'
+    else:
+        page_url = f'https://www.pinterest.com/{handle}/'
+
+    comp = WatchedCompetitor(platform=platform, handle=handle, page_url=page_url, niche=niche, is_own=is_own)
+    db.session.add(comp)
+    db.session.commit()
+    return jsonify({'status': 'added', 'id': comp.id, 'handle': handle, 'platform': platform})
+
+
+@night_ops_bp.route('/api/competitor/<comp_id>', methods=['DELETE'])
+@login_required
+def remove_competitor(comp_id):
+    from models import db, WatchedCompetitor
+    comp = WatchedCompetitor.query.get_or_404(comp_id)
+    db.session.delete(comp)
+    db.session.commit()
+    return jsonify({'status': 'removed', 'id': comp_id})
+

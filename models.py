@@ -375,3 +375,15 @@ class ContentPlan(db.Model):
     status = db.Column(db.String(20), default='pending')     # pending, approved, executed
     source_report_id = db.Column(db.String(36), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+class WatchedCompetitor(db.Model):
+    __tablename__ = 'watched_competitors'
+
+    id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    platform = db.Column(db.String(50), nullable=False)
+    handle = db.Column(db.String(200), nullable=False)
+    page_url = db.Column(db.String(500), default='')
+    niche = db.Column(db.String(50), default='')
+    is_own = db.Column(db.Boolean, default=False)
+    added_at = db.Column(db.DateTime, default=datetime.now)
+

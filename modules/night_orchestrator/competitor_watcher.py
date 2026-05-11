@@ -317,7 +317,17 @@ def run_competitor_scan(app, competitors: list[tuple] | None = None) -> dict:
     with app.app_context():
         from models import db, NightCompetitor
 
-        competitors = competitors or DEFAULT_COMPETITORS
+        # Read from DB (WatchedCompetitor), fallback to DEFAULT_COMPETITORS
+        if competitors is None:
+            try:
+                from models import WatchedCompetitor
+                watched = WatchedCompetitor.query.all()
+                if watched:
+                    competitors = [(w.platform, w.handle, w.page_url) for w in watched]
+                else:
+                    competitors = DEFAULT_COMPETITORS
+            except Exception:
+                competitors = DEFAULT_COMPETITORS
         scan_time = datetime.now()
         results = []
         driver = None
