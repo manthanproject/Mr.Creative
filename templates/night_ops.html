@@ -1,5 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Night Ops — Mr.Creative{% endblock %}
+{% block title %}Night Ops — Mr.Creative
+<div id="addCompModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1001;padding:30px;overflow-y:auto;" onclick="if(event.target===this)this.style.display='none'">
+<div style="max-width:500px;margin:40px auto;background:var(--bg-white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3>Add Competitor</h3><button class="btn btn-ghost btn-sm" onclick="document.getElementById('addCompModal').style.display='none'">X</button></div>
+<div style="display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;gap:8px;">
+<select id="addCompPlatform" style="padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"><option value="instagram">Instagram</option><option value="pinterest">Pinterest</option></select>
+<input id="addCompHandle" type="text" placeholder="handle (without @)" style="flex:1;padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"/>
+</div>
+<select id="addCompNiche" style="padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"><option value="">All Niches</option><option value="skincare">Skincare</option><option value="haircare">Hair Care</option><option value="beauty">Beauty</option><option value="personal_care">Personal Care</option><option value="health">Health</option></select>
+<label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-muted);"><input type="checkbox" id="addCompOwn"/> This is my own page</label>
+<button class="btn btn-primary" onclick="submitCompetitor()">Add Competitor</button>
+</div>
+<div style="margin-top:20px;"><div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;">Currently Watching</div><div id="watchedList" style="max-height:200px;overflow-y:auto;"></div></div>
+</div></div>
+
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -204,7 +220,7 @@
     <div class="card animate-fade-up delay-9">
         <div class="card-header">
             <h3>👁 Competitor Watch</h3>
-            <button class="btn btn-ghost btn-sm" onclick="loadCompetitors()">Refresh</button>
+            <div style="display:flex;gap:4px;"><button class="btn btn-ghost btn-sm" onclick="showAddCompetitor()">+ Add</button><button class="btn btn-ghost btn-sm" onclick="loadCompetitors()">Refresh</button></div>
         </div>
         <div class="card-body" id="competitorsContainer">
             <p style="color:var(--text-muted);">Loading...</p>
@@ -247,6 +263,30 @@
 </style>
 
 <script>
+
+
+function showAddCompetitor(){document.getElementById('addCompModal').style.display='block';loadWatched();}
+function loadWatched(){
+fetch('/night-ops/api/watched-competitors').then(function(r){return r.json()}).then(function(comps){
+var el=document.getElementById('watchedList');
+if(!comps.length){el.innerHTML='<p style="color:var(--text-muted);">No competitors configured.</p>';return;}
+el.innerHTML=comps.map(function(c){
+return '<div style="padding:6px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:8px;">'
++'<span style="font-size:0.7rem;padding:1px 5px;background:var(--bg-hover);border-radius:3px;">'+c.platform+'</span>'
++'<span style="font-weight:500;">@'+c.handle+'</span>'
++(c.niche?'<span style="font-size:0.7rem;padding:1px 5px;background:var(--bg-subtle);border-radius:3px;">'+c.niche+'</span>':'')
++(c.is_own?'<span style="font-size:0.65rem;color:var(--accent);">own</span>':'')
++'<button style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.8rem;" onclick="removeComp(\''+c.id+'\')">remove</button>'
++'</div>';}).join('');});}
+function submitCompetitor(){
+var p=document.getElementById('addCompPlatform').value;
+var h=document.getElementById('addCompHandle').value.replace('@','').trim();
+var n=document.getElementById('addCompNiche').value;
+var o=document.getElementById('addCompOwn').checked;
+if(!h){alert('Enter a handle');return;}
+fetch('/night-ops/api/competitor/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:p,handle:h,niche:n,is_own:o})})
+.then(function(r){return r.json()}).then(function(d){if(d.error){alert(d.error);return;}document.getElementById('addCompHandle').value='';loadWatched();loadCompetitors();});}
+function removeComp(id){if(!confirm('Remove?'))return;fetch('/night-ops/api/competitor/'+id,{method:'DELETE'}).then(function(r){return r.json()}).then(function(){loadWatched();loadCompetitors();});}
 
 function runNicheAnalysis(niche) {
     document.querySelectorAll('.niche-btn').forEach(function(b){b.style.fontWeight='400'});
@@ -534,4 +574,20 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCompetitors();
 });
 </script>
+
+<div id="addCompModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1001;padding:30px;overflow-y:auto;" onclick="if(event.target===this)this.style.display='none'">
+<div style="max-width:500px;margin:40px auto;background:var(--bg-white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3>Add Competitor</h3><button class="btn btn-ghost btn-sm" onclick="document.getElementById('addCompModal').style.display='none'">X</button></div>
+<div style="display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;gap:8px;">
+<select id="addCompPlatform" style="padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"><option value="instagram">Instagram</option><option value="pinterest">Pinterest</option></select>
+<input id="addCompHandle" type="text" placeholder="handle (without @)" style="flex:1;padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"/>
+</div>
+<select id="addCompNiche" style="padding:8px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);"><option value="">All Niches</option><option value="skincare">Skincare</option><option value="haircare">Hair Care</option><option value="beauty">Beauty</option><option value="personal_care">Personal Care</option><option value="health">Health</option></select>
+<label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-muted);"><input type="checkbox" id="addCompOwn"/> This is my own page</label>
+<button class="btn btn-primary" onclick="submitCompetitor()">Add Competitor</button>
+</div>
+<div style="margin-top:20px;"><div style="font-weight:600;font-size:0.85rem;margin-bottom:8px;">Currently Watching</div><div id="watchedList" style="max-height:200px;overflow-y:auto;"></div></div>
+</div></div>
+
 {% endblock %}
