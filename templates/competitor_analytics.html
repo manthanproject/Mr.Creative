@@ -94,6 +94,75 @@ var sd=_compData.map(function(c){var d=c.data||{};return{handle:c.handle,platfor
 fetch('/night-ops/api/competitor-insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({competitors:sd})})
 .then(function(r){return r.json()}).then(function(data){btn.disabled=false;btn.textContent='Generate Insights';document.getElementById('aiInsights').innerHTML=(data.insights||data.error||'No insights').replace(/\n/g,'<br>');})
 .catch(function(e){btn.disabled=false;btn.textContent='Generate Insights';alert('Error: '+e);});}
+
+function generateLeads(){
+var btn=document.getElementById('leadsBtn');
+var niche=document.getElementById('leadsNiche').value;
+btn.disabled=true;btn.textContent='Generating...';
+document.getElementById('leadsArea').innerHTML='<p style="color:var(--text-muted);">Analyzing trends and generating leads...</p>';
+fetch('/night-ops/api/generate-leads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:niche})})
+.then(function(r){return r.json()})
+.then(function(data){
+btn.disabled=false;btn.textContent='Generate Leads';
+if(data.error){document.getElementById('leadsArea').innerHTML='<p style="color:var(--danger);">'+data.error+'</p>';return;}
+var html='<div style="margin-bottom:8px;font-size:0.8rem;color:var(--text-muted);">Niche: '+data.niche+' | Trends analyzed: '+data.trend_count+'</div>';
+
+// Product Leads
+var pl=data.product_leads||[];
+if(pl.length){html+='<div style="margin-bottom:16px;"><div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">Product Opportunities</div>'
++'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">'
++pl.map(function(p){var uc=p.urgency==='high'?'danger':p.urgency==='medium'?'warning':'info';
+return '<div style="background:var(--bg-hover);padding:12px;border-radius:var(--radius-sm);border-left:3px solid var(--'+uc+');">'
++'<div style="font-weight:600;font-size:0.9rem;">'+p.product+'</div>'
++'<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">'+p.why+'</div>'
++'<div style="display:flex;gap:8px;margin-top:6px;font-size:0.7rem;">'
++'<span style="padding:2px 6px;background:var(--'+uc+'-bg);color:var(--'+uc+');border-radius:4px;">'+p.urgency+'</span>'
++'<span style="color:var(--text-muted);">'+p.source+'</span></div>'
++'<div style="font-size:0.75rem;color:var(--accent);margin-top:6px;">'+p.action+'</div></div>';}).join('')+'</div></div>';}
+
+// Content Leads
+var cl=data.content_leads||[];
+if(cl.length){html+='<div style="margin-bottom:16px;"><div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">Content Ideas</div>'
++'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">'
++cl.map(function(c){return '<div style="background:var(--bg-hover);padding:12px;border-radius:var(--radius-sm);">'
++'<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">'
++'<span style="font-size:0.65rem;padding:2px 6px;background:var(--accent-glow);color:var(--accent);border-radius:4px;text-transform:uppercase;">'+c.format+'</span>'
++'<span style="font-size:0.65rem;color:var(--text-muted);">'+c.platform+'</span></div>'
++'<div style="font-weight:500;font-size:0.85rem;">'+c.topic+'</div>'
++'<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;font-style:italic;">"'+c.hook+'"</div>'
++'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Products: '+(c.products_to_feature||[]).join(', ')+'</div></div>';}).join('')+'</div></div>';}
+
+// Keywords
+var kl=data.keyword_leads||[];
+if(kl.length){html+='<div style="margin-bottom:16px;"><div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">Keyword Targets</div>'
++'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;">'
++kl.map(function(k){return '<div style="background:var(--bg-hover);padding:10px;border-radius:var(--radius-sm);">'
++'<div style="font-weight:600;font-size:0.85rem;">'+k.keyword+'</div>'
++'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">Intent: '+k.intent+'</div>'
++'<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:6px;padding:6px;background:var(--bg-subtle);border-radius:4px;">'+k.ad_copy+'</div></div>';}).join('')+'</div></div>';}
+
+// Collab Leads
+var co=data.collab_leads||[];
+if(co.length){html+='<div style="margin-bottom:16px;"><div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">Collaboration Targets</div>'
++'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">'
++co.map(function(c){return '<div style="background:var(--bg-hover);padding:10px;border-radius:var(--radius-sm);">'
++'<span style="font-size:0.65rem;padding:2px 6px;background:var(--info-bg);color:var(--info);border-radius:4px;">'+c.type+'</span>'
++'<div style="font-weight:500;font-size:0.85rem;margin-top:6px;">'+c.suggestion+'</div>'
++'<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">'+c.pitch+'</div>'
++'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">'+c.why+'</div></div>';}).join('')+'</div></div>';}
+
+// Quick Wins
+var qw=data.quick_wins||[];
+if(qw.length){html+='<div><div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">Quick Wins</div>'
++qw.map(function(q){return '<div style="padding:8px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;">'
++'<span style="font-size:0.65rem;padding:2px 6px;background:'+(q.impact==='high'?'var(--success-bg)':'var(--warning-bg)')+';color:'+(q.impact==='high'?'var(--success)':'var(--warning)')+';border-radius:4px;">'+q.impact+' impact</span>'
++'<span style="font-size:0.85rem;flex:1;">'+q.action+'</span>'
++'<span style="font-size:0.7rem;color:var(--text-muted);">'+q.timeline+'</span></div>';}).join('')+'</div>';}
+
+document.getElementById('leadsArea').innerHTML=html;
+})
+.catch(function(e){btn.disabled=false;btn.textContent='Generate Leads';alert('Error: '+e);});}
+
 document.addEventListener('DOMContentLoaded',init);
 </script>
 {% endblock %}

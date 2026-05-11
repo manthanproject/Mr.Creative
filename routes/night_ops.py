@@ -397,3 +397,125 @@ Be specific, data-driven, and actionable. Format with clear sections. Keep it un
         return jsonify({'insights': insights})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@night_ops_bp.route('/api/generate-leads', methods=['POST'])
+@login_required
+def generate_leads():
+    """Generate actionable leads from trend + competitor data via Groq."""
+    from models import db, NightTrend, NightCompetitor, NightReport
+    from config import Config
+
+    groq_key = Config.GROQ_API_KEY
+    if not groq_key:
+        return jsonify({'error': 'No GROQ_API_KEY configured'}), 500
+
+    niche = (request.json or {}).get('niche', 'all')
+    since = datetime.now() - timedelta(days=7)
+
+    # Gather trends
+    trends_q = NightTrend.query.filter(NightTrend.scanned_at >= since)
+    all_trends = trends_q.order_by(NightTrend.score.desc()).limit(50).all()
+    trend_items = []
+    for t_item in all_trends:
+        try:
+            data = json.loads(t_item.trend_data) if t_item.trend_data else {}
+        except Exception:
+            data = {}
+        title = data.get('title', '') or t_item.category or ''
+        if niche != 'all':
+            combined = (t_item.category + ' ' + title).lower()
+            niche_kw = NICHE_MAP.get(niche, [])
+            if not any(kw in combined for kw in niche_kw):
+                continue
+        trend_items.append({
+            'source': t_item.source, 'title': title[:80],
+            'price': data.get('price', ''), 'score': t_item.score,
+        })
+
+    # Gather competitors
+    comps = NightCompetitor.query.filter(NightCompetitor.scanned_at >= since).all()
+    comp_items = []
+    for c in comps:
+        try:
+            cdata = json.loads(c.last_post_data) if c.last_post_data else {}
+        except Exception:
+            cdata = {}
+        pin_titles = [p.get('title', '')[:60] for p in (cdata.get('recent_pins', []) or [])[:5]]
+        comp_items.append({
+            'handle': c.handle, 'platform': c.platform,
+            'followers': c.follower_count, 'top_pins': pin_titles,
+        })
+
+    niche_label = NICHE_LABELS.get(niche, 'All Niches') if niche != 'all' else 'All Niches'
+
+    prompt = f"""You are a lead generation expert for dropy.in, an Indian e-commerce brand selling imported beauty, health, and skincare products online (Shopify store + marketplace).
+
+Based on this market intelligence data, generate ACTIONABLE LEADS:
+
+=== TRENDING PRODUCTS ({len(trend_items)} items, {niche_label}) ===
+{json.dumps(trend_items[:20], indent=1)}
+
+=== COMPETITOR ACTIVITY ===
+{json.dumps(comp_items, indent=1)}
+
+Generate leads as JSON with this exact structure:
+{{
+  "product_leads": [
+    {{"product": "specific product name", "why": "why stock/promote this", "urgency": "high|medium|low", "source": "amazon|pinterest|competitor", "action": "what to do right now"}}
+  ],
+  "content_leads": [
+    {{"format": "carousel|reel|story|pin|banner|blog", "topic": "specific topic", "hook": "attention-grabbing first line", "products_to_feature": ["product1"], "platform": "instagram|pinterest|both"}}
+  ],
+  "keyword_leads": [
+    {{"keyword": "search term", "intent": "buy|research|compare", "ad_copy": "short Google/social ad text"}}
+  ],
+  "collab_leads": [
+    {{"type": "influencer|brand|page", "suggestion": "who to approach", "pitch": "one-line pitch idea", "why": "reason"}}
+  ],
+  "quick_wins": [
+    {{"action": "specific action", "effort": "low|medium", "impact": "high|medium", "timeline": "today|this week|this month"}}
+  ]
+}}
+
+Generate 3-5 items per category. Be SPECIFIC to Indian market and dropy.in products (CeraVe, Korean beauty, imported skincare). No generic advice.
+Respond ONLY with valid JSON."""
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=groq_key)
+        response = client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7, max_tokens=3000,
+        )
+        result_text = (response.choices[0].message.content or '').strip()
+        result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+        result_text = re.sub(r'\s*```$', '', result_text)
+
+        try:
+            leads = json.loads(result_text)
+        except json.JSONDecodeError:
+            start = result_text.find('{')
+            end = result_text.rfind('}')
+            if start != -1 and end > start:
+                leads = json.loads(result_text[start:end+1])
+            else:
+                leads = {'error': 'Failed to parse', 'raw': result_text[:500]}
+
+        # Save as report
+        report = NightReport(
+            report_type='leads',
+            report_data=json.dumps(leads, ensure_ascii=False),
+            summary=f"Leads for {niche_label}: {len(leads.get('product_leads',[]))} products, {len(leads.get('content_leads',[]))} content, {len(leads.get('keyword_leads',[]))} keywords",
+            status='completed',
+        )
+        db.session.add(report)
+        db.session.commit()
+
+        leads['niche'] = niche_label
+        leads['trend_count'] = len(trend_items)
+        return jsonify(leads)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
