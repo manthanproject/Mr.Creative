@@ -247,6 +247,48 @@
 </style>
 
 <script>
+
+function runNicheAnalysis(niche) {
+    document.querySelectorAll('.niche-btn').forEach(function(b){b.style.fontWeight='400'});
+    if(event&&event.target)event.target.style.fontWeight='700';
+    var spinner=document.getElementById('nicheSpinner');
+    spinner.style.display='inline';
+    fetch('/night-ops/api/niche-trends?niche='+niche+'&limit=30')
+    .then(function(r){return r.json()})
+    .then(function(td){
+        document.getElementById('nicheTrendCount').textContent=td.count;
+        var tl=document.getElementById('nicheTrendList');
+        tl.innerHTML=(td.trends||[]).slice(0,10).map(function(t){
+            var d=t.data||{};var title=d.title||t.category||'';var img=d.image_url||'';
+            return '<div style="padding:4px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:6px;">'
+            +(img?'<img src="'+img+'" style="width:28px;height:28px;object-fit:cover;border-radius:3px;" onerror="this.style.display=\'none\'"/>':'')
+            +'<span style="font-size:0.7rem;padding:1px 5px;background:var(--bg-hover);border-radius:3px;">'+t.source+'</span>'
+            +'<span style="flex:1;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+title.slice(0,65)+'</span>'
+            +'<span style="font-size:0.75rem;color:var(--accent);">'+(t.score*100).toFixed(0)+'%</span></div>';
+        }).join('')||'<p style="color:var(--text-muted);font-size:0.85rem;">No matching trends.</p>';
+        return fetch('/night-ops/api/niche-analysis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:niche})});
+    })
+    .then(function(r){return r.json()})
+    .then(function(a){
+        spinner.style.display='none';
+        var res=document.getElementById('nicheResults');res.style.display='block';
+        document.getElementById('nicheTitle').textContent='Niche: '+(a.label||niche);
+        document.getElementById('nicheSummary').textContent=a.summary||'';
+        document.getElementById('nicheOpportunities').innerHTML=(a.top_opportunities||[]).map(function(o){return '<div style="padding:4px 0;font-size:0.85rem;border-bottom:1px solid var(--border-light);">'+o+'</div>'}).join('')||'None';
+        document.getElementById('nicheProducts').innerHTML=(a.trending_products||[]).map(function(p){return '<div style="padding:4px 0;font-size:0.85rem;border-bottom:1px solid var(--border-light);">'+p+'</div>'}).join('')||'None';
+        document.getElementById('nicheRisks').innerHTML=(a.risk_factors||[]).map(function(r){return '<div style="padding:4px 0;font-size:0.85rem;border-bottom:1px solid var(--border-light);">'+r+'</div>'}).join('')||'None';
+        document.getElementById('nicheContentIdeas').innerHTML=(a.content_suggestions||[]).map(function(s){
+            return '<div style="background:var(--bg-hover);padding:10px;border-radius:6px;">'
+            +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span class="badge badge-info" style="font-size:0.65rem;">'+(s.type||'')+'</span><span style="font-weight:500;font-size:0.85rem;">'+(s.product||'')+'</span></div>'
+            +'<div style="font-size:0.8rem;color:var(--text-secondary);">'+(s.idea||'')+'</div>'
+            +(s.reason?'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">'+s.reason+'</div>':'')
+            +'</div>';
+        }).join('')||'None';
+        res.scrollIntoView({behavior:'smooth',block:'start'});
+    })
+    .catch(function(e){spinner.style.display='none';alert('Analysis failed: '+e)});
+}
+
 // ── Reset ──
 function resetDashboard() {
     if (!confirm('Clear ALL night ops data (trends, competitors, reports, plans)?')) return;
