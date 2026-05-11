@@ -397,4 +397,3 @@ Be specific, data-driven, and actionable. Format with clear sections. Keep it un
         return jsonify({'insights': insights})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-\n
