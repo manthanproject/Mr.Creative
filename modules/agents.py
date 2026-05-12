@@ -28,11 +28,27 @@ class AgentEngine:
             except ImportError:
                 print("[Agent] cerebras-cloud-sdk not installed — pip install cerebras-cloud-sdk")
         self._using_cerebras = False
+        self._last_provider = 'groq'
         self._reference_image_path: str | None = None
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7, max_tokens=2000):
-        """Call Groq LLM → on 429, switch to Cerebras for rest of session."""
-        # Pick client
+        """Call LLM: Gemini 2.5 Flash → Groq → Cerebras."""
+        combined_prompt = f"{system_prompt}
+
+{user_prompt}"
+
+        # Try Gemini first (via central call_llm)
+        try:
+            from modules.night_orchestrator.llm import call_llm as central_llm
+            result = central_llm(combined_prompt, temperature=temperature, max_tokens=max_tokens)
+            if result:
+                self._using_cerebras = False
+                self._last_provider = 'gemini'
+                return result
+        except Exception as e:
+            print(f"[Agent] Gemini failed, falling back to Groq: {e}")
+
+        # Groq fallback
         if self._using_cerebras and self.cerebras_client:
             client = self.cerebras_client
             model = self.cerebras_model
