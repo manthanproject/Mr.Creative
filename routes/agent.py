@@ -413,3 +413,56 @@ def generate_carousel_route(job_id):
 
     db.session.commit()
     return jsonify({'success': True, 'slides': generated, 'count': len(generated)})
+
+
+# A+ Template Routes
+@agent_bp.route('/aplus/templates')
+@login_required
+def aplus_templates():
+    from modules.aplus_templates import get_available_templates
+    return jsonify({'templates': get_available_templates()})
+
+@agent_bp.route('/aplus/generate', methods=['POST'])
+@login_required
+def aplus_generate():
+    data = request.get_json() or {}
+    product_name = data.get('product_name', '').strip()
+    if not product_name:
+        return jsonify({'error': 'Product name required'}), 400
+
+    templates_to_gen = data.get('templates', ['hero_banner', 'feature_grid', 'comparison_chart', 'how_to_steps'])
+    product_image = data.get('product_image', '')
+    brand_name = data.get('brand_name', '')
+    product_category = data.get('product_category', 'Beauty')
+    key_features = data.get('key_features', [])
+    target_audience = data.get('target_audience', '')
+
+    from modules.aplus_templates import generate_aplus_copy, render_aplus_image
+    output_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'aplus')
+    os.makedirs(output_dir, exist_ok=True)
+
+    results = []
+    errors = []
+    for template_name in templates_to_gen:
+        try:
+            copy_data = generate_aplus_copy(
+                product_name=product_name, product_category=product_category,
+                key_features=key_features, target_audience=target_audience,
+                brand_name=brand_name, template_type=template_name,
+            )
+            copy_data['brand_name'] = brand_name
+            copy_data['product_name'] = product_name
+            if product_image:
+                abs_path = os.path.abspath(product_image)
+                copy_data['product_image'] = 'file:///' + abs_path.replace(chr(92), '/')
+
+            output_path = render_aplus_image(
+                template_name=template_name, data=copy_data,
+                output_dir=output_dir, width=970,
+            )
+            rel_path = os.path.relpath(output_path, current_app.root_path).replace(chr(92), '/')
+            results.append({'template': template_name, 'image_path': '/' + rel_path, 'copy_data': copy_data})
+        except Exception as e:
+            errors.append({'template': template_name, 'error': str(e)})
+
+    return jsonify({'success': len(results) > 0, 'generated': results, 'errors': errors})
