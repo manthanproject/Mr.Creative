@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: transparent; }
+#aplus-container { width: {{WIDTH}}px; background: #fff; font-family: 'Inter', sans-serif; color: #1a1a1a; padding: 50px; }
+.section-header { text-align: center; margin-bottom: 36px; }
+.section-label { font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: #8b7355; margin-bottom: 10px; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 8px; }
+.section-divider { width: 50px; height: 3px; background: linear-gradient(90deg, #8b7355, #c4a97d); border-radius: 2px; margin: 12px auto 0; }
+.table-wrapper { border-radius: 14px; overflow: hidden; border: 1px solid #e8e2d9; }
+table { width: 100%; border-collapse: collapse; }
+thead th { padding: 16px 20px; font-size: 13px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+thead th:first-child { text-align: left; background: #f5f0eb; color: #8b7355; }
+thead th.product-col { background: #1a1a1a; color: #fff; }
+thead th.comp-col { background: #f5f0eb; color: #888; }
+tbody td { padding: 14px 20px; font-size: 13px; text-align: center; border-top: 1px solid #f0ece6; }
+tbody td:first-child { text-align: left; font-weight: 500; color: #444; }
+tbody tr:nth-child(even) { background: #faf8f5; }
+.check { color: #2d8a4e; font-weight: 700; font-size: 16px; }
+.cross { color: #cc4444; font-weight: 700; font-size: 16px; }
+.score-high { color: #2d8a4e; font-weight: 700; }
+.score-mid { color: #b8860b; font-weight: 600; }
+.score-low { color: #cc4444; font-weight: 600; }
+.verdict { text-align: center; margin-top: 24px; padding: 16px 24px; background: linear-gradient(135deg, #faf8f5, #f5f0eb); border-radius: 10px; font-size: 14px; font-weight: 500; color: #555; }
+.verdict strong { color: #1a1a1a; }
+</style>
+</head>
+<body>
+<div id="aplus-container">
+    <div class="section-header">
+        <div class="section-label" id="brand"></div>
+        <div class="section-title" id="title"></div>
+        <div class="section-divider"></div>
+    </div>
+    <div class="table-wrapper"><table id="chart"></table></div>
+    <div class="verdict" id="verdict"></div>
+</div>
+<script>
+const data = {{DATA_JSON}};
+document.getElementById('brand').textContent = data.brand_name || '';
+document.getElementById('title').textContent = data.section_title || 'How We Compare';
+document.getElementById('verdict').innerHTML = '<strong>' + (data.verdict || '') + '</strong>';
+const table = document.getElementById('chart');
+const comps = data.competitors || ['Brand A', 'Brand B'];
+let h = '<thead><tr><th>Features</th><th class="product-col">' + (data.product_name || 'Our Product') + '</th>';
+comps.forEach(c => { h += '<th class="comp-col">' + c + '</th>'; });
+h += '</tr></thead><tbody>';
+(data.rows || []).forEach(row => {
+    h += '<tr><td>' + row.feature + '</td><td>' + fs(row.product_score) + '</td><td>' + fs(row.comp_a_score,1) + '</td>';
+    if (comps.length > 1) h += '<td>' + fs(row.comp_b_score,1) + '</td>';
+    h += '</tr>';
+});
+h += '</tbody>';
+table.innerHTML = h;
+function fs(s,c) {
+    if (!s) return '<span class="cross">\u2717</span>';
+    s = String(s);
+    if (s === 'Yes') return '<span class="check">\u2713</span>';
+    if (s === 'No' || s === '-') return '<span class="cross">\u2717</span>';
+    if (s.includes('/')) { var n=parseInt(s); if(n>=4) return '<span class="score-high">'+s+'</span>'; if(n>=3) return '<span class="score-mid">'+s+'</span>'; return '<span class="score-low">'+s+'</span>'; }
+    return s;
+}
+</script>
+</body>
+</html>

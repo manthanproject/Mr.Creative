@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: transparent; }
+#aplus-container { width: {{WIDTH}}px; background: #fff; font-family: 'Inter', sans-serif; color: #1a1a1a; padding: 50px; }
+.section-header { text-align: center; margin-bottom: 40px; }
+.section-label { font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: #8b7355; margin-bottom: 10px; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.section-divider { width: 50px; height: 3px; background: linear-gradient(90deg, #8b7355, #c4a97d); border-radius: 2px; margin: 12px auto 0; }
+.grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+.feature-card { text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #faf8f5, #f5f0eb); border-radius: 14px; border: 1px solid rgba(139,115,85,0.08); }
+.feature-icon { font-size: 32px; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: white; border-radius: 16px; margin: 0 auto 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.feature-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.feature-desc { font-size: 12.5px; color: #666; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="aplus-container">
+    <div class="section-header">
+        <div class="section-label" id="brand"></div>
+        <div class="section-title" id="title"></div>
+        <div class="section-divider"></div>
+    </div>
+    <div class="grid" id="grid"></div>
+</div>
+<script>
+const data = {{DATA_JSON}};
+document.getElementById('brand').textContent = data.brand_name || '';
+document.getElementById('title').textContent = data.section_title || 'Key Features';
+const g = document.getElementById('grid');
+(data.features || []).forEach(f => {
+    g.innerHTML += '<div class="feature-card"><div class="feature-icon">'+f.icon_emoji+'</div><div class="feature-title">'+f.title+'</div><div class="feature-desc">'+f.desc+'</div></div>';
+});
+</script>
+</body>
+</html>

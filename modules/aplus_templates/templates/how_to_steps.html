@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: transparent; }
+#aplus-container { width: {{WIDTH}}px; background: linear-gradient(180deg, #fff 0%, #faf8f5 100%); font-family: 'Inter', sans-serif; color: #1a1a1a; padding: 50px; }
+.section-header { text-align: center; margin-bottom: 40px; }
+.section-label { font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: #8b7355; margin-bottom: 10px; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 8px; }
+.section-divider { width: 50px; height: 3px; background: linear-gradient(90deg, #8b7355, #c4a97d); border-radius: 2px; margin: 12px auto 0; }
+.steps-container { display: flex; gap: 20px; }
+.step-card { flex: 1; background: white; border-radius: 16px; padding: 28px 22px; text-align: center; border: 1px solid rgba(139,115,85,0.08); box-shadow: 0 4px 16px rgba(0,0,0,0.04); position: relative; }
+.step-number { width: 44px; height: 44px; background: linear-gradient(135deg, #1a1a1a, #333); color: white; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin: 0 auto 16px; }
+.step-icon { font-size: 28px; margin-bottom: 12px; }
+.step-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.step-desc { font-size: 12px; color: #666; line-height: 1.5; }
+.pro-tip { margin-top: 28px; padding: 16px 24px; background: linear-gradient(135deg, #f5f0eb, #ece3d5); border-radius: 10px; text-align: center; font-size: 13px; color: #555; border-left: 4px solid #c4a97d; }
+.pro-tip strong { color: #8b7355; }
+</style>
+</head>
+<body>
+<div id="aplus-container">
+    <div class="section-header">
+        <div class="section-label" id="brand"></div>
+        <div class="section-title" id="title"></div>
+        <div class="section-divider"></div>
+    </div>
+    <div class="steps-container" id="steps"></div>
+    <div class="pro-tip" id="tip"></div>
+</div>
+<script>
+const data = {{DATA_JSON}};
+document.getElementById('brand').textContent = data.brand_name || '';
+document.getElementById('title').textContent = data.section_title || 'How To Use';
+const el = document.getElementById('steps');
+(data.steps || []).forEach((s,i,a) => {
+    el.innerHTML += '<div class="step-card"><div class="step-number">'+(s.number||i+1)+'</div><div class="step-icon">'+(s.icon_emoji||'')+'</div><div class="step-title">'+s.title+'</div><div class="step-desc">'+s.desc+'</div></div>';
+});
+var tip = data.pro_tip || '';
+if (tip) { document.getElementById('tip').innerHTML = '<strong>Pro Tip:</strong> ' + tip; }
+else { document.getElementById('tip').style.display = 'none'; }
+</script>
+</body>
+</html>
