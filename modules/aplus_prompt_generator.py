@@ -39,7 +39,7 @@ def generate_listing_prompts(product_info):
     base_context = (
         f"Product: {name} | Category: {category} | Size: {dimensions} | "
         f"Features: {features_str} | Audience: {audience} | Brand: {brand} | USP: {usp} | "
-        f"Colors: {primary}, {secondary}, {accent} | Style: {style_notes or 'Premium commercial'}"
+        f"Style: {style_notes or 'Premium commercial, natural product photography'}"
     )
 
     results = []
@@ -51,9 +51,9 @@ def generate_listing_prompts(product_info):
                 f"PRODUCT: {base_context}\n\n"
                 f"IMAGE TYPE: {spec['instruction']}\n\n"
                 f"RULES: Ultra photorealistic, 12K UHD, professional 3-point studio lighting, "
-                f"85mm prime lens f/8 ISO 100, bold uppercase Montserrat typography, "
-                f"color palette {primary} + {secondary} + {accent}, "
-                f"clean geometric color-block layout, NO gradients NO clutter NO cartoonish. "
+                f"85mm prime lens f/8 ISO 100. "
+                f"Clean professional layout. NO color blocks, NO hex codes, NO forced color palette. "
+                f"Let the AI decide natural colors based on the product. NO gradients NO clutter NO cartoonish. "
                 f"Write ALL text/headlines that should appear in the image. "
                 f"Include negative prompt at end.\n\n"
                 f"Return ONLY the prompt text, nothing else. No markdown, no labels, no explanations."
