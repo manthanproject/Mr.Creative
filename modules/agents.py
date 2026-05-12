@@ -314,15 +314,53 @@ Each prompt MUST include a specific camera (not always the same one — vary the
 5. For Flow engine: describe the SCENE around the product (reference image provides the product)
 6. Write in natural language paragraphs, not keyword lists
 
-SPECIAL RULE FOR A+ CONTENT:
-A+ content prompts must describe DESIGNED INFOGRAPHIC LAYOUTS that Flow will generate as images.
-CRITICAL: Replace all generic phrases with ACTUAL brand data:
-- Instead of "the product" → use the actual product name from the brand kit
-- Instead of "key benefit" → use actual benefits from the brand analysis (e.g. "Reduces wrinkles in 2 weeks")
-- Instead of "3 features" → list the actual features (e.g. "• Niacinamide 10% • Zinc PCA 1% • Lightweight formula")
-- Instead of "brand name" → use the actual brand name (e.g. "The Ordinary" or "Dropy Beauty")
-- Include real claims, real ingredient names, real benefit statements from the brand analysis
-Each A+ prompt should read like a complete design brief with ALL the text that should appear in the final image.
+CRITICAL RULE FOR ALL CONTENT TYPES:
+NEVER use generic phrases. Replace with ACTUAL brand data from the brand analysis:
+- Instead of "the product" or "the bottle" → use the actual product name
+- Instead of "brand name" → use the actual brand name
+- Instead of "key benefit" → use actual benefits from brand analysis
+- Instead of "serum" or "cream" → use the actual product type and category
+- Include real product features, real ingredients, real claims from brand analysis
+
+CONTENT TYPE SPECIFIC RULES:
+
+SOCIAL POST prompts:
+- Show the product in relatable everyday moments (morning routine, desk, travel bag)
+- Include specific props that match the product category (not generic coffee cups)
+- Describe the exact surface, background, and ambient mood
+- Focus on aspirational lifestyle that matches the target audience
+
+BANNER prompts:
+- Design for text overlay — leave clean negative space on one side (specify which side)
+- Product should occupy 30-40% of frame, rest is breathing room
+- Describe the exact surface texture (marble, wood, linen, concrete)
+- Include headline text that should appear: use actual product name and USP
+
+LIFESTYLE prompts:
+- Show a real person USING the product (not just holding it)
+- Specify the person's demographics matching the target audience
+- Describe the exact setting (bathroom, bedroom, gym, office — match the product)
+- Shallow depth of field with product sharp, background soft
+- Make it feel candid and authentic, not staged
+
+AD CREATIVE prompts:
+- Design for scroll-stopping impact — bold composition, strong contrast
+- Include actual headline text with product name and key benefit
+- Specify the exact call-to-action text (Shop Now, Try Today, Limited Offer)
+- Split layout: product on one side, text on the other
+- Include actual price point or offer if available from brand analysis
+
+A+ CONTENT prompts:
+- Describe DESIGNED INFOGRAPHIC LAYOUTS for marketplace listings
+- Include ALL text that should appear in the image (headlines, features, descriptions)
+- Use actual features, ingredients, and benefits from brand analysis
+- Structure as: hero shot, feature grid, comparison, how-to, ingredients, trust badges
+
+MODEL PHOTOGRAPHY prompts:
+- Specify model demographics matching target audience (age, style, setting)
+- Product must be the HERO — model is the context, not the subject
+- Describe the exact pose and how they interact with the product
+- Include wardrobe details that complement the product aesthetic
 
 Return ONLY valid JSON array. Each item:
 {{
