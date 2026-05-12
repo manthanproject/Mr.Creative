@@ -45,26 +45,36 @@ def call_llm(prompt: str, system: str = '', temperature: float = 0.7, max_tokens
 
 
 def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max_tokens: int) -> str:
-    """Call Google Gemini API."""
+    """Call Google Gemini API with model rotation."""
     import google.generativeai as genai
 
     genai.configure(api_key=api_key)
 
-    # Rotate through models — each has its own free tier quota
     models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
     last_error = None
+
     for model_name in models:
         try:
-            model = genai.GenerativeModel(model_name=model_name,
-        system_instruction=system if system else None,
-        generation_config=genai.GenerationConfig(
-            temperature=temperature,
-            max_output_tokens=max_tokens,
-        ),
-    )
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=system if system else None,
+                generation_config=genai.GenerationConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                ),
+            )
+            response = model.generate_content(prompt)
+            print(f"[LLM] Used {model_name}")
+            return (response.text or '').strip()
+        except Exception as e:
+            last_error = e
+            if '429' in str(e):
+                print(f"[LLM] {model_name} quota hit, trying next model...")
+                continue
+            raise
 
-    response = model.generate_content(prompt)
-    return (response.text or '').strip()
+    raise last_error
+
 
 
 def _call_groq(api_key: str, prompt: str, system: str, temperature: float, max_tokens: int) -> str:
