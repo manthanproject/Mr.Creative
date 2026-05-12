@@ -267,13 +267,7 @@ Use "flow" engine for ALL pieces (reference image is provided)."""
         from modules.prompt_library import get_prompt_context_for_llm, build_prompt, CONTENT_TYPE_CONFIG
 
         content_types = list(set(item.get('type', 'social_post') for item in content_plan))
-        all_aplus = all(item.get('type') == 'a_plus' for item in content_plan)
-
-        # Expert prompts for A+ content (no LLM rewriting needed)
-        if all_aplus:
-            return self._craft_aplus_prompts_direct(content_plan, brand_analysis, brand_kit)
-
-        # LLM with prompt library (Groq/Cerebras)
+        # All content types go through LLM for unique detailed prompts
 
         # Get content types from the plan
         content_types = list(set(item.get('type', 'social_post') for item in content_plan))
