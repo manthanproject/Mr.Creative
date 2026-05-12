@@ -10,6 +10,11 @@ import time
 from typing import Any
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
+try:
+    import undetected_chromedriver as uc
+    HAS_UC = True
+except ImportError:
+    HAS_UC = False
 
 
 class FlowSession:
@@ -27,10 +32,24 @@ class FlowSession:
             print("[FlowSession] Could not launch Flow Chrome")
             return False
 
-        opts = Options()
-        opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
+        if HAS_UC:
+            # Undetected Chrome — patches binary to bypass bot detection
+            print("[FlowSession] Using undetected-chromedriver")
+            uc_opts = uc.ChromeOptions()
+            uc_opts.add_argument('--user-data-dir=' + os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'chrome_flow_crimsonbox69'
+            ))
+            self.driver = uc.Chrome(options=uc_opts, version_main=None)
+            self.driver.get('https://labs.google/fx/tools/flow')
+            import time as _t
+            _t.sleep(5)
+        else:
+            # Fallback: attach to existing debug port
+            opts = Options()
+            opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
+            self.driver = webdriver.Chrome(options=opts)
 
-        self.driver = webdriver.Chrome(options=opts)
         self.driver.set_script_timeout(120)
 
         # Anti-detection: mask Selenium/automation markers
