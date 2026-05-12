@@ -56,8 +56,8 @@
     .pm-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
     /* Flow-style toggle buttons */
-    .flow-toggle-group { display: flex; gap: 2px; background: var(--pm-bg-elevated); border-radius: var(--pm-radius-pill); padding: 3px; border: 1px solid var(--pm-border); }
-    .flow-toggle-btn { flex: 1; padding: 6px 10px; border-radius: var(--pm-radius-pill); border: none; background: transparent; color: var(--pm-text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: inherit; text-align: center; }
+    .flow-toggle-group { display: flex; gap: 3px; background: rgba(30,32,34,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: var(--pm-radius-pill); padding: 3px; border: 1px solid rgba(255,255,255,0.06); }
+    .flow-toggle-btn { flex: 1; padding: 6px 10px; border-radius: var(--pm-radius-pill); border: 1px solid transparent; background: transparent; color: var(--pm-text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 0.25s; font-family: inherit; text-align: center; } .flow-toggle-btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); } .flow-toggle-btn.active { background: linear-gradient(135deg, rgba(193,205,125,0.65), rgba(160,180,80,0.65)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: #1a1d00; border-color: rgba(193,205,125,0.3); box-shadow: 0 2px 12px rgba(193,205,125,0.25); font-weight: 600; }
     .flow-toggle-btn:hover { color: var(--pm-text); }
     .flow-toggle-btn.active { background: var(--pm-accent); color: var(--pm-accent-text); font-weight: 600; }
 

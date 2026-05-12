@@ -47,8 +47,8 @@
 
     /* Content type pills */
     .ag-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.3rem; }
-    .ag-pill { padding: 0.35rem 0.75rem; border-radius: var(--ag-pill); font-size: 0.72rem; font-weight: 500; cursor: pointer; border: 1px solid var(--ag-border); background: var(--ag-elevated); color: var(--ag-text-sec); transition: all 0.2s; user-select: none; }
-    .ag-pill.active { background: var(--ag-accent-dim); border-color: var(--ag-accent); color: var(--ag-accent); }
+    .ag-pill { padding: 0.35rem 0.75rem; border-radius: var(--ag-pill); font-size: 0.72rem; font-weight: 500; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(30,32,34,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--ag-text-sec); transition: all 0.25s; user-select: none; } .ag-pill:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+    .ag-pill.active { background: linear-gradient(135deg, rgba(193,205,125,0.65), rgba(160,180,80,0.65)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: rgba(193,205,125,0.3); color: #1a1d00; box-shadow: 0 2px 12px rgba(193,205,125,0.2); font-weight: 600; }
 
     /* Progress */
     .ag-progress { display: none; margin-top: 1rem; }
