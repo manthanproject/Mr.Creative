@@ -50,7 +50,7 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
 
     genai.configure(api_key=api_key)
 
-    models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
+    models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']
     last_error = None
 
     for model_name in models:
