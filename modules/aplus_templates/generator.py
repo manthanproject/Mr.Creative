@@ -25,26 +25,31 @@ def generate_aplus_copy(product_name, product_category, key_features=None,
     }
     spec = templates_spec.get(template_type, templates_spec['hero_banner'])
     features_str = ', '.join(key_features) if key_features else 'not specified'
-    prompt = f"""You are a senior e-commerce copywriter for premium beauty/health brands on Amazon India.
-Generate marketing copy for an A+ listing image.
-
-Product: {product_name}
-Brand: {brand_name or 'Premium Brand'}
-Category: {product_category or 'Beauty'}
-Key Features: {features_str}
-Target Audience: {target_audience or 'Women 18-35'}
-
-Template: {template_type} - {spec['desc']}
-
-Return ONLY valid JSON (no markdown):
-{spec['fields']}
-
-Write like L'Oreal/Neutrogena - premium but accessible. Keep text concise for images."""
+    prompt = (
+        "You are a senior e-commerce copywriter for premium beauty/health brands on Amazon India.\n"
+        "Generate marketing copy for an A+ listing image.\n\n"
+        f"Product: {product_name}\n"
+        f"Brand: {brand_name or 'Premium Brand'}\n"
+        f"Category: {product_category or 'Beauty'}\n"
+        f"Key Features: {features_str}\n"
+        f"Target Audience: {target_audience or 'Women 18-35'}\n\n"
+        f"Template: {template_type} - {spec['desc']}\n\n"
+        f"Return ONLY valid JSON (no markdown, no backticks):\n{spec['fields']}\n\n"
+        "Write like L'Oreal/Neutrogena - premium but accessible. Keep text concise for images."
+    )
 
     try:
         result = call_llm(prompt, temperature=0.7, max_tokens=1000)
         result = result.strip()
-        if result.startswith("", 1)[0]
+        # Remove markdown code fences if present
+        if result.startswith('`'):
+            lines = result.split('\n')
+            # Remove first and last lines if they are fences
+            if lines[0].strip().startswith('`'):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith('`'):
+                lines = lines[:-1]
+            result = '\n'.join(lines)
         return json.loads(result)
     except Exception as e:
         logger.error(f"[A+ Copy] Error: {e}")
@@ -64,20 +69,20 @@ def _fallback(template_type, product_name):
     return {
         'headline': product_name,
         'tagline': 'Premium quality for everyday beauty',
-        'section_title': f'Why Choose {product_name}',
+        'section_title': 'Why Choose ' + product_name,
         'benefits': [
-            {'icon_emoji': chr(10024), 'title': 'Premium Quality', 'desc': 'Made with finest ingredients'},
-            {'icon_emoji': chr(11088), 'title': 'Long Lasting', 'desc': 'All-day performance'},
-            {'icon_emoji': chr(128154), 'title': 'Gentle Formula', 'desc': 'For all skin types'},
-            {'icon_emoji': chr(9989), 'title': 'Dermatologist Tested', 'desc': 'Clinically proven'},
+            {'icon_emoji': '\u2728', 'title': 'Premium Quality', 'desc': 'Made with finest ingredients'},
+            {'icon_emoji': '\u2B50', 'title': 'Long Lasting', 'desc': 'All-day performance'},
+            {'icon_emoji': '\U0001F49A', 'title': 'Gentle Formula', 'desc': 'For all skin types'},
+            {'icon_emoji': '\u2705', 'title': 'Dermatologist Tested', 'desc': 'Clinically proven'},
         ],
         'features': [
-            {'icon_emoji': chr(10024), 'title': 'Premium', 'desc': 'Advanced formulation'},
-            {'icon_emoji': chr(11088), 'title': 'Quick Results', 'desc': 'Visible improvement'},
-            {'icon_emoji': chr(128154), 'title': 'Natural', 'desc': 'Clean beauty'},
-            {'icon_emoji': chr(128737), 'title': 'Safe', 'desc': 'Dermatologist tested'},
-            {'icon_emoji': chr(128167), 'title': 'Hydrating', 'desc': 'Deep moisture'},
-            {'icon_emoji': chr(9851), 'title': 'Eco-Friendly', 'desc': 'Sustainable'},
+            {'icon_emoji': '\u2728', 'title': 'Premium', 'desc': 'Advanced formulation'},
+            {'icon_emoji': '\u2B50', 'title': 'Quick Results', 'desc': 'Visible improvement'},
+            {'icon_emoji': '\U0001F49A', 'title': 'Natural', 'desc': 'Clean beauty'},
+            {'icon_emoji': '\U0001F6E1', 'title': 'Safe', 'desc': 'Dermatologist tested'},
+            {'icon_emoji': '\U0001F4A7', 'title': 'Hydrating', 'desc': 'Deep moisture'},
+            {'icon_emoji': '\u267B', 'title': 'Eco-Friendly', 'desc': 'Sustainable'},
         ],
         'cta': 'Shop Now',
     }
