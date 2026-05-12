@@ -20,6 +20,7 @@ DOM Selectors (April 2026):
 import os
 import time
 import datetime
+import random
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -70,6 +71,24 @@ class FlowBot:
         self.status_message = message
         print(f"[FlowBot] {status}: {message}")
 
+    def _human_delay(self, min_s=0.5, max_s=2.0):
+        time.sleep(random.uniform(min_s, max_s))
+
+    def _human_move(self, element):
+        try:
+            ox = random.randint(-5, 5)
+            oy = random.randint(-3, 3)
+            ActionChains(self.driver).move_to_element_with_offset(element, ox, oy).pause(random.uniform(0.1, 0.4)).perform()
+        except Exception:
+            pass
+
+    def _human_scroll(self):
+        try:
+            self.driver.execute_script(f"window.scrollBy(0, {random.randint(-50, 100)});")
+            time.sleep(random.uniform(0.2, 0.5))
+        except Exception:
+            pass
+
     def _is_on_flow(self):
         try:
             url = self.driver.current_url
@@ -82,7 +101,8 @@ class FlowBot:
         el = self.driver.execute_script(script)
         if el:
             try:
-                ActionChains(self.driver).move_to_element(el).pause(0.3).click().perform()
+                self._human_move(el)
+                ActionChains(self.driver).move_to_element(el).pause(random.uniform(0.2, 0.6)).click().perform()
             except Exception:
                 self.driver.execute_script("arguments[0].click();", el)
             return True
@@ -438,25 +458,22 @@ class FlowBot:
         if not prompt_el:
             raise RuntimeError('Prompt input not found')
 
-        ActionChains(self.driver).move_to_element(prompt_el).pause(0.3).click().perform()
-        time.sleep(0.3)
+        self._human_move(prompt_el)
+        self._human_delay(0.3, 0.8)
+        ActionChains(self.driver).move_to_element(prompt_el).click().perform()
+        self._human_delay(0.2, 0.5)
         prompt_el.send_keys(Keys.CONTROL, 'a')
-        time.sleep(0.1)
+        self._human_delay(0.1, 0.3)
         prompt_el.send_keys(Keys.DELETE)
-        time.sleep(0.2)
-
-        # Paste via clipboard — fastest method that triggers contenteditable events
+        self._human_delay(0.3, 0.7)
         import pyperclip
-        pyperclip.copy(prompt_text)
-        # Verify clipboard was set correctly
-        try:
-            clip = pyperclip.paste()
-            if clip != prompt_text:
-                print(f"[FlowBot] \u26a0\ufe0f Clipboard mismatch! Expected prompt, got: {clip[:50]}...")
-        except Exception:
-            pass
-        prompt_el.send_keys(Keys.CONTROL, 'v')
-        time.sleep(0.5)
+        chunk_size = random.randint(80, 150)
+        for i in range(0, len(prompt_text), chunk_size):
+            chunk = prompt_text[i:i + chunk_size]
+            pyperclip.copy(chunk)
+            prompt_el.send_keys(Keys.CONTROL, 'v')
+            self._human_delay(0.1, 0.3)
+        self._human_delay(0.5, 1.0)
         self._update_status('entering_prompt', 'Prompt entered!')
 
     def click_create(self):
@@ -471,7 +488,8 @@ class FlowBot:
         """)
         if clicked:
             self._update_status('generating', 'Create clicked!')
-            time.sleep(3)
+            self._human_delay(2.0, 5.0)
+            self._human_scroll()
         else:
             self._update_status('error', 'Create button not found')
         return clicked
@@ -877,12 +895,19 @@ class FlowBot:
                 # Settings
                 self.set_image_settings(aspect_ratio, count)
 
+            self._human_delay(1.0, 3.0)
+            self._human_scroll()
+
             # Upload reference image if provided (every batch — Flow forgets between runs)
             if image_path:
                 self.upload_reference_image(image_path)
+                self._human_delay(1.0, 2.0)
 
             # Type prompt immediately (don't wait for image processing)
             self.type_prompt(prompt)
+
+            self._human_delay(1.5, 3.5)
+            self._human_scroll()
 
             # NOW wait for image processing to complete before clicking Create
             if image_path:
