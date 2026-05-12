@@ -434,16 +434,18 @@ h5 {
 }
 
 .btn-primary {
-    background: #c1cd7d;
-    background-size: 200% 200%;
-    color: #2c3400;
-    box-shadow: var(--shadow-accent);
+    background: linear-gradient(135deg, rgba(193,205,125,0.75), rgba(160,180,80,0.75));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: #1a1d00;
+    box-shadow: 0 4px 20px rgba(193,205,125,0.25);
+    border: 1px solid rgba(193,205,125,0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(193, 205, 125, 0.4);
-    background-position: right center;
+    box-shadow: 0 8px 32px rgba(193,205,125,0.45);
+    background: linear-gradient(135deg, rgba(193,205,125,0.9), rgba(160,180,80,0.9));
 }
 
 .btn-primary:active {
@@ -451,50 +453,62 @@ h5 {
 }
 
 .btn-secondary {
-    background: #282a2c;
+    background: rgba(40,42,44,0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     color: #c7c8b6;
-    border: 2px solid #333537;
-    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
 .btn-secondary:hover {
-    border-color: var(--accent-light);
-    box-shadow: var(--shadow-md);
+    border-color: rgba(193,205,125,0.3);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
     transform: translateY(-1px);
-    background: var(--bg-hover);
+    background: rgba(50,52,54,0.8);
 }
 
 .btn-ghost {
-    background: transparent;
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: #c7c8b6;
     padding: 0.5rem 0.75rem;
+    border: 1px solid rgba(255,255,255,0.05);
 }
 
 .btn-ghost:hover {
-    background: #333537;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(193,205,125,0.2);
     color: var(--accent);
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, #f87171, #ef4444);
+    background: linear-gradient(135deg, rgba(248,113,113,0.7), rgba(239,68,68,0.7));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     color: white;
-    box-shadow: 0 4px 16px rgba(248, 113, 113, 0.25);
+    box-shadow: 0 4px 16px rgba(248,113,113,0.2);
+    border: 1px solid rgba(248,113,113,0.3);
 }
 
 .btn-danger:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(248, 113, 113, 0.35);
+    box-shadow: 0 8px 25px rgba(248,113,113,0.4);
+    background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(239,68,68,0.9));
 }
 
 .btn-danger-outline {
-    background: transparent;
+    background: rgba(248,113,113,0.05);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: var(--danger);
-    border: 2px solid rgba(248, 113, 113, 0.3);
+    border: 1px solid rgba(248,113,113,0.2);
 }
 
 .btn-danger-outline:hover {
-    background: var(--danger-bg);
-    border-color: var(--danger);
+    background: rgba(248,113,113,0.12);
+    border-color: rgba(248,113,113,0.5);
 }
 
 .btn-full {
