@@ -50,8 +50,12 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
 
     genai.configure(api_key=api_key)
 
-    model = genai.GenerativeModel(
-        model_name='gemini-2.5-flash',
+    # Rotate through models — each has its own free tier quota
+    models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+    last_error = None
+    for model_name in models:
+        try:
+            model = genai.GenerativeModel(model_name=model_name,
         system_instruction=system if system else None,
         generation_config=genai.GenerationConfig(
             temperature=temperature,
