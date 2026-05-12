@@ -466,3 +466,84 @@ def aplus_generate():
             errors.append({'template': template_name, 'error': str(e)})
 
     return jsonify({'success': len(results) > 0, 'generated': results, 'errors': errors})
+
+
+# A+ Listing Prompt Generator
+@agent_bp.route('/aplus/prompts', methods=['POST'])
+@login_required
+def aplus_prompts():
+    data = request.get_json() or {}
+    product_name = data.get('product_name', '').strip()
+    if not product_name:
+        return jsonify({'error': 'Product name required'}), 400
+
+    from modules.aplus_prompt_generator import generate_listing_prompts
+    product_info = {
+        'product_name': product_name,
+        'category': data.get('category', ''),
+        'dimensions': data.get('dimensions', ''),
+        'features': data.get('features', []),
+        'target_audience': data.get('target_audience', ''),
+        'brand_name': data.get('brand_name', ''),
+        'usp': data.get('usp', ''),
+        'color_palette': data.get('color_palette', {}),
+        'style_notes': data.get('style_notes', ''),
+    }
+    prompts = generate_listing_prompts(product_info)
+
+    if data.get('auto_run') and prompts:
+        import uuid as _uuid
+        job_id = str(_uuid.uuid4())
+        _agent_jobs[job_id] = {
+            'status': 'queued', 'prompts': prompts,
+            'product_info': product_info,
+            'current': 0, 'total': len(prompts),
+            'results': [], 'errors': [],
+        }
+
+        def _run_flow(app, jid, prompt_list):
+            with app.app_context():
+                job = _agent_jobs[jid]
+                job['status'] = 'running'
+                from modules.flow_runner import FlowSession
+                session = FlowSession()
+                if not session.start():
+                    job['status'] = 'failed'
+                    job['errors'].append('Could not start Flow')
+                    return
+                output_dir = os.path.join(app.root_path, 'static', 'uploads', 'aplus_flow')
+                os.makedirs(output_dir, exist_ok=True)
+                import time, random
+                for i, p in enumerate(prompt_list):
+                    job['current'] = i + 1
+                    try:
+                        images = session.run_batch(
+                            prompt=p['prompt'], aspect_ratio='1:1',
+                            count=4, output_dir=output_dir, is_first=(i==0),
+                        )
+                        job['results'].append({'id': p['id'], 'name': p['name'], 'images': images})
+                    except Exception as e:
+                        job['errors'].append({'id': p['id'], 'error': str(e)})
+                    time.sleep(random.uniform(15, 30))
+                session.stop()
+                job['status'] = 'completed'
+
+        t = threading.Thread(target=_run_flow, args=(current_app._get_current_object(), job_id, prompts))
+        t.daemon = True
+        t.start()
+        return jsonify({'success': True, 'prompts': prompts, 'auto_run': True, 'job_id': job_id})
+
+    return jsonify({'success': True, 'prompts': prompts, 'auto_run': False})
+
+
+@agent_bp.route('/aplus/prompts/status/<job_id>')
+@login_required
+def aplus_prompt_status(job_id):
+    job = _agent_jobs.get(job_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    return jsonify({
+        'status': job['status'], 'current': job.get('current', 0),
+        'total': job.get('total', 0), 'results': job.get('results', []),
+        'errors': job.get('errors', []),
+    })
