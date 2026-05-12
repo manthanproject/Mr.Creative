@@ -96,7 +96,18 @@ Make each prompt hyper-detailed and specific to THIS product."""
             if lines and lines[-1].strip().startswith('`'):
                 lines = lines[:-1]
             result = chr(10).join(lines)
-        prompts = json.loads(result)
+        # Fix newlines inside JSON strings
+        import re
+        result = re.sub(r'(?<!\\)\n', ' ', result)  # replace literal newlines with spaces
+        result = result.replace('\r', ' ')
+        # Try parsing
+        try:
+            prompts = json.loads(result)
+        except json.JSONDecodeError:
+            # Try fixing common issues: trailing commas, unescaped quotes
+            result = re.sub(r',\s*]', ']', result)
+            result = re.sub(r',\s*}', '}', result)
+            prompts = json.loads(result)
         if isinstance(prompts, list) and len(prompts) >= 1:
             return prompts
         raise ValueError("Expected list")
