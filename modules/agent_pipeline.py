@@ -69,7 +69,7 @@ def run_agent_pipeline(app, job_id):
 
             # ── Check if all content types support direct mode (skip LLM entirely) ──
             content_types = json.loads(job.content_types) if job.content_types else None
-            direct_types = {'a_plus', 'model_photography'}
+            direct_types = {'model_photography'}
             all_direct = content_types and all(t in direct_types for t in content_types)
 
             if all_direct:
