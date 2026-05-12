@@ -3,8 +3,8 @@ Mr.Creative — Night Ops Routes
 Dashboard for morning reports, manual cycle triggers, competitor management.
 """
 
-from flask import Blueprint, render_template, jsonify, request
-from flask_login import login_required
+from flask import Blueprint, render_template, jsonify, request, current_app
+from flask_login import login_required, current_user
 import json
 import re
 from datetime import datetime, timedelta
