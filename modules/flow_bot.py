@@ -445,29 +445,17 @@ class FlowBot:
         prompt_el.send_keys(Keys.DELETE)
         time.sleep(0.2)
 
-        # Inject text via JS + dispatch input event (reliable for contenteditable)
+        # Paste via clipboard — fastest method that triggers contenteditable events
         import pyperclip
-        self.driver.execute_script('''
-            var el = arguments[0];
-            var text = arguments[1];
-            el.focus();
-            el.textContent = text;
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-        ''', prompt_el, prompt_text)
-        import time as _t
-        _t.sleep(0.5)
-        # Verify text was set
-        actual = self.driver.execute_script('return arguments[0].textContent', prompt_el)
-        if actual and len(actual) < len(prompt_text) * 0.8:
-            # JS inject incomplete, fallback to clipboard paste
-            print(f"[FlowBot] JS inject partial ({len(actual)}/{len(prompt_text)} chars), trying clipboard paste")
-            prompt_el.send_keys(Keys.CONTROL, 'a')
-            _t.sleep(0.2)
-            prompt_el.send_keys(Keys.DELETE)
-            _t.sleep(0.2)
-            pyperclip.copy(prompt_text)
-            prompt_el.send_keys(Keys.CONTROL, 'v')
+        pyperclip.copy(prompt_text)
+        # Verify clipboard was set correctly
+        try:
+            clip = pyperclip.paste()
+            if clip != prompt_text:
+                print(f"[FlowBot] \u26a0\ufe0f Clipboard mismatch! Expected prompt, got: {clip[:50]}...")
+        except Exception:
+            pass
+        prompt_el.send_keys(Keys.CONTROL, 'v')
         time.sleep(0.5)
         self._update_status('entering_prompt', 'Prompt entered!')
 
