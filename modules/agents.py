@@ -33,9 +33,7 @@ class AgentEngine:
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7, max_tokens=2000):
         """Call LLM: Gemini 2.5 Flash → Groq → Cerebras."""
-        combined_prompt = f"{system_prompt}
-
-{user_prompt}"
+        combined_prompt = system_prompt + chr(10) + chr(10) + user_prompt
 
         # Try Gemini first (via central call_llm)
         try:
