@@ -33,6 +33,30 @@ class FlowSession:
         self.driver = webdriver.Chrome(options=opts)
         self.driver.set_script_timeout(120)
 
+        # Anti-detection: mask Selenium/automation markers
+        try:
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': """
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['en-US', 'en']
+                    });
+                    window.chrome = { runtime: {} };
+                    const origQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (params) => (
+                        params.name === 'notifications'
+                            ? Promise.resolve({ state: Notification.permission })
+                            : origQuery(params)
+                    );
+                """
+            })
+            print("[FlowSession] Stealth patches applied")
+        except Exception as e:
+            print(f"[FlowSession] Stealth patch warning: {e}")
+
         download_dir = os.path.expanduser('~/Downloads')
         self.bot = FlowBot(self.driver, download_dir=download_dir)
         print("[FlowSession] Session started")

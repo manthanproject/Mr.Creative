@@ -42,6 +42,10 @@ def launch_chrome(port, profile_dir, start_url=''):
         chrome_exe,
         f'--remote-debugging-port={port}',
         f'--user-data-dir={profile_dir}',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+        '--no-first-run',
+        '--no-default-browser-check',
     ]
     if start_url:
         cmd.append(start_url)
