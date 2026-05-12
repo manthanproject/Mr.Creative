@@ -1,22 +1,20 @@
 """
 A+ Listing Prompt Generator
-Input: product details -> Gemini generates 8 detailed image prompts -> ready for Flow
+Generates 8 prompts one at a time via Gemini — no JSON parsing issues.
 """
 
-import json
 import logging
-
 logger = logging.getLogger('aplus')
 
-PROMPT_TYPES = [
-    {'id': 'hero', 'name': 'Hero Image'},
-    {'id': 'features', 'name': 'Key Features Infographic'},
-    {'id': 'howto', 'name': 'How To Use'},
-    {'id': 'dimensions', 'name': 'Size & Dimensions'},
-    {'id': 'comparison', 'name': 'Comparison Chart'},
-    {'id': 'lifestyle', 'name': 'Lifestyle Image'},
-    {'id': 'multiuse', 'name': 'Multi-Use Versatility'},
-    {'id': 'trust', 'name': 'Trust & Quality Badges'},
+PROMPT_SPECS = [
+    {'id': 'hero', 'name': 'Hero Image', 'instruction': 'Product centered on pure white seamless background, soft shadow beneath, no text, no graphics, best angle showing full detail. Sharp focus on every texture and detail.'},
+    {'id': 'features', 'name': 'Key Features Infographic', 'instruction': 'Product on one side, 4-5 feature callouts with minimal icons and bold headlines on the other side. Write the ACTUAL feature titles and one-line descriptions. Color-block layout.'},
+    {'id': 'howto', 'name': 'How To Use', 'instruction': '3-4 numbered steps showing product usage/application. Write ACTUAL step titles and instructions. Clean instructional infographic layout.'},
+    {'id': 'dimensions', 'name': 'Size & Dimensions', 'instruction': 'Product centered with measurement lines showing actual dimensions. Technical infographic. Show size reference comparisons.'},
+    {'id': 'comparison', 'name': 'Comparison Chart', 'instruction': 'Table comparing this product vs 2 generic competitors. Write ACTUAL feature comparison rows with checkmarks and crosses. Product wins all categories.'},
+    {'id': 'lifestyle', 'name': 'Lifestyle Image', 'instruction': 'Target audience using the product in real-world context. Modern setting, editorial photography, shallow depth of field. Product is focal point. Headline overlay.'},
+    {'id': 'multiuse', 'name': 'Multi-Use Versatility', 'instruction': 'Product shown in 4-6 different use cases or surfaces. Structured grid collage with equal spacing. Each context labeled.'},
+    {'id': 'trust', 'name': 'Trust & Quality Badges', 'instruction': 'Product centered with 6 quality/trust badge seals arranged around it. Write the badge texts. Clean premium layout.'},
 ]
 
 
@@ -33,104 +31,63 @@ def generate_listing_prompts(product_info):
     colors = product_info.get('color_palette', {})
     style_notes = product_info.get('style_notes', '')
 
-    primary_color = colors.get('primary', '#FFFFFF')
-    secondary_color = colors.get('secondary', '#D4AF37')
-    accent_color = colors.get('accent', '#000000')
-    features_str = ', '.join(features) if features else 'Premium quality, Durable, Versatile'
-
-    mega_prompt = f"""You are a world-class Amazon product listing image prompt engineer. Generate exactly 8 separate AI image generation prompts for this product.
-
-PRODUCT DETAILS:
-- Product: {name}
-- Category: {category}
-- Dimensions: {dimensions}
-- Key Features: {features_str}
-- Target Audience: {audience}
-- Brand: {brand}
-- USP: {usp}
-- Color Palette: Primary {primary_color}, Secondary {secondary_color}, Accent {accent_color}
-- Style Notes: {style_notes or 'Premium commercial quality'}
-
-RULES FOR EVERY PROMPT:
-- Ultra photorealistic, 12K UHD, HDR balanced, razor-sharp focus
-- Professional 3-point studio lighting (softbox + fill + rim)
-- Camera: full-frame DSLR, 85mm prime, f/8, ISO 100
-- Typography: Bold uppercase geometric sans-serif (Montserrat/Gotham style)
-- Use the EXACT color palette hex codes given above
-- Clean geometric color-block layouts, strong spacing
-- NO gradients, NO clutter, NO cartoonish rendering, NO watermarks
-- Each prompt must be 150-250 words, completely self-contained
-- Write ALL text/headlines/subtext that should appear in the image
-- Negative: no blur, no low-quality, no messy typography, no gradients
-
-Return ONLY a JSON array with exactly 8 objects (no markdown, no backticks):
-[
-  {{"id": "hero", "name": "Hero Image", "prompt": "full prompt text here..."}},
-  {{"id": "features", "name": "Key Features Infographic", "prompt": "full prompt text..."}},
-  {{"id": "howto", "name": "How To Use", "prompt": "full prompt text..."}},
-  {{"id": "dimensions", "name": "Size & Dimensions", "prompt": "full prompt text..."}},
-  {{"id": "comparison", "name": "Comparison Chart", "prompt": "full prompt text..."}},
-  {{"id": "lifestyle", "name": "Lifestyle Image", "prompt": "full prompt text..."}},
-  {{"id": "multiuse", "name": "Multi-Use Versatility", "prompt": "full prompt text..."}},
-  {{"id": "trust", "name": "Trust & Quality Badges", "prompt": "full prompt text..."}}
-]
-
-PROMPT 1 (hero): Product centered on white background, soft shadow, no text, best angle, sharp detail.
-PROMPT 2 (features): Product on one side, 4-5 feature callouts with icons + text. Write ACTUAL feature text.
-PROMPT 3 (howto): 3-4 numbered usage steps. Write ACTUAL step titles and instructions.
-PROMPT 4 (dimensions): Product with measurement lines showing actual dimensions.
-PROMPT 5 (comparison): Table comparing product vs 2 competitors. Write ACTUAL comparison rows.
-PROMPT 6 (lifestyle): Target audience using product. Editorial photography. Headline overlay.
-PROMPT 7 (multiuse): Product in 4-6 use cases. Structured grid. Each labeled.
-PROMPT 8 (trust): Product centered with 6 quality/trust badges. Write badge texts.
-
-Make each prompt hyper-detailed and specific to THIS product."""
-
-    try:
-        result = call_llm(mega_prompt, temperature=0.7, max_tokens=4000)
-        result = result.strip()
-        if result.startswith('`'):
-            lines = result.split(chr(10))
-            if lines[0].strip().startswith('`'):
-                lines = lines[1:]
-            if lines and lines[-1].strip().startswith('`'):
-                lines = lines[:-1]
-            result = chr(10).join(lines)
-        # Fix newlines inside JSON strings
-        import re
-        result = re.sub(r'(?<!\\)\n', ' ', result)  # replace literal newlines with spaces
-        result = result.replace('\r', ' ')
-        # Try parsing
-        try:
-            prompts = json.loads(result)
-        except json.JSONDecodeError:
-            # Try fixing common issues: trailing commas, unescaped quotes
-            result = re.sub(r',\s*]', ']', result)
-            result = re.sub(r',\s*}', '}', result)
-            prompts = json.loads(result)
-        if isinstance(prompts, list) and len(prompts) >= 1:
-            return prompts
-        raise ValueError("Expected list")
-    except Exception as e:
-        logger.error(f"[A+ Prompts] Error: {e}")
-        return _fallback_prompts(product_info)
-
-
-def _fallback_prompts(product_info):
-    name = product_info.get('product_name', 'Product')
-    brand = product_info.get('brand_name', 'Brand')
-    features = product_info.get('features', ['Premium Quality', 'Durable', 'Versatile'])
-    colors = product_info.get('color_palette', {})
     primary = colors.get('primary', '#FFFFFF')
     secondary = colors.get('secondary', '#D4AF37')
-    base = f"Ultra photorealistic professional product photography, 12K UHD, HDR balanced, studio lighting, {primary} and {secondary} color palette, Montserrat typography, no gradients, no clutter."
-    return [
-        {'id': 'hero', 'name': 'Hero Image', 'prompt': f'{base} {name} centered on pure white background, soft shadow, sharp detail, no text.'},
-        {'id': 'features', 'name': 'Key Features', 'prompt': f'{base} Infographic for {name}. Product left, 4 features right: {", ".join(features[:4])}. Brand: {brand}.'},
-        {'id': 'howto', 'name': 'How To Use', 'prompt': f'{base} 3-step usage guide for {name}. Numbered steps. Headline: HOW TO USE. Brand: {brand}.'},
-        {'id': 'dimensions', 'name': 'Size & Dimensions', 'prompt': f'{base} Dimension infographic for {name}. Measurement lines. {product_info.get("dimensions", "")}. Brand: {brand}.'},
-        {'id': 'comparison', 'name': 'Comparison Chart', 'prompt': f'{base} Comparison table for {name} vs competitors. 5 rows. Checkmarks/crosses. Brand: {brand}.'},
-        {'id': 'lifestyle', 'name': 'Lifestyle Image', 'prompt': f'{base} Lifestyle photo using {name}. Modern setting. Headline: MADE FOR YOUR LIFESTYLE. Brand: {brand}.'},
-        {'id': 'multiuse', 'name': 'Multi-Use', 'prompt': f'{base} {name} in 4 use contexts. Grid collage. Headline: STYLE IT YOUR WAY. Brand: {brand}.'},
-        {'id': 'trust', 'name': 'Trust Badges', 'prompt': f'{base} {name} with 6 quality badges. Headline: CRAFTED WITH PRECISION. Brand: {brand}.'},
-    ]
+    accent = colors.get('accent', '#000000')
+    features_str = ', '.join(features) if features else 'Premium, Durable, Versatile'
+
+    base_context = (
+        f"Product: {name} | Category: {category} | Size: {dimensions} | "
+        f"Features: {features_str} | Audience: {audience} | Brand: {brand} | USP: {usp} | "
+        f"Colors: {primary}, {secondary}, {accent} | Style: {style_notes or 'Premium commercial'}"
+    )
+
+    results = []
+    for spec in PROMPT_SPECS:
+        try:
+            ask = (
+                f"You are a premium Amazon listing image prompt engineer. "
+                f"Write ONE detailed AI image generation prompt (150-250 words) for: {spec['name']}.\n\n"
+                f"PRODUCT: {base_context}\n\n"
+                f"IMAGE TYPE: {spec['instruction']}\n\n"
+                f"RULES: Ultra photorealistic, 12K UHD, professional 3-point studio lighting, "
+                f"85mm prime lens f/8 ISO 100, bold uppercase Montserrat typography, "
+                f"color palette {primary} + {secondary} + {accent}, "
+                f"clean geometric color-block layout, NO gradients NO clutter NO cartoonish. "
+                f"Write ALL text/headlines that should appear in the image. "
+                f"Include negative prompt at end.\n\n"
+                f"Return ONLY the prompt text, nothing else. No markdown, no labels, no explanations."
+            )
+            result = call_llm(ask, temperature=0.7, max_tokens=800)
+            if result and len(result.strip()) > 50:
+                results.append({
+                    'id': spec['id'],
+                    'name': spec['name'],
+                    'prompt': result.strip(),
+                })
+                logger.info(f"[A+ Prompts] Generated: {spec['name']}")
+            else:
+                raise ValueError("Empty or too short")
+        except Exception as e:
+            logger.warning(f"[A+ Prompts] {spec['name']} failed: {e}, using fallback")
+            results.append({
+                'id': spec['id'],
+                'name': spec['name'],
+                'prompt': _single_fallback(spec, product_info),
+            })
+
+    return results
+
+
+def _single_fallback(spec, info):
+    name = info.get('product_name', 'Product')
+    brand = info.get('brand_name', 'Brand')
+    colors = info.get('color_palette', {})
+    p = colors.get('primary', '#FFFFFF')
+    s = colors.get('secondary', '#D4AF37')
+    return (
+        f"Ultra photorealistic product photography, 12K UHD, HDR balanced, "
+        f"studio lighting, {p} and {s} palette, Montserrat typography. "
+        f"{spec['instruction']} Product: {name}. Brand: {brand}. "
+        f"No gradients, no clutter, no cartoonish rendering."
+    )
