@@ -41,7 +41,7 @@ async function detectAccount() {
 
 // ── Detect what this profile can do ──
 async function detectCapabilities() {
-    const caps = ['campaign', 'photoshoot', 'flow', 'gemini'];
+    const caps = ['campaign', 'photoshoot', 'gemini'];
     try {
         const data = await chrome.storage.local.get('extraCapabilities');
         if (data.extraCapabilities && Array.isArray(data.extraCapabilities)) {
