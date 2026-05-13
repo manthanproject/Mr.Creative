@@ -87,6 +87,9 @@ def _call_gemini_extension(prompt, timeout=120):
     job_id = f'llm_{uuid.uuid4().hex[:8]}'
     try:
         from routes.extension import _state, _lock, gemini_results
+        print(f"[LLM-EXT] Imported OK. Profiles: {list(_state.get('profiles', {}).keys())}")
+        for pid, info in _state.get('profiles', {}).items():
+            print(f"[LLM-EXT] Profile {pid}: caps={info.get('capabilities', [])}")
         job = {
             'job_id': job_id,
             'job_type': 'gemini',
