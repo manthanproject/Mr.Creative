@@ -67,7 +67,7 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
             response = model.generate_content(prompt)
             print(f"[LLM] Used {model_name}")
             global last_provider
-            last_provider = f'gemini ({model_name})'
+            last_provider = model_name[:20]
             return (response.text or '').strip()
         except Exception as e:
             last_error = e
