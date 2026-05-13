@@ -188,6 +188,10 @@ def bulk_delete():
     for col_id in collection_ids:
         collection = Collection.query.filter_by(id=col_id, user_id=current_user.id).first()
         if collection:
+            # Null out FK on generations first (prevent FK constraint error)
+            from models import Generation
+            Generation.query.filter_by(collection_id=col_id).update({'collection_id': None})
+
             # Delete collection folder
             col_dir = os.path.join(output_folder, f'collection_{col_id}')
             if os.path.exists(col_dir):
