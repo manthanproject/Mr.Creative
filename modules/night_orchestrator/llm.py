@@ -10,7 +10,7 @@ logger = logging.getLogger('night_ops')
 last_provider = 'unknown'
 
 
-def call_llm(prompt, system='', temperature=0.7, max_tokens=3000):
+def call_llm(prompt, system='', temperature=0.7, max_tokens=3000, image_url=None):
     """Call best available LLM. Returns response text."""
     from config import Config
     global last_provider
@@ -27,7 +27,7 @@ def call_llm(prompt, system='', temperature=0.7, max_tokens=3000):
 
     # 2. Try Gemini Extension (no quota limits)
     try:
-        result = _call_gemini_extension(prompt)
+        result = _call_gemini_extension(prompt, image_url=image_url)
         if result:
             return result
     except Exception as e:
@@ -77,7 +77,7 @@ def _call_gemini_api(api_key, prompt, system, temperature, max_tokens):
     raise Exception("All Gemini API models exhausted")
 
 
-def _call_gemini_extension(prompt, timeout=120):
+def _call_gemini_extension(prompt, timeout=120, image_url=None):
     """Gemini via Chrome extension — no API quota. Direct queue."""
     import uuid
     global last_provider
@@ -98,6 +98,8 @@ def _call_gemini_extension(prompt, timeout=120):
                     'job_id': job_id,
                     'job_type': 'gemini',
                     'prompt_text': prompt,
+                    'image_url': image_url,
+                    'image_filename': 'product.jpg',
                 }
                 _state['job_data'][job_id] = job
                 _state['pending_commands'][pid] = job
