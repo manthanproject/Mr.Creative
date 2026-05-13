@@ -294,7 +294,7 @@ def run_agent_pipeline(app, job_id):
             with _lock:
                 _state['job_data'][_fid] = _fjob
                 _routed = False
-                _profiles = _state.get('profiles') or {}
+                _profiles = dict(_state.get('profiles') or {})
                 for pid, info in _profiles.items():
                     caps = info.get('capabilities', [])
                     if 'flow_active' in caps:
@@ -326,7 +326,7 @@ def run_agent_pipeline(app, job_id):
                         _done = True
                         print(f'[Pipeline] Flow done: {_cj.get("message", "")}')
                         break
-                    _profiles2 = _state.get('profiles') or {}
+                    _profiles2 = dict(_state.get('profiles') or {})
                     for pid, info in _profiles2.items():
                         _cur = info.get('current_job')
                         if isinstance(_cur, dict) and _cur.get('job_id') == _fid:
