@@ -1,93 +1,126 @@
 """
 A+ Listing Prompt Generator
-Generates 8 prompts one at a time via Gemini — no JSON parsing issues.
+Upload product image to Gemini + one mega-prompt → N unique Flow-ready prompts
 """
 
 import logging
 logger = logging.getLogger('aplus')
 
-PROMPT_SPECS = [
-    {'id': 'hero', 'name': 'Hero Image', 'instruction': 'Product centered on pure white seamless background, soft shadow beneath, no text, no graphics, best angle showing full detail. Sharp focus on every texture and detail.'},
-    {'id': 'features', 'name': 'Key Features Infographic', 'instruction': 'Product on one side, 4-5 feature callouts with minimal icons and bold headlines on the other side. Write the ACTUAL feature titles and one-line descriptions. Color-block layout.'},
-    {'id': 'howto', 'name': 'How To Use', 'instruction': '3-4 numbered steps showing product usage/application. Write ACTUAL step titles and instructions. Clean instructional infographic layout.'},
-    {'id': 'dimensions', 'name': 'Size & Dimensions', 'instruction': 'Product centered with measurement lines showing actual dimensions. Technical infographic. Show size reference comparisons.'},
-    {'id': 'comparison', 'name': 'Comparison Chart', 'instruction': 'Table comparing this product vs 2 generic competitors. Write ACTUAL feature comparison rows with checkmarks and crosses. Product wins all categories.'},
-    {'id': 'lifestyle', 'name': 'Lifestyle Image', 'instruction': 'Target audience using the product in real-world context. Modern setting, editorial photography, shallow depth of field. Product is focal point. Headline overlay.'},
-    {'id': 'multiuse', 'name': 'Multi-Use Versatility', 'instruction': 'Product shown in 4-6 different use cases or surfaces. Structured grid collage with equal spacing. Each context labeled.'},
-    {'id': 'trust', 'name': 'Trust & Quality Badges', 'instruction': 'Product centered with 6 quality/trust badge seals arranged around it. Write the badge texts. Clean premium layout.'},
-]
+
+PROMPT_TYPES = {
+    1: ['hero'],
+    2: ['hero', 'features'],
+    3: ['hero', 'features', 'lifestyle'],
+    4: ['hero', 'features', 'lifestyle', 'howto'],
+    5: ['hero', 'features', 'lifestyle', 'howto', 'dimensions'],
+    6: ['hero', 'features', 'lifestyle', 'howto', 'dimensions', 'comparison'],
+    7: ['hero', 'features', 'lifestyle', 'howto', 'dimensions', 'comparison', 'multiuse'],
+    8: ['hero', 'features', 'lifestyle', 'howto', 'dimensions', 'comparison', 'multiuse', 'trust'],
+}
+
+TYPE_DESCRIPTIONS = {
+    'hero': 'Hero Image — product centered on white background, no text, best angle, sharp detail',
+    'features': 'Key Features Infographic — product on one side, 4-5 feature callouts with icons + text on other side',
+    'lifestyle': 'Lifestyle Image — target audience USING the product in real-world context, editorial photography',
+    'howto': 'How To Use — 3-4 numbered usage steps with actual step titles and instructions',
+    'dimensions': 'Size & Dimensions — product with measurement lines showing actual dimensions',
+    'comparison': 'Comparison Chart — table comparing product vs 2 generic competitors with checkmarks/crosses',
+    'multiuse': 'Multi-Use Versatility — product in 4-6 different use cases, structured grid collage',
+    'trust': 'Trust & Quality Badges — product centered with 6 quality/trust badge seals around it',
+}
 
 
-def generate_listing_prompts(product_info):
+def build_mega_prompt(count, brand_info=None):
+    """Build one mega-prompt that asks Gemini for N unique image prompts."""
+    # Pick which types to use
+    types = PROMPT_TYPES.get(min(count, 8), PROMPT_TYPES[8])
+    # If more than 8, repeat types with variations
+    while len(types) < count:
+        types.append(types[len(types) % 8])
+
+    type_list = ""
+    for i, t in enumerate(types[:count]):
+        desc = TYPE_DESCRIPTIONS.get(t, t)
+        type_list += f"\nPROMPT {i+1} — {desc}"
+
+    brand_context = ""
+    if brand_info:
+        name = brand_info.get('product_name', '')
+        features = brand_info.get('features', [])
+        if name:
+            brand_context = f"\nProduct: {name}"
+        if features:
+            brand_context += f"\nFeatures: {', '.join(features)}"
+
+    prompt = f"""Look at this product image carefully. You are a world-class Amazon listing image prompt engineer.
+
+Generate exactly {count} unique AI image generation prompts for this product's Amazon A+ listing.
+{brand_context}
+
+Each prompt MUST:
+- Be 100-200 words, completely self-contained
+- Describe the EXACT product you see in the image (not a generic product)
+- Include: scene description, lighting (3-point studio), camera (85mm f/8 ISO 100), composition
+- Include ALL text/headlines that should appear in the image
+- End with negative prompt (no blur, no low quality, no cartoonish)
+- Be ultra photorealistic, 12K UHD quality
+
+IMAGE TYPES NEEDED:{type_list}
+
+FORMAT: Separate each prompt with exactly this line:
+===PROMPT===
+
+Return ONLY the prompts separated by ===PROMPT===. No numbering, no labels, no explanations.
+Start directly with the first prompt."""
+
+    return prompt, types[:count]
+
+
+def parse_prompts(response_text, expected_types):
+    """Parse Gemini response into individual prompts."""
+    raw = response_text.strip()
+    parts = [p.strip() for p in raw.split('===PROMPT===') if p.strip()]
+
+    prompts = []
+    for i, text in enumerate(parts):
+        ptype = expected_types[i] if i < len(expected_types) else f'extra_{i}'
+        prompts.append({
+            'id': ptype,
+            'name': TYPE_DESCRIPTIONS.get(ptype, ptype),
+            'prompt': text,
+        })
+
+    return prompts
+
+
+def generate_listing_prompts(product_info, count=8):
+    """Generate N listing prompts using call_llm (Gemini API/Extension/Groq chain)."""
     from modules.night_orchestrator.llm import call_llm
 
-    name = product_info.get('product_name', 'Product')
-    category = product_info.get('category', 'General')
-    dimensions = product_info.get('dimensions', 'Standard size')
-    features = product_info.get('features', [])
-    audience = product_info.get('target_audience', 'Adults 18-35')
-    brand = product_info.get('brand_name', 'Premium Brand')
-    usp = product_info.get('usp', 'Premium quality')
-    colors = product_info.get('color_palette', {})
-    style_notes = product_info.get('style_notes', '')
+    mega, types = build_mega_prompt(count, product_info)
 
-    primary = colors.get('primary', '#FFFFFF')
-    secondary = colors.get('secondary', '#D4AF37')
-    accent = colors.get('accent', '#000000')
-    features_str = ', '.join(features) if features else 'Premium, Durable, Versatile'
-
-    base_context = (
-        f"Product: {name} | Category: {category} | Size: {dimensions} | "
-        f"Features: {features_str} | Audience: {audience} | Brand: {brand} | USP: {usp} | "
-        f"Style: {style_notes or 'Premium commercial, natural product photography'}"
-    )
-
-    results = []
-    for spec in PROMPT_SPECS:
-        try:
-            ask = (
-                f"You are a premium Amazon listing image prompt engineer. "
-                f"Write ONE detailed AI image generation prompt (150-250 words) for: {spec['name']}.\n\n"
-                f"PRODUCT: {base_context}\n\n"
-                f"IMAGE TYPE: {spec['instruction']}\n\n"
-                f"RULES: Ultra photorealistic, 12K UHD, professional 3-point studio lighting, "
-                f"85mm prime lens f/8 ISO 100. "
-                f"Clean professional layout. NO color blocks, NO hex codes, NO forced color palette. "
-                f"Let the AI decide natural colors based on the product. NO gradients NO clutter NO cartoonish. "
-                f"Write ALL text/headlines that should appear in the image. "
-                f"Include negative prompt at end.\n\n"
-                f"Return ONLY the prompt text, nothing else. No markdown, no labels, no explanations."
-            )
-            result = call_llm(ask, temperature=0.7, max_tokens=800)
-            if result and len(result.strip()) > 50:
-                results.append({
-                    'id': spec['id'],
-                    'name': spec['name'],
-                    'prompt': result.strip(),
-                })
-                logger.info(f"[A+ Prompts] Generated: {spec['name']}")
-            else:
-                raise ValueError("Empty or too short")
-        except Exception as e:
-            logger.warning(f"[A+ Prompts] {spec['name']} failed: {e}, using fallback")
-            results.append({
-                'id': spec['id'],
-                'name': spec['name'],
-                'prompt': _single_fallback(spec, product_info),
-            })
-
-    return results
+    try:
+        result = call_llm(mega, temperature=0.7, max_tokens=8000)
+        prompts = parse_prompts(result, types)
+        if len(prompts) >= 1:
+            print(f"[A+ Prompts] Generated {len(prompts)} prompts")
+            return prompts
+        raise ValueError("No prompts parsed")
+    except Exception as e:
+        logger.error(f"[A+ Prompts] Error: {e}")
+        return _fallback_prompts(product_info, types)
 
 
-def _single_fallback(spec, info):
+def _fallback_prompts(info, types):
+    """Basic fallback if LLM fails."""
     name = info.get('product_name', 'Product')
     brand = info.get('brand_name', 'Brand')
-    colors = info.get('color_palette', {})
-    p = colors.get('primary', '#FFFFFF')
-    s = colors.get('secondary', '#D4AF37')
-    return (
-        f"Ultra photorealistic product photography, 12K UHD, HDR balanced, "
-        f"studio lighting, {p} and {s} palette, Montserrat typography. "
-        f"{spec['instruction']} Product: {name}. Brand: {brand}. "
-        f"No gradients, no clutter, no cartoonish rendering."
-    )
+    prompts = []
+    for t in types:
+        desc = TYPE_DESCRIPTIONS.get(t, t)
+        prompts.append({
+            'id': t,
+            'name': desc,
+            'prompt': f"Ultra photorealistic 12K UHD product photography, {desc}. Product: {name}. Brand: {brand}. 85mm lens f/8 ISO 100, 3-point studio lighting. No gradients, no clutter, no cartoonish.",
+        })
+    return prompts
