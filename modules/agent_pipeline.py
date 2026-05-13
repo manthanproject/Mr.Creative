@@ -113,7 +113,36 @@ def run_agent_pipeline(app, job_id):
                 print(f"[Pipeline] Direct mode ({prompt_type}): {job.target_count} images, skipping LLM")
 
             else:
-                # NON-A+ FLOW: run Steps 1-3 with LLM
+                # Check if A+ content — skip Agent 1 & 2
+                _ct = json.loads(job.content_types) if job.content_types else []
+                _is_aplus = _ct and all(t == 'a_plus' for t in _ct)
+
+                if _is_aplus:
+                    job.status = 'crafting'
+                    job.current_agent = 'A+ Prompt Generator'
+                    job.progress = 30
+                    job.message = f'Generating {job.target_count} A+ prompts with product image...'
+                    db.session.commit()
+                    from modules.aplus_prompt_generator import generate_listing_prompts
+                    _info = {
+                        'product_name': getattr(brand_kit, 'name', 'Product') if brand_kit else 'Product',
+                        'features': [f.strip() for f in (getattr(brand_kit, 'description', '') or '').split(',') if f.strip()],
+                        'brand_name': getattr(brand_kit, 'name', '') if brand_kit else '',
+                    }
+                    _ref_url = None
+                    if job.reference_image:
+                        _ref_url = f'http://127.0.0.1:5000/static/{job.reference_image}'
+                    _ap = generate_listing_prompts(_info, count=job.target_count, image_url=_ref_url)
+                    prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
+                    content_plan = [{'type': 'a_plus', 'id': i+1} for i in range(len(prompts))]
+                    job.prompts = json.dumps(prompts)
+                    job.content_plan = json.dumps(content_plan)
+                    job.brand_analysis = json.dumps({})
+                    job.progress = 40
+                    print(f"[Pipeline] A+ shortcut: {len(prompts)} prompts ready (skipped Agent 1 & 2)")
+                    db.session.commit()
+
+                if not _is_aplus:
                 # ── Step 1: Brand Analysis ──
                 job.status = 'analyzing'
                 job.current_agent = 'Brand Analyst'
