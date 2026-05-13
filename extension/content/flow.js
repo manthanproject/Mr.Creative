@@ -18,51 +18,133 @@ try { chrome.runtime.sendMessage({ type: 'ADD_CAPABILITY', capability: 'flow_act
 const FlowBot = {
 
   async run(job) {
-    var prompt_text = job.prompt_text || '';
+    var prompts = job.prompts || [];
+    var single = job.prompt_text || '';
     var image_url = job.image_url;
     var image_filename = job.image_filename || 'product.jpg';
     var aspect_ratio = job.aspect_ratio || 'square';
-    var count = job.count || 4;
+    var count = job.count || 1;
     var job_id = job.job_id;
 
-    try {
-      MC.log('Flow: starting job', job_id, 'prompt length:', prompt_text.length);
+    if (prompts.length === 0 && single) prompts = [single];
+    MC.log('Flow: starting job', job_id, prompts.length + ' prompts');
 
-      // Step 1: Navigate — ensure on project page
-      await MC.sendStatus(job_id, 'navigating', 'Navigating to Flow...');
+    try {
+      await MC.sendStatus(job_id, 'navigating', 'Opening Flow project...');
       await this._ensureProjectPage(job_id);
 
-      // Step 2: Set image settings (aspect ratio, count)
-      await MC.sendStatus(job_id, 'settings', 'Setting: ' + aspect_ratio + ', x' + count);
+      await MC.sendStatus(job_id, 'settings', 'Setting: ' + aspect_ratio + ', ' + count + 'x');
       await this._setImageSettings(aspect_ratio, count);
 
-      // Step 3: Upload reference image
-      if (image_url) {
-        await MC.sendStatus(job_id, 'entering_prompt', 'Uploading reference: ' + image_filename);
-        await this._uploadReferenceImage(image_url, image_filename);
+      for (var i = 0; i < prompts.length; i++) {
+        var promptText = typeof prompts[i] === 'object' ? prompts[i].prompt : prompts[i];
+        MC.log('Flow: prompt ' + (i+1) + '/' + prompts.length);
+
+        if (image_url) {
+          await MC.sendStatus(job_id, 'generating', 'Image ' + (i+1) + '/' + prompts.length + ': uploading ref...');
+          await this._uploadRefViaButton(image_url, image_filename);
+        }
+
+        await MC.sendStatus(job_id, 'generating', 'Image ' + (i+1) + '/' + prompts.length + ': typing prompt...');
+        await this._typePrompt(promptText);
+
+        if (image_url) await this._waitImgProcess();
+
+        var before = this._countImages();
+        await MC.sendStatus(job_id, 'generating', 'Image ' + (i+1) + '/' + prompts.length + ': creating...');
+        await this._clickCreate();
+        await this._waitForResults(job_id, before);
+        MC.log('Flow: image ' + (i+1) + ' done!');
+
+        if (i < prompts.length - 1) {
+          var delay = Math.floor(Math.random() * 7000) + 5000;
+          await MC.sendStatus(job_id, 'generating', 'Waiting ' + Math.round(delay/1000) + 's...');
+          await MC.sleep(delay);
+        }
       }
 
-      // Step 4: Type prompt
-      await MC.sendStatus(job_id, 'entering_prompt', 'Typing prompt...');
-      await this._typePrompt(prompt_text);
-
-      // Step 5: Click Create
-      await MC.sendStatus(job_id, 'generating', 'Clicking Create...');
-      var countBefore = this._countImages();
-      await this._clickCreate();
-
-      // Step 6: Wait for images
-      await MC.sendStatus(job_id, 'generating', 'Waiting for images...');
-      await this._waitForResults(job_id, countBefore);
-
-      // Step 7: Download
-      await MC.sendStatus(job_id, 'downloading', 'Downloading images...');
-      await this._downloadResults(job_id, count, countBefore);
-
-      await MC.sendStatus(job_id, 'complete', 'Flow generation complete!');
+      await MC.sendStatus(job_id, 'downloading', 'Downloading ' + prompts.length + ' images...');
+      await this._downloadAll(job_id, prompts.length);
+      await MC.sendStatus(job_id, 'complete', prompts.length + ' images done!', {total_images: prompts.length});
     } catch (err) {
       MC.log('Flow error:', err);
       await MC.sendStatus(job_id, 'error', 'Failed: ' + err.message);
+    }
+  },
+
+  async _uploadRefViaButton(imageUrl, filename) {
+    // Click + button
+    var plus = document.querySelector('button[aria-label="Add"]') || document.querySelector('.prompt-actions button');
+    if (!plus) {
+      var btns = document.querySelectorAll('button');
+      for (var b of btns) { if (b.offsetParent && b.textContent.trim() === '+') { plus = b; break; } }
+    }
+    if (!plus) {
+      // Try the + icon in prompt bar
+      var icons = document.querySelectorAll('button');
+      for (var b of icons) { if (b.offsetParent && b.innerHTML.includes('add') && b.getBoundingClientRect().width < 60) { plus = b; break; } }
+    }
+    if (plus) {
+      plus.click();
+      MC.log('Flow: + button clicked');
+      await MC.sleep(1000);
+    }
+
+    // Click Upload image option
+    var uploadOpt = null;
+    var allEls = document.querySelectorAll('button, div, li, [role="menuitem"]');
+    for (var el of allEls) {
+      if (el.offsetParent && el.textContent.includes('Upload') && el.textContent.includes('image')) {
+        uploadOpt = el;
+        break;
+      }
+    }
+    if (uploadOpt) {
+      uploadOpt.click();
+      MC.log('Flow: Upload image clicked');
+      await MC.sleep(1000);
+    }
+
+    // Find file input and inject file
+    var fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      try {
+        var resp = await fetch(imageUrl);
+        var blob = await resp.blob();
+        var file = new File([blob], filename, { type: blob.type });
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        MC.log('Flow: file injected');
+        await MC.sleep(3000);
+      } catch (e) { MC.log('Flow: upload failed:', e.message); }
+    } else {
+      MC.log('Flow: no file input found');
+    }
+  },
+
+  async _waitImgProcess() {
+    for (var i = 0; i < 30; i++) {
+      var found = false;
+      document.querySelectorAll('span, div, p').forEach(function(el) {
+        if (el.offsetParent && el.textContent.trim().match(/^\d+%$/)) found = true;
+      });
+      if (!found) return;
+      await MC.sleep(1000);
+    }
+  },
+
+  async _downloadAll(jobId, count) {
+    var allLinks = [];
+    document.querySelectorAll('a[href*="/edit/"]').forEach(function(a) {
+      if (a.querySelector('img[src*="getMediaUrlRedirect"]')) allLinks.push(a.getAttribute('href'));
+    });
+    var toDownload = allLinks.slice(-count);
+    MC.log('Flow: downloading ' + toDownload.length + ' images');
+    for (var i = 0; i < toDownload.length; i++) {
+      await MC.sendStatus(jobId, 'downloading', 'Download ' + (i+1) + '/' + toDownload.length);
+      await this._downloadSingleImage(toDownload[i], i, jobId);
     }
   },
 
@@ -193,7 +275,7 @@ const FlowBot = {
     await MC.sleep(300);
 
     // Select count
-    this._clickFlowTab(count + 'x') || this._clickFlowTab('x' + count);
+    this._clickFlowTab(count + 'x') || if (count > 1) this._clickFlowTab(count + 'x') || this._clickFlowTab('x' + count);
     await MC.sleep(300);
 
     // Close dropdown — click outside
