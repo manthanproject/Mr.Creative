@@ -257,124 +257,100 @@ def run_agent_pipeline(app, job_id):
             results = []
             total = len(prompts)
 
-            # One prompt per Flow run (x1) — unique images, avoids detection
-            batches = [[p] for p in prompts]
+            # Extension-based Flow (no Selenium)
+            import uuid as _uuid
+            from routes.extension import _state, _lock
 
-            image_index = 0
-            from modules.flow_runner import FlowSession
+            _prompt_texts = []
+            for p in prompts:
+                _prompt_texts.append(p.get('prompt', '') if isinstance(p, dict) else str(p))
 
-            session = FlowSession()
-            if not session.start():
-                raise RuntimeError('Could not start Flow session')
+            _ref_url = None
+            if job.reference_image:
+                _ref_url = f'http://127.0.0.1:5000/static/{job.reference_image}'
 
-            try:
-              for batch_num, batch in enumerate(batches):
-                # Delay between runs to avoid Google detection (skip first)
-                if batch_num > 0:
-                    import random as _rnd
-                    _delay = _rnd.uniform(8, 15)
-                    print(f"[Pipeline] Waiting {_delay:.0f}s before next generation...")
-                    time.sleep(_delay)
-                progress = 40 + int((batch_num / len(batches)) * 45)
-                job.progress = progress
-                job.message = f'Flow batch {batch_num+1}/{len(batches)} — generating {len(batch)} images...'
-                db.session.commit()
+            _ar = 'square'
+            if hasattr(job, 'aspect_ratio') and job.aspect_ratio:
+                _ar_map = {'1:1': 'square', '16:9': 'landscape', '9:16': 'story', '3:4': 'feed', '4:3': 'wide'}
+                _ar = _ar_map.get(job.aspect_ratio, 'square')
 
-                # Use first prompt in batch (Flow creates variations)
-                prompt_item = batch[0]
-                prompt_text = prompt_item.get('prompt', '') if isinstance(prompt_item, dict) else str(prompt_item)
-                width = int(prompt_item.get('width', 1024)) if isinstance(prompt_item, dict) else 1024
-                height = int(prompt_item.get('height', 1024)) if isinstance(prompt_item, dict) else 1024
+            _dl_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
+            _before = set(os.listdir(_dl_dir)) if os.path.exists(_dl_dir) else set()
 
-                # Aspect ratio: user override or from content plan
-                if hasattr(job, 'aspect_ratio') and job.aspect_ratio and job.aspect_ratio != 'mixed':
-                    ar = job.aspect_ratio
-                elif width > height:
-                    ar = '16:9'
-                elif height > width:
-                    ar = '9:16'
-                else:
-                    ar = '1:1'
+            _fid = f'flow_{_uuid.uuid4().hex[:8]}'
+            _fjob = {
+                'job_id': _fid, 'job_type': 'flow',
+                'prompts': _prompt_texts, 'image_url': _ref_url,
+                'image_filename': os.path.basename(job.reference_image) if job.reference_image else 'product.jpg',
+                'aspect_ratio': _ar, 'count': 1,
+            }
 
-                print(f"[Pipeline] Batch {batch_num+1}: '{str(prompt_text)[:50]}...' | {ar} | x{len(batch)}")
+            with _lock:
+                _state['job_data'][_fid] = _fjob
+                _routed = False
+                for pid, info in _state.get('profiles', {}).items():
+                    caps = info.get('capabilities', [])
+                    if 'flow_active' in caps or 'flow' in caps:
+                        _state['pending_commands'][pid] = _fjob
+                        _routed = True
+                        print(f'[Pipeline] Flow job {_fid} routed to {pid}')
+                        break
+                if not _routed:
+                    _state.setdefault('job_queue', []).append(_fjob)
+                    print(f'[Pipeline] Flow job {_fid} queued')
 
-                try:
-                    # Reference image path (only for first batch — Flow keeps it after)
-                    ref_image = None
-                    if job.reference_image:
-                        ref_image = os.path.join(
-                            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            'static', job.reference_image
-                        )
-                        if not os.path.exists(ref_image):
-                            ref_image = None
+            job.message = f'Flow extension: generating {total} images...'
+            job.progress = 45
+            db.session.commit()
 
-                    files = session.run_batch(
-                        prompt=prompt_text,
-                        aspect_ratio=ar,
-                        count=1,
-                        output_dir=output_dir,
-                        reference_image=ref_image,
-                        is_first=(batch_num == 0),
-                    )
-
-                    for j, filepath in enumerate(files):
-                        plan_idx = image_index + j
-                        plan_item = content_plan[plan_idx] if plan_idx < len(content_plan) else {}
-
-                        rel_path = os.path.relpath(filepath,
-                            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
-                        ).replace('\\', '/')
-
-                        gen = Generation(
-                            user_id=job.user_id,
-                            collection_id=collection.id,
-                            output_path=rel_path,
-                            pomelli_feature='agent',
-                            status='completed',
-                            tags=(str(plan_item.get('title', '')) + ' | ' + str(prompt_text)[:100]),
-                        )
-                        db.session.add(gen)
-                        db.session.commit()
-
-                        results.append({
-                            'id': plan_idx + 1,
-                            'filename': os.path.basename(filepath),
-                            'path': rel_path,
-                            'engine': 'flow',
-                            'title': str(plan_item.get('title', f'Image {plan_idx+1}')),
-                            'type': str(plan_item.get('type', 'unknown')),
-                        })
-
-                    print(f"[Pipeline] Batch {batch_num+1} done: {len(files)} images")
-
-                    # Auto-save first image as prompt preview
-                    if files:
-                        from modules.prompt_previews import set_preview_if_missing
-                        first_rel = os.path.relpath(files[0],
-                            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
-                        ).replace('\\', '/')
-                        set_preview_if_missing(prompt_text, first_rel)
-
-                except Exception as e:
-                    print(f"[Pipeline] Batch {batch_num+1} failed: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    for j in range(len(batch)):
-                        results.append({
-                            'id': image_index + j + 1,
-                            'error': str(e)[:100],
-                            'engine': 'flow',
-                        })
-
-                image_index += len(batch)
-                time.sleep(15)  # Pause between batches to avoid Flow rate-limiting
-
+            _timeout = max(total * 600, 600)
+            _start = time.time()
+            _done = False
+            while time.time() - _start < _timeout:
+                time.sleep(5)
+                with _lock:
+                    _cj = _state.get('completed_jobs', {}).get(_fid)
+                    if _cj and _cj.get('state') in ('complete', 'error'):
+                        _done = True
+                        print(f'[Pipeline] Flow done: {_cj.get("message", "")}')
+                        break
+                    for pid, info in _state.get('profiles', {}).items():
+                        _cur = info.get('current_job')
+                        if isinstance(_cur, dict) and _cur.get('job_id') == _fid:
+                            _msg = _cur.get('message', '')
+                            if _msg:
+                                job.message = f'Flow: {_msg}'
+                                try: db.session.commit()
+                                except: pass
                 if not _check_job_control(job, db):
-                    session.close()
                     return
-            finally:
-                session.close()
+
+            time.sleep(3)
+            _after = set(os.listdir(_dl_dir)) if os.path.exists(_dl_dir) else set()
+            _new = sorted([f for f in (_after - _before) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))])
+            print(f'[Pipeline] {len(_new)} files downloaded')
+
+            import shutil
+            for i, fname in enumerate(_new[:total]):
+                src = os.path.join(_dl_dir, fname)
+                dst = os.path.join(output_dir, fname)
+                try: shutil.move(src, dst)
+                except: shutil.copy2(src, dst)
+                rel_path = os.path.relpath(dst,
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
+                ).replace('\\', '/')
+                plan_item = content_plan[i] if i < len(content_plan) else {}
+                ptxt = _prompt_texts[i] if i < len(_prompt_texts) else ''
+                gen = Generation(
+                    user_id=job.user_id, collection_id=collection.id,
+                    output_path=rel_path, pomelli_feature='agent',
+                    status='completed', tags=(str(plan_item.get('title', '')) + ' | ' + ptxt[:100]),
+                )
+                db.session.add(gen)
+                db.session.commit()
+                results.append({'id': i+1, 'filename': fname, 'path': rel_path, 'engine': 'flow-ext', 'type': str(plan_item.get('type', 'a_plus'))})
+
+            print(f'[Pipeline] {len(results)} images saved to collection')
 
             job.results = json.dumps(results)
             job.progress = 90
