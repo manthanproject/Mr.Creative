@@ -1,4 +1,126 @@
 
+
+// ══════════════════════════════════════════════
+// PJAX — SPA-like navigation without framework
+// ══════════════════════════════════════════════
+(function() {
+    var _pjaxEnabled = true;
+    var _mainSelector = '.main-content, main, .content-area';
+
+    function getMain() {
+        return document.querySelector(_mainSelector);
+    }
+
+    function swapContent(html, url) {
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var newMain = doc.querySelector(_mainSelector);
+        var main = getMain();
+        if (!newMain || !main) { window.location.href = url; return; }
+
+        // Update title
+        var newTitle = doc.querySelector('title');
+        if (newTitle) document.title = newTitle.textContent;
+
+        // Update active sidebar link
+        document.querySelectorAll('.sidebar a, .nav-link').forEach(function(a) {
+            a.classList.remove('active');
+            var href = a.getAttribute('href');
+            if (href && url.startsWith(href) && href !== '/') {
+                a.classList.add('active');
+            }
+        });
+
+        // Swap content with animation
+        main.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
+        main.style.opacity = '0';
+        main.style.transform = 'translateY(4px)';
+
+        setTimeout(function() {
+            main.innerHTML = newMain.innerHTML;
+
+            // Copy any new CSS from head
+            doc.querySelectorAll('style, link[rel=stylesheet]').forEach(function(s) {
+                var id = s.id || s.getAttribute('href');
+                if (id && !document.querySelector('[id="'+id+'"], [href="'+id+'"]')) {
+                    document.head.appendChild(s.cloneNode(true));
+                }
+            });
+
+            // Execute inline scripts
+            main.querySelectorAll('script').forEach(function(old) {
+                var s = document.createElement('script');
+                if (old.src) { s.src = old.src; }
+                else { s.textContent = old.textContent; }
+                old.parentNode.replaceChild(s, old);
+            });
+
+            // Fade in
+            main.style.opacity = '1';
+            main.style.transform = 'translateY(0)';
+
+            // Update URL
+            history.pushState({pjax: true, url: url}, '', url);
+
+            // Scroll to top
+            main.scrollTop = 0;
+            window.scrollTo(0, 0);
+        }, 100);
+    }
+
+    // Intercept sidebar link clicks
+    document.addEventListener('click', function(e) {
+        if (!_pjaxEnabled) return;
+
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+
+        var href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('javascript')) return;
+        if (link.target === '_blank') return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        if (link.hasAttribute('data-no-pjax')) return;
+
+        // Only PJAX internal navigation links
+        if (!href.startsWith('/')) return;
+
+        // Skip API calls, static files, auth
+        if (href.match(/^\/(api|static|auth|login|logout)\//)) return;
+
+        e.preventDefault();
+
+        // Don't reload same page
+        if (href === window.location.pathname) return;
+
+        var main = getMain();
+        if (main) {
+            main.style.transition = 'opacity 0.08s';
+            main.style.opacity = '0.3';
+        }
+
+        fetch(href, { headers: { 'X-PJAX': '1' } })
+            .then(function(r) {
+                if (!r.ok) throw new Error(r.status);
+                return r.text();
+            })
+            .then(function(html) { swapContent(html, href); })
+            .catch(function() { window.location.href = href; });
+    });
+
+    // Handle back/forward buttons
+    window.addEventListener('popstate', function(e) {
+        if (e.state && e.state.pjax) {
+            fetch(e.state.url, { headers: { 'X-PJAX': '1' } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) { swapContent(html, e.state.url); })
+                .catch(function() { window.location.reload(); });
+        }
+    });
+
+    // Save initial state
+    history.replaceState({pjax: true, url: window.location.href}, '');
+})();
+
 // ══════════════════════════════════════════════
 // Soft Reload System — no white flash, instant feel
 // ══════════════════════════════════════════════
