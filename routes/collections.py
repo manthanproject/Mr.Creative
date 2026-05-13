@@ -216,3 +216,19 @@ def compare():
     collections = Collection.query.filter_by(user_id=current_user.id)\
         .order_by(Collection.updated_at.desc()).all()
     return render_template('compare.html', collections=collections)
+
+@collections_bp.route('/cleanup-orphans', methods=['POST'])
+@login_required
+def cleanup_orphans():
+    """Remove generation records where the file no longer exists on disk."""
+    from models import Generation
+    gens = Generation.query.filter_by(user_id=current_user.id).all()
+    removed = 0
+    for g in gens:
+        if g.output_path:
+            full_path = os.path.join(current_app.root_path, g.output_path.lstrip('/'))
+            if not os.path.exists(full_path):
+                db.session.delete(g)
+                removed += 1
+    db.session.commit()
+    return jsonify({'success': True, 'removed': removed, 'message': f'{removed} orphaned records cleaned up'})

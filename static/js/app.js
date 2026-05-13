@@ -1,4 +1,13 @@
 
+// ── Broken Image Handler ──
+document.addEventListener('error', function(e) {
+    if (e.target.tagName === 'IMG') {
+        e.target.style.display = 'none';
+        e.target.removeAttribute('src');
+    }
+}, true);
+
+
 
 // ══════════════════════════════════════════════
 // PJAX — SPA-like navigation without framework
