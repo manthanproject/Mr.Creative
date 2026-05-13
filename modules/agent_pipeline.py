@@ -264,9 +264,12 @@ def run_agent_pipeline(app, job_id):
             import uuid as _uuid
             from routes.extension import _state, _lock
 
-            _prompt_texts = []
+            _prompt_texts: list[str] = []
             for p in prompts:
-                _prompt_texts.append(p.get('prompt', '') if isinstance(p, dict) else str(p))
+                if isinstance(p, dict):
+                    _prompt_texts.append(str(p.get('prompt', '')))
+                else:
+                    _prompt_texts.append(str(p))
 
             _ref_url = None
             if job.reference_image:
@@ -291,7 +294,8 @@ def run_agent_pipeline(app, job_id):
             with _lock:
                 _state['job_data'][_fid] = _fjob
                 _routed = False
-                for pid, info in _state.get('profiles', {}).items():
+                _profiles = _state.get('profiles') or {}
+                for pid, info in _profiles.items():
                     caps = info.get('capabilities', [])
                     if 'flow_active' in caps:
                         _state['pending_commands'][pid] = _fjob
@@ -299,7 +303,11 @@ def run_agent_pipeline(app, job_id):
                         print(f'[Pipeline] Flow job {_fid} routed to {pid}')
                         break
                 if not _routed:
-                    _state.setdefault('job_queue', []).append(_fjob)
+                    _jq = _state.get('job_queue')
+                    if not isinstance(_jq, list):
+                        _jq = []
+                        _state['job_queue'] = _jq
+                    _jq.append(_fjob)
                     print(f'[Pipeline] Flow job {_fid} queued')
 
             job.message = f'Flow extension: generating {total} images...'
@@ -312,19 +320,21 @@ def run_agent_pipeline(app, job_id):
             while time.time() - _start < _timeout:
                 time.sleep(5)
                 with _lock:
-                    _cj = _state.get('completed_jobs', {}).get(_fid)
-                    if _cj and _cj.get('state') in ('complete', 'error'):
+                    _completed = _state.get('completed_jobs') or {}
+                    _cj = _completed.get(_fid) if isinstance(_completed, dict) else None
+                    if _cj and isinstance(_cj, dict) and _cj.get('state') in ('complete', 'error'):
                         _done = True
                         print(f'[Pipeline] Flow done: {_cj.get("message", "")}')
                         break
-                    for pid, info in _state.get('profiles', {}).items():
+                    _profiles2 = _state.get('profiles') or {}
+                    for pid, info in _profiles2.items():
                         _cur = info.get('current_job')
                         if isinstance(_cur, dict) and _cur.get('job_id') == _fid:
                             _msg = _cur.get('message', '')
                             if _msg:
                                 job.message = f'Flow: {_msg}'
                                 try: db.session.commit()
-                                except: pass
+                                except Exception: pass
                 if not _check_job_control(job, db):
                     return
 
@@ -342,7 +352,7 @@ def run_agent_pipeline(app, job_id):
                 rel_path = os.path.relpath(dst,
                     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
                 ).replace('\\', '/')
-                plan_item = content_plan[i] if i < len(content_plan) else {}
+                plan_item = content_plan[i] if content_plan and i < len(content_plan) else {}
                 ptxt = _prompt_texts[i] if i < len(_prompt_texts) else ''
                 gen = Generation(
                     user_id=job.user_id, collection_id=collection.id,
