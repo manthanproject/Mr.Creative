@@ -93,14 +93,14 @@ def parse_prompts(response_text, expected_types):
     return prompts
 
 
-def generate_listing_prompts(product_info, count=8):
+def generate_listing_prompts(product_info, count=8, image_url=None):
     """Generate N listing prompts using call_llm (Gemini API/Extension/Groq chain)."""
     from modules.night_orchestrator.llm import call_llm
 
     mega, types = build_mega_prompt(count, product_info)
 
     try:
-        result = call_llm(mega, temperature=0.7, max_tokens=8000)
+        result = call_llm(mega, temperature=0.7, max_tokens=8000, image_url=image_url)
         prompts = parse_prompts(result, types)
         if len(prompts) >= 1:
             print(f"[A+ Prompts] Generated {len(prompts)} prompts")

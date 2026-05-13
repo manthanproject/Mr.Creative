@@ -186,7 +186,10 @@ def run_agent_pipeline(app, job_id):
                         'brand_name': brand_kit.name or '',
                         'style_notes': getattr(brand_kit, 'tone', '') or 'premium commercial',
                     }
-                    _ap = generate_listing_prompts(_info)[:len(content_plan)]
+                    _ref_url = None
+                    if job.reference_image:
+                        _ref_url = f'http://127.0.0.1:5000/static/{job.reference_image}'
+                    _ap = generate_listing_prompts(_info, count=len(content_plan), image_url=_ref_url)
                     prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
                     print(f"[Pipeline] A+ prompts ready: {len(prompts)}")
                 else:
