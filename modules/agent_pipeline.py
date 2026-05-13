@@ -143,92 +143,92 @@ def run_agent_pipeline(app, job_id):
                     db.session.commit()
 
                 if not _is_aplus:
-                # ── Step 1: Brand Analysis ──
-                job.status = 'analyzing'
-                job.current_agent = 'Brand Analyst'
-                job.progress = 5
-                job.message = 'Analyzing brand identity...'
-                db.session.commit()
-
-                brand_analysis = engine.analyze_brand(brand_kit)
-                try:
-                    from modules.night_orchestrator.llm import last_provider
-                    job.llm_provider = last_provider
-                except ImportError:
-                    job.llm_provider = 'groq'
-                db.session.commit()
-                job.brand_analysis = json.dumps(brand_analysis)
-                job.progress = 15
-                db.session.commit()
-
-                if not _check_job_control(job, db):
-                    return
-
-                # ── Step 2: Content Planning ──
-                job.status = 'planning'
-                job.current_agent = 'Content Strategist'
-                job.progress = 20
-                job.message = f'Planning {job.target_count} content pieces...'
-                db.session.commit()
-
-                content_types = json.loads(job.content_types) if job.content_types else None
-                content_plan = engine.plan_content(
-                    brand_analysis, brand_kit,
-                    target_count=job.target_count,
-                    content_types=content_types
-                )
-                content_plan = content_plan[:job.target_count]
-                job.content_plan = json.dumps(content_plan)
-                job.progress = 30
-                db.session.commit()
-
-                if not _check_job_control(job, db):
-                    return
-
-                # ── Step 3: Prompt Crafting ──
-                job.status = 'crafting'
-                job.current_agent = 'Prompt Crafter'
-                job.progress = 35
-                job.message = f'Crafting {len(content_plan)} prompts...'
-                db.session.commit()
-
-                if job.reference_image:
-                    ref_abs = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'static', job.reference_image
-                    )
-                    engine._reference_image_path = ref_abs
-
-                # A+ content: use dedicated hyper-detailed prompt generator (1 prompt at a time)
-                _ctypes = json.loads(job.content_types) if job.content_types else []
-                _all_aplus = _ctypes and all(t == 'a_plus' for t in _ctypes)
-
-                if _all_aplus:
-                    print(f"[Pipeline] A+ mode: {len(content_plan)} hyper-detailed prompts via aplus_prompt_generator")
-                    job.message = f'Generating {len(content_plan)} detailed A+ prompts...'
+                    # ── Step 1: Brand Analysis ──
+                    job.status = 'analyzing'
+                    job.current_agent = 'Brand Analyst'
+                    job.progress = 5
+                    job.message = 'Analyzing brand identity...'
                     db.session.commit()
-                    from modules.aplus_prompt_generator import generate_listing_prompts
-                    _info = {
-                        'product_name': brand_kit.name or 'Product',
-                        'category': getattr(brand_kit, 'category', '') or 'General',
-                        'features': [f.strip() for f in (getattr(brand_kit, 'description', '') or '').split(',') if f.strip()],
-                        'brand_name': brand_kit.name or '',
-                        'style_notes': getattr(brand_kit, 'tone', '') or 'premium commercial',
-                    }
-                    _ref_url = None
-                    if job.reference_image:
-                        _ref_url = f'http://127.0.0.1:5000/static/{job.reference_image}'
-                    _ap = generate_listing_prompts(_info, count=len(content_plan), image_url=_ref_url)
-                    prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
-                    print(f"[Pipeline] A+ prompts ready: {len(prompts)}")
-                else:
-                    prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
-                job.prompts = json.dumps(prompts)
-                job.progress = 40
-                db.session.commit()
 
-                if not _check_job_control(job, db):
-                    return
+                    brand_analysis = engine.analyze_brand(brand_kit)
+                    try:
+                        from modules.night_orchestrator.llm import last_provider
+                        job.llm_provider = last_provider
+                    except ImportError:
+                        job.llm_provider = 'groq'
+                    db.session.commit()
+                    job.brand_analysis = json.dumps(brand_analysis)
+                    job.progress = 15
+                    db.session.commit()
+
+                    if not _check_job_control(job, db):
+                        return
+
+                    # ── Step 2: Content Planning ──
+                    job.status = 'planning'
+                    job.current_agent = 'Content Strategist'
+                    job.progress = 20
+                    job.message = f'Planning {job.target_count} content pieces...'
+                    db.session.commit()
+
+                    content_types = json.loads(job.content_types) if job.content_types else None
+                    content_plan = engine.plan_content(
+                        brand_analysis, brand_kit,
+                        target_count=job.target_count,
+                        content_types=content_types
+                    )
+                    content_plan = content_plan[:job.target_count]
+                    job.content_plan = json.dumps(content_plan)
+                    job.progress = 30
+                    db.session.commit()
+
+                    if not _check_job_control(job, db):
+                        return
+
+                    # ── Step 3: Prompt Crafting ──
+                    job.status = 'crafting'
+                    job.current_agent = 'Prompt Crafter'
+                    job.progress = 35
+                    job.message = f'Crafting {len(content_plan)} prompts...'
+                    db.session.commit()
+
+                    if job.reference_image:
+                        ref_abs = os.path.join(
+                            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'static', job.reference_image
+                        )
+                        engine._reference_image_path = ref_abs
+
+                    # A+ content: use dedicated hyper-detailed prompt generator (1 prompt at a time)
+                    _ctypes = json.loads(job.content_types) if job.content_types else []
+                    _all_aplus = _ctypes and all(t == 'a_plus' for t in _ctypes)
+
+                    if _all_aplus:
+                        print(f"[Pipeline] A+ mode: {len(content_plan)} hyper-detailed prompts via aplus_prompt_generator")
+                        job.message = f'Generating {len(content_plan)} detailed A+ prompts...'
+                        db.session.commit()
+                        from modules.aplus_prompt_generator import generate_listing_prompts
+                        _info = {
+                            'product_name': brand_kit.name or 'Product',
+                            'category': getattr(brand_kit, 'category', '') or 'General',
+                            'features': [f.strip() for f in (getattr(brand_kit, 'description', '') or '').split(',') if f.strip()],
+                            'brand_name': brand_kit.name or '',
+                            'style_notes': getattr(brand_kit, 'tone', '') or 'premium commercial',
+                        }
+                        _ref_url = None
+                        if job.reference_image:
+                            _ref_url = f'http://127.0.0.1:5000/static/{job.reference_image}'
+                        _ap = generate_listing_prompts(_info, count=len(content_plan), image_url=_ref_url)
+                        prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
+                        print(f"[Pipeline] A+ prompts ready: {len(prompts)}")
+                    else:
+                        prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
+                    job.prompts = json.dumps(prompts)
+                    job.progress = 40
+                    db.session.commit()
+
+                    if not _check_job_control(job, db):
+                        return
 
             # ── Step 4: Image Generation via Flow Bot ──
             job.status = 'generating'
