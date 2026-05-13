@@ -92,8 +92,16 @@ const GeminiBot = {
       }
 
       await MC.sendStatus(job_id, 'entering_prompt', 'Typing prompt...');
-      const template = PROMPT_TEMPLATES[prompt_type] || PROMPT_TEMPLATES.flow;
-      let fullPrompt = template;
+      let fullPrompt;
+      if (job.prompt_text && job.prompt_text.length > 20) {
+        // Direct prompt from LLM chain — use as-is
+        fullPrompt = job.prompt_text;
+        MC.log('Gemini: using direct prompt_text (' + fullPrompt.length + ' chars)');
+      } else {
+        // Template-based prompt
+        const template = PROMPT_TEMPLATES[prompt_type] || PROMPT_TEMPLATES.flow;
+        fullPrompt = template;
+      }
       if (custom_instructions) fullPrompt += '\n\nAdditional instructions: ' + custom_instructions;
 
       const inputEl = document.querySelector(GSEL.inputField);
