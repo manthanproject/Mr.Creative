@@ -388,7 +388,7 @@ Write one FLUX-optimized prompt per content piece. Each prompt must:
 - Sound like a production brief, not AI art keywords"""
 
         print(f"[Agent 3] Prompt Crafter: Writing {len(content_plan)} prompts with prompt library ({len(content_types)} types)...")
-        result = self._call_llm(system, user, temperature=0.8, max_tokens=4000)
+        result = self._call_llm(system, user, temperature=0.8, max_tokens=8000)
         parsed = self._parse_json(result)
         if parsed and isinstance(parsed, list):
             print(f"[Agent 3] Prompts ready: {len(parsed)} crafted!")
