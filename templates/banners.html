@@ -470,7 +470,7 @@ async function deleteBannerJob() {
         bannerJobCancelled = true;
         clearInterval(pollInterval);
         showToast('Job deleted', 'success');
-        location.reload();
+        softReload();
     }
 }
 

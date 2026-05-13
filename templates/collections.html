@@ -643,7 +643,7 @@ async function toggleCollectionShare(id) {
         } else {
             showToast('Collection unshared', 'info');
         }
-        setTimeout(function() { location.reload(); }, 1000);
+        setTimeout(function() { softReload(); }, 1000);
     }
 }
 

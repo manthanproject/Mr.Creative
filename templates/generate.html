@@ -2644,7 +2644,7 @@
     // ════════════════════
     // UTILITY
     // ════════════════════
-    function refreshJobs() { location.reload(); }
+    function refreshJobs() { softReload(); }
 
     async function loadProfiles() {
         try {
@@ -2673,7 +2673,7 @@
     async function clearJobs() {
         if (!await showConfirm('Clear all jobs?')) return;
         await fetch('/generate/clear-jobs', { method: 'POST' });
-        location.reload();
+        softReload();
     }
 
     // ════════════════════

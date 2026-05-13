@@ -345,7 +345,7 @@ async function uploadFiles(files) {
         if (data.success) {
             statusText.textContent = data.message;
             showToast(data.message, 'success');
-            setTimeout(function() { location.reload(); }, 1000);
+            setTimeout(function() { softReload(); }, 1000);
         } else {
             statusText.textContent = data.error || 'Upload failed';
             showToast(data.error || 'Upload failed', 'error');
@@ -380,7 +380,7 @@ function handleCollectionDrop(event) {
 async function toggleShare(id) {
     var res = await fetch('/collections/' + id + '/toggle-share', { method: 'POST' });
     var data = await res.json();
-    if (data.success) location.reload();
+    if (data.success) softReload();
 }
 
 function copyShareLink() {

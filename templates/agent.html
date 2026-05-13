@@ -454,7 +454,7 @@ async function deleteBrandKit(id) {
     if (!await showConfirm('Delete this brand kit?')) return;
     fetch('/agent/brand-kit/' + id + '/delete', { method: 'POST' })
         .then(function(r) { return r.json(); })
-        .then(function(d) { if (d.success) location.reload(); else showToast(d.error || 'Delete failed', 'error'); })
+        .then(function(d) { if (d.success) softReload(); else showToast(d.error || 'Delete failed', 'error'); })
         .catch(function(e) { showToast('Error: ' + e, 'error'); });
 }
 
@@ -485,7 +485,7 @@ async function saveBrandKit() {
             })
         });
         var data = await res.json();
-        if (data.success) { showToast('Brand kit saved!', 'success'); setTimeout(function() { location.reload(); }, 800); }
+        if (data.success) { showToast('Brand kit saved!', 'success'); setTimeout(function() { softReload(); }, 800); }
         else showToast(data.error || 'Failed', 'error');
     } catch (e) { showToast('Connection error', 'error'); }
 }
@@ -689,7 +689,7 @@ async function deleteJob(jobId) {
     var data = await res.json();
     if (data.success) {
         showToast('Job deleted', 'success');
-        location.reload();
+        softReload();
     }
 }
 

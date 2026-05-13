@@ -218,12 +218,12 @@ function copyPrompt(btn) {
 function useInFlow(prompt) {
     // Store in sessionStorage and redirect to Flow/Banners page
     sessionStorage.setItem('prefill_prompt', prompt);
-    window.location.href = '/banners/';
+    softNavigate('/banners/');
 }
 
 function useInAgent(prompt) {
     sessionStorage.setItem('prefill_prompt', prompt);
-    window.location.href = '/agent/';
+    softNavigate('/agent/');
 }
 
 function toggleAddPrompt() {
@@ -246,7 +246,7 @@ async function saveCustomPrompt() {
     if (data.success) {
         showToast('Prompt saved!', 'success');
         document.getElementById('newPromptText').value = '';
-        window.location.href = '/prompts/library?cat=' + category;
+        softNavigate('/prompts/library?cat=') + category;
     } else {
         showToast(data.error || 'Failed to save', 'error');
     }
@@ -258,7 +258,7 @@ async function deleteCustomPrompt(id) {
     var data = await res.json();
     if (data.success) {
         showToast('Prompt deleted', 'success');
-        location.reload();  // URL already has ?cat= param, reload preserves it
+        softReload();  // URL already has ?cat= param, reload preserves it
     }
 }
 

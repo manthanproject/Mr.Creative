@@ -877,7 +877,7 @@
             var data = await res.json();
             if (data.success) {
                 showToast(data.message || 'Job scheduled!', 'success');
-                setTimeout(function() { location.reload(); }, 800);
+                setTimeout(function() { softReload(); }, 800);
             } else {
                 showToast(data.error || 'Failed to create.', 'error');
             }
@@ -909,7 +909,7 @@
         try {
             var res = await fetch('/scheduler/' + id + '/run-now', { method: 'POST' });
             var data = await res.json();
-            if (data.success) { showToast(data.message || 'Job started!', 'success'); setTimeout(function() { window.location.href = '/generate/'; }, 1500); }
+            if (data.success) { showToast(data.message || 'Job started!', 'success'); setTimeout(function() { softNavigate('/generate/'); }, 1500); }
             else { showToast(data.error || 'Failed to run.', 'error'); }
         } catch (err) { showToast('Error running job.', 'error'); }
     }

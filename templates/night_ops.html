@@ -348,7 +348,7 @@ function resetDashboard() {
     fetch('/night-ops/api/reset', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
-            if (data.status === 'reset') location.reload();
+            if (data.status === 'reset') softReload();
         })
         .catch(err => alert('Reset failed: ' + err));
 }
@@ -415,7 +415,7 @@ function pollStatus() {
                 }
 
                 // Reload page after a short delay to show fresh data
-                setTimeout(() => location.reload(), 3000);
+                setTimeout(() => softReload(), 3000);
             }
         })
         .catch(() => {});
@@ -525,7 +525,7 @@ function submitAutoPost() {
             if (data.errors && data.errors.length) {
                 statusEl.textContent += ` (${data.errors.length} skipped)`;
             }
-            setTimeout(() => location.reload(), 2000);
+            setTimeout(() => softReload(), 2000);
         } else {
             statusEl.style.background = 'rgba(220,50,50,0.15)';
             statusEl.style.color = '#f66';

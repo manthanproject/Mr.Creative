@@ -411,7 +411,7 @@ async function createPost(mode) {
         });
         var data = await res.json();
         if (data.success) {
-            location.reload();
+            softReload();
         } else {
             showToast(data.error || 'Failed to create post', 'error');
         }
@@ -426,7 +426,7 @@ async function postNow(postId) {
         var res = await fetch('/social/post-now/' + postId, { method: 'POST' });
         var data = await res.json();
         if (data.success) {
-            location.reload();
+            softReload();
         } else {
             showToast(data.error || 'Failed to post', 'error');
         }

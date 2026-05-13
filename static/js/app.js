@@ -1,4 +1,58 @@
 
+// ══════════════════════════════════════════════
+// Soft Reload System — no white flash, instant feel
+// ══════════════════════════════════════════════
+
+// Override location.reload globally
+(function() {
+    var _origReload = location.reload.bind(location);
+
+    // Soft reload: fetch current page, swap main content with fade
+    window.softReload = function(callback) {
+        var main = document.querySelector('.main-content') || document.querySelector('main') || document.querySelector('.content-area');
+        if (!main) { _origReload(); return; }
+
+        // Fade out
+        main.style.transition = 'opacity 0.12s ease-out';
+        main.style.opacity = '0.3';
+
+        fetch(window.location.href, { headers: { 'X-Soft-Reload': '1' } })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var newMain = doc.querySelector('.main-content') || doc.querySelector('main') || doc.querySelector('.content-area');
+
+                if (newMain) {
+                    main.innerHTML = newMain.innerHTML;
+                    // Re-run any inline scripts
+                    main.querySelectorAll('script').forEach(function(oldScript) {
+                        var newScript = document.createElement('script');
+                        if (oldScript.src) { newScript.src = oldScript.src; }
+                        else { newScript.textContent = oldScript.textContent; }
+                        oldScript.parentNode.replaceChild(newScript, oldScript);
+                    });
+                }
+
+                // Fade in
+                main.style.opacity = '1';
+                if (callback) callback();
+            })
+            .catch(function() { _origReload(); });
+    };
+
+    // Soft navigate: go to new page without white flash
+    window.softNavigate = function(url) {
+        var main = document.querySelector('.main-content') || document.querySelector('main') || document.querySelector('.content-area');
+        if (!main) { window.location.href = url; return; }
+
+        main.style.transition = 'opacity 0.1s ease-out';
+        main.style.opacity = '0';
+        setTimeout(function() { window.location.href = url; }, 100);
+    };
+})();
+
+
 // ── Instant Navigation ──
 // Prefetch pages on hover, show loading indicator on click
 document.addEventListener('DOMContentLoaded', function() {

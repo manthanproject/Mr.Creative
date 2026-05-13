@@ -652,7 +652,7 @@
             var data = await res.json();
             if (data.success) {
                 showToast(data.message || 'Data cleared!', 'success');
-                setTimeout(function() { location.reload(); }, 1000);
+                setTimeout(function() { softReload(); }, 1000);
             } else {
                 showToast(data.error || 'Failed.', 'error');
             }
