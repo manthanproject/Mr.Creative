@@ -81,34 +81,52 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
 
 
 def _call_gemini_extension(prompt, timeout=120):
-    """Call Gemini via Chrome extension - no API quota limits."""
-    import requests
+    """Call Gemini via Chrome extension - no API quota limits. Direct queue, no HTTP."""
     import uuid
-    base = 'http://127.0.0.1:5000'
+
     job_id = f'llm_{uuid.uuid4().hex[:8]}'
     try:
-        r = requests.post(f'{base}/api/ext/submit', json={
-            'job_id': job_id, 'job_type': 'gemini', 'prompt_text': prompt,
-        }, timeout=5)
-        if not r.ok:
-            raise Exception(f'Queue failed: {r.status_code}')
-        print(f"[LLM] Gemini extension job queued: {job_id}")
+        from routes.extension import _state, _lock, gemini_results
+        job = {
+            'job_id': job_id,
+            'job_type': 'gemini',
+            'prompt_text': prompt,
+        }
+        with _lock:
+            _state['job_data'][job_id] = job
+            # Find a profile with gemini capability
+            routed = False
+            for pid, info in _state['profiles'].items():
+                caps = info.get('capabilities', [])
+                if 'gemini' in caps:
+                    _state['pending_commands'][pid] = job
+                    routed = True
+                    print(f"[LLM] Gemini extension job {job_id} routed to {pid}")
+                    break
+            if not routed:
+                # Put in general queue
+                jq = _state.get('job_queue', [])
+                jq.append(job)
+                _state['job_queue'] = jq
+                print(f"[LLM] Gemini extension job {job_id} queued (waiting for profile)")
     except Exception as e:
         raise Exception(f'Extension queue failed: {e}')
+
+    # Poll for result
     start = time.time()
     while time.time() - start < timeout:
         time.sleep(3)
-        try:
-            r = requests.get(f'{base}/api/ext/gemini-result/{job_id}', timeout=5)
-            if r.ok:
-                data = r.json()
-                if data.get('result'):
-                    global last_provider
-                    last_provider = 'gemini-ext'
-                    print("[LLM] Gemini extension returned result")
-                    return data['result']
-        except Exception:
-            pass
+        result = gemini_results.get(job_id)
+        if result and result.get('result'):
+            try:
+                del gemini_results[job_id]
+            except KeyError:
+                pass
+            global last_provider
+            last_provider = 'gemini-ext'
+            print("[LLM] Gemini extension returned result")
+            return result['result']
+
     raise Exception(f'Extension timeout after {timeout}s')
 
 
