@@ -225,11 +225,8 @@ def run_agent_pipeline(app, job_id):
             results = []
             total = len(prompts)
 
-            # Group prompts into batches of 4 (Flow generates up to 4 per run)
-            batches = []
-            for i in range(0, total, 4):
-                batch = prompts[i:i+4]
-                batches.append(batch)
+            # One prompt per Flow run (x1) — unique images, avoids detection
+            batches = [[p] for p in prompts]
 
             image_index = 0
             from modules.flow_runner import FlowSession
@@ -240,6 +237,12 @@ def run_agent_pipeline(app, job_id):
 
             try:
               for batch_num, batch in enumerate(batches):
+                # Delay between runs to avoid Google detection (skip first)
+                if batch_num > 0:
+                    import random as _rnd
+                    _delay = _rnd.uniform(8, 15)
+                    print(f"[Pipeline] Waiting {_delay:.0f}s before next generation...")
+                    time.sleep(_delay)
                 progress = 40 + int((batch_num / len(batches)) * 45)
                 job.progress = progress
                 job.message = f'Flow batch {batch_num+1}/{len(batches)} — generating {len(batch)} images...'
@@ -277,7 +280,7 @@ def run_agent_pipeline(app, job_id):
                     files = session.run_batch(
                         prompt=prompt_text,
                         aspect_ratio=ar,
-                        count=len(batch),
+                        count=1,
                         output_dir=output_dir,
                         reference_image=ref_image,
                         is_first=(batch_num == 0),
