@@ -40,10 +40,10 @@ class FlowSession:
 
         try:
             self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': \"\"\"
+                'source': """
                     Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
                     window.chrome = { runtime: {} };
-                \"\"\"
+                """
             })
             print("[FlowSession] Stealth patches applied")
         except Exception as e:
