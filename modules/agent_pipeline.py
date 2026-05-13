@@ -290,7 +290,7 @@ def run_agent_pipeline(app, job_id):
                 _routed = False
                 for pid, info in _state.get('profiles', {}).items():
                     caps = info.get('capabilities', [])
-                    if 'flow_active' in caps or 'flow' in caps:
+                    if 'flow_active' in caps:
                         _state['pending_commands'][pid] = _fjob
                         _routed = True
                         print(f'[Pipeline] Flow job {_fid} routed to {pid}')
