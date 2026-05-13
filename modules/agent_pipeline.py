@@ -122,7 +122,11 @@ def run_agent_pipeline(app, job_id):
                 db.session.commit()
 
                 brand_analysis = engine.analyze_brand(brand_kit)
-                job.llm_provider = engine._last_provider if hasattr(engine, '_last_provider') else ('cerebras' if engine._using_cerebras else 'groq')
+                try:
+                    from modules.night_orchestrator.llm import last_provider
+                    job.llm_provider = last_provider
+                except ImportError:
+                    job.llm_provider = 'groq'
                 db.session.commit()
                 job.brand_analysis = json.dumps(brand_analysis)
                 job.progress = 15

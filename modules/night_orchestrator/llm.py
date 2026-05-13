@@ -7,6 +7,7 @@ All Night Ops modules use this instead of calling APIs directly.
 import logging
 
 logger = logging.getLogger('night_ops')
+last_provider = 'groq'  # tracks which LLM was last used
 
 
 def call_llm(prompt: str, system: str = '', temperature: float = 0.7, max_tokens: int = 3000) -> str:
@@ -65,6 +66,8 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
             )
             response = model.generate_content(prompt)
             print(f"[LLM] Used {model_name}")
+            global last_provider
+            last_provider = f'gemini ({model_name})'
             return (response.text or '').strip()
         except Exception as e:
             last_error = e
