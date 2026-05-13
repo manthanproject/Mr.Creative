@@ -28,7 +28,7 @@ def call_llm(prompt: str, system: str = '', temperature: float = 0.7, max_tokens
                 logger.info("[LLM] Response via Gemini")
                 return result
         except Exception as e:
-            logger.warning(f"[LLM] Gemini failed: {e}, trying Groq...")
+            logger.warning(f"[LLM] Gemini API failed: {e}, trying Gemini extension...")
 
     # Fallback to Groq
     groq_key = Config.GROQ_API_KEY
@@ -78,6 +78,38 @@ def _call_gemini(api_key: str, prompt: str, system: str, temperature: float, max
 
     raise last_error
 
+
+
+def _call_gemini_extension(prompt, timeout=120):
+    """Call Gemini via Chrome extension - no API quota limits."""
+    import requests
+    import uuid
+    base = 'http://127.0.0.1:5000'
+    job_id = f'llm_{uuid.uuid4().hex[:8]}'
+    try:
+        r = requests.post(f'{base}/api/ext/submit', json={
+            'job_id': job_id, 'job_type': 'gemini', 'prompt_text': prompt,
+        }, timeout=5)
+        if not r.ok:
+            raise Exception(f'Queue failed: {r.status_code}')
+        print(f"[LLM] Gemini extension job queued: {job_id}")
+    except Exception as e:
+        raise Exception(f'Extension queue failed: {e}')
+    start = time.time()
+    while time.time() - start < timeout:
+        time.sleep(3)
+        try:
+            r = requests.get(f'{base}/api/ext/gemini-result/{job_id}', timeout=5)
+            if r.ok:
+                data = r.json()
+                if data.get('result'):
+                    global last_provider
+                    last_provider = 'gemini-ext'
+                    print("[LLM] Gemini extension returned result")
+                    return data['result']
+        except Exception:
+            pass
+    raise Exception(f'Extension timeout after {timeout}s')
 
 
 def _call_groq(api_key: str, prompt: str, system: str, temperature: float, max_tokens: int) -> str:
