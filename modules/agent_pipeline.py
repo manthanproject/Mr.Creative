@@ -181,10 +181,10 @@ def run_agent_pipeline(app, job_id):
                     from modules.aplus_prompt_generator import generate_listing_prompts
                     _info = {
                         'product_name': brand_kit.name or 'Product',
-                        'category': brand_kit.category or 'General',
-                        'features': [f.strip() for f in (brand_kit.description or '').split(',') if f.strip()],
+                        'category': getattr(brand_kit, 'category', '') or 'General',
+                        'features': [f.strip() for f in (getattr(brand_kit, 'description', '') or '').split(',') if f.strip()],
                         'brand_name': brand_kit.name or '',
-                        'style_notes': brand_kit.tone or 'premium commercial',
+                        'style_notes': getattr(brand_kit, 'tone', '') or 'premium commercial',
                     }
                     _ap = generate_listing_prompts(_info)[:len(content_plan)]
                     prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
