@@ -1,3 +1,42 @@
+
+// ── Instant Navigation ──
+// Prefetch pages on hover, show loading indicator on click
+document.addEventListener('DOMContentLoaded', function() {
+    // Prefetch on hover
+    document.querySelectorAll('.sidebar a[href]').forEach(function(link) {
+        link.addEventListener('mouseenter', function() {
+            var href = this.getAttribute('href');
+            if (href && href.startsWith('/') && !document.querySelector('link[href="'+href+'"]')) {
+                var pf = document.createElement('link');
+                pf.rel = 'prefetch';
+                pf.href = href;
+                document.head.appendChild(pf);
+            }
+        });
+        // Instant fade-out on click
+        link.addEventListener('click', function() {
+            var main = document.querySelector('.main-content') || document.querySelector('main') || document.querySelector('.content');
+            if (main) {
+                main.style.transition = 'opacity 0.1s';
+                main.style.opacity = '0.4';
+            }
+        });
+    });
+});
+
+// ── Smart Reload Helper ──
+// Use instead of location.reload() — updates only the changed element
+function smartUpdate(selector, html) {
+    var el = document.querySelector(selector);
+    if (el) {
+        el.style.transition = 'opacity 0.15s';
+        el.style.opacity = '0';
+        setTimeout(function() {
+            el.innerHTML = html;
+            el.style.opacity = '1';
+        }, 150);
+    }
+}
 /* ========================================
    MR.CREATIVE — Client-side JavaScript
    ======================================== */

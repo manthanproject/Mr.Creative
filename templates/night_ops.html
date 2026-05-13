@@ -448,7 +448,14 @@ function approvePlan(planId) {
     fetch(`/night-ops/api/plan/${planId}/approve`, { method: 'POST' })
         .then(r => r.json())
         .then(data => {
-            if (data.status === 'approved') location.reload();
+            if (data.status === 'approved') {
+                var btn = event.target;
+                btn.textContent = 'Approved';
+                btn.disabled = true;
+                btn.style.background = 'rgba(50,200,80,0.15)';
+                btn.style.color = '#4c4';
+                btn.style.border = '1px solid rgba(50,200,80,0.3)';
+            }
         });
 }
 
