@@ -84,6 +84,8 @@ def delete_brand_kit(kit_id):
     kit = BrandKit.query.filter_by(id=kit_id, user_id=current_user.id).first()
     if not kit:
         return jsonify({'error': 'Not found'}), 404
+    # Delete agent jobs referencing this kit first (FK constraint)
+    AgentJob.query.filter_by(brand_kit_id=kit_id).delete(synchronize_session=False)
     db.session.delete(kit)
     db.session.commit()
     return jsonify({'success': True})
