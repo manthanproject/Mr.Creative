@@ -25,56 +25,53 @@ class FlowSession:
         self.bot: Any = None
 
     def start(self):
-        from modules.chrome_launcher import ensure_flow_chrome
         from modules.flow_bot import FlowBot
 
-        if not ensure_flow_chrome('crimsonbox69@gmail.com'):
-            print("[FlowSession] Could not launch Flow Chrome")
-            return False
-
         if HAS_UC:
-            # Undetected Chrome — patches binary to bypass bot detection
-            print("[FlowSession] Using undetected-chromedriver")
-            uc_opts = uc.ChromeOptions()
-            uc_opts.add_argument('--user-data-dir=' + os.path.join(
+            print("[FlowSession] Using undetected-chromedriver (no debug port)")
+            profile_dir = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'chrome_flow_crimsonbox69'
-            ))
-            self.driver = uc.Chrome(options=uc_opts, version_main=None)
-            self.driver.get('https://labs.google/fx/tools/flow')
-            import time as _t
-            _t.sleep(5)
+                'chrome_flow_uc'
+            )
+            try:
+                uc_opts = uc.ChromeOptions()
+                uc_opts.add_argument('--user-data-dir=' + profile_dir)
+                self.driver = uc.Chrome(options=uc_opts, version_main=None)
+                self.driver.get('https://labs.google/fx/tools/flow')
+                import time as _t
+                _t.sleep(8)
+                print("[FlowSession] UC Chrome ready")
+            except Exception as e:
+                print(f"[FlowSession] UC failed: {e}, falling back to debug port")
+                from modules.chrome_launcher import ensure_flow_chrome
+                if not ensure_flow_chrome('crimsonbox69@gmail.com'):
+                    return False
+                opts = Options()
+                opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
+                self.driver = webdriver.Chrome(options=opts)
         else:
-            # Fallback: attach to existing debug port
+            from modules.chrome_launcher import ensure_flow_chrome
+            if not ensure_flow_chrome('crimsonbox69@gmail.com'):
+                print("[FlowSession] Could not launch Flow Chrome")
+                return False
             opts = Options()
             opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
             self.driver = webdriver.Chrome(options=opts)
 
         self.driver.set_script_timeout(120)
 
-        # Anti-detection: mask Selenium/automation markers
-        try:
-            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': """
-                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5]
-                    });
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['en-US', 'en']
-                    });
-                    window.chrome = { runtime: {} };
-                    const origQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (params) => (
-                        params.name === 'notifications'
-                            ? Promise.resolve({ state: Notification.permission })
-                            : origQuery(params)
-                    );
-                """
-            })
-            print("[FlowSession] Stealth patches applied")
-        except Exception as e:
-            print(f"[FlowSession] Stealth patch warning: {e}")
+        # CDP stealth only for debug-port mode (UC handles its own)
+        if not HAS_UC:
+            try:
+                self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                    'source': """
+                        Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                        window.chrome = { runtime: {} };
+                    """
+                })
+                print("[FlowSession] Stealth patches applied")
+            except Exception as e:
+                print(f"[FlowSession] Stealth patch warning: {e}")
 
         download_dir = os.path.expanduser('~/Downloads')
         self.bot = FlowBot(self.driver, download_dir=download_dir)
