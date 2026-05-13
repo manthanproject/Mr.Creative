@@ -30,8 +30,22 @@ const FlowBot = {
     MC.log('Flow: starting job', job_id, prompts.length + ' prompts');
 
     try {
-      await MC.sendStatus(job_id, 'navigating', 'Opening Flow project...');
-      await this._ensureProjectPage(job_id);
+      // Save job to storage BEFORE navigation (page reload kills this instance)
+      await chrome.storage.local.set({ pendingFlowJob: job });
+
+      // If not on project page, click New Project (script will reload, resume below)
+      if (!location.href.includes('/project/')) {
+        MC.log('Flow: need project page, clicking New Project...');
+        await MC.sendStatus(job_id, 'navigating', 'Opening Flow project...');
+        await this._clickNewProject(job_id);
+        for (var w = 0; w < 20; w++) {
+          if (location.href.includes('/project/')) break;
+          await MC.sleep(500);
+        }
+      }
+
+      MC.log('Flow: on project page, waiting for prompt bar...');
+      await this._waitForPromptBar();
 
       await MC.sendStatus(job_id, 'settings', 'Setting: ' + aspect_ratio + ', ' + count + 'x');
       await this._setImageSettings(aspect_ratio, count);
@@ -65,9 +79,11 @@ const FlowBot = {
 
       await MC.sendStatus(job_id, 'downloading', 'Downloading ' + prompts.length + ' images...');
       await this._downloadAll(job_id, prompts.length);
+      await chrome.storage.local.remove('pendingFlowJob');
       await MC.sendStatus(job_id, 'complete', prompts.length + ' images done!', {total_images: prompts.length});
     } catch (err) {
       MC.log('Flow error:', err);
+      await chrome.storage.local.remove('pendingFlowJob');
       await MC.sendStatus(job_id, 'error', 'Failed: ' + err.message);
     }
   },
@@ -151,6 +167,38 @@ const FlowBot = {
   // ══════════════════════════════════════
   // NAVIGATION (matches Selenium navigate_to_flow)
   // ══════════════════════════════════════
+
+  async _clickNewProject(jobId) {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (location.href.includes('/project/')) return;
+      await MC.sendStatus(jobId, 'navigating', 'Clicking New Project (' + (attempt+1) + ')...');
+      var clicked = false;
+      var allBtns = document.querySelectorAll('button, a, div[role="button"]');
+      for (var el of allBtns) {
+        if (!el.offsetParent) continue;
+        var txt = el.textContent.trim();
+        if (txt.includes('New project') || txt.includes('New Project')) {
+          el.click();
+          MC.log('Flow: clicked New Project');
+          clicked = true;
+          break;
+        }
+      }
+      if (!clicked) {
+        var cards = document.querySelectorAll('div, button');
+        for (var c of cards) {
+          if (!c.offsetParent) continue;
+          if (c.textContent.includes('+') && c.textContent.includes('New')) {
+            c.click();
+            MC.log('Flow: clicked + card');
+            clicked = true;
+            break;
+          }
+        }
+      }
+      await MC.sleep(clicked ? 3000 : 2000);
+    }
+  },
 
   async _ensureProjectPage(jobId) {
     await MC.sleep(2000);
@@ -556,9 +604,15 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   return true;
 });
 
-// ── Self-check: pick up pending job if dispatch failed ──
+// ── Self-check: resume persisted job after page navigation ──
 setTimeout(async function() {
   try {
+    var data = await chrome.storage.local.get('pendingFlowJob');
+    if (data.pendingFlowJob && location.href.includes('/project/')) {
+      MC.log('Flow: resuming persisted job:', data.pendingFlowJob.job_id);
+      FlowBot.run(data.pendingFlowJob);
+      return;
+    }
     var res = await fetch(MC.SERVER + '/api/ext/pending-for-tab');
     if (res.ok && res.status !== 204) {
       var job = await res.json();
@@ -571,5 +625,5 @@ setTimeout(async function() {
         });
       }
     }
-  } catch (e) {}
+  } catch (e) { MC.log('Flow init error:', e); }
 }, 3000);
