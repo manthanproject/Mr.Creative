@@ -25,44 +25,21 @@ class FlowSession:
         self.bot: Any = None
 
     def start(self):
+        from modules.chrome_launcher import ensure_flow_chrome
         from modules.flow_bot import FlowBot
 
-        if HAS_UC:
-            print("[FlowSession] Using undetected-chromedriver (no debug port)")
-            profile_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'chrome_flow_uc'
-            )
-            try:
-                uc_opts = uc.ChromeOptions()
-                uc_opts.add_argument('--user-data-dir=' + profile_dir)
-                self.driver = uc.Chrome(options=uc_opts, version_main=None)
-                self.driver.get('https://labs.google/fx/tools/flow')
-                import time as _t
-                _t.sleep(8)
-                print("[FlowSession] UC Chrome ready")
-            except Exception as e:
-                print(f"[FlowSession] UC failed: {e}, falling back to debug port")
-                from modules.chrome_launcher import ensure_flow_chrome
-                if not ensure_flow_chrome('crimsonbox69@gmail.com'):
-                    return False
-                opts = Options()
-                opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
-                self.driver = webdriver.Chrome(options=opts)
-        else:
-            from modules.chrome_launcher import ensure_flow_chrome
-            if not ensure_flow_chrome('crimsonbox69@gmail.com'):
-                print("[FlowSession] Could not launch Flow Chrome")
-                return False
-            opts = Options()
-            opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
-            self.driver = webdriver.Chrome(options=opts)
+        if not ensure_flow_chrome('crimsonbox69@gmail.com'):
+            print("[FlowSession] Could not launch Flow Chrome")
+            return False
+
+        opts = Options()
+        opts.add_experimental_option('debuggerAddress', '127.0.0.1:9223')
+        self.driver = webdriver.Chrome(options=opts)
 
         self.driver.set_script_timeout(120)
 
-        # CDP stealth only for debug-port mode (UC handles its own)
-        if not HAS_UC:
-            try:
+        # CDP stealth patches
+        try:
                 self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
                     'source': """
                         Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
