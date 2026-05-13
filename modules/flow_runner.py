@@ -38,17 +38,16 @@ class FlowSession:
 
         self.driver.set_script_timeout(120)
 
-        # CDP stealth patches
         try:
-                self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                    'source': """
-                        Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                        window.chrome = { runtime: {} };
-                    """
-                })
-                print("[FlowSession] Stealth patches applied")
-            except Exception as e:
-                print(f"[FlowSession] Stealth patch warning: {e}")
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': \"\"\"
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    window.chrome = { runtime: {} };
+                \"\"\"
+            })
+            print("[FlowSession] Stealth patches applied")
+        except Exception as e:
+            print(f"[FlowSession] Stealth patch warning: {e}")
 
         download_dir = os.path.expanduser('~/Downloads')
         self.bot = FlowBot(self.driver, download_dir=download_dir)
