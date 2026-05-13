@@ -113,6 +113,9 @@ def run_agent_pipeline(app, job_id):
                 print(f"[Pipeline] Direct mode ({prompt_type}): {job.target_count} images, skipping LLM")
 
             else:
+                prompts = []
+                content_plan = []
+
                 # Check if A+ content — skip Agent 1 & 2
                 _ct = json.loads(job.content_types) if job.content_types else []
                 _is_aplus = _ct and all(t == 'a_plus' for t in _ct)
