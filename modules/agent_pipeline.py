@@ -170,7 +170,27 @@ def run_agent_pipeline(app, job_id):
                     )
                     engine._reference_image_path = ref_abs
 
-                prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
+                # A+ content: use dedicated hyper-detailed prompt generator (1 prompt at a time)
+                _ctypes = json.loads(job.content_types) if job.content_types else []
+                _all_aplus = _ctypes and all(t == 'a_plus' for t in _ctypes)
+
+                if _all_aplus:
+                    print(f"[Pipeline] A+ mode: {len(content_plan)} hyper-detailed prompts via aplus_prompt_generator")
+                    job.message = f'Generating {len(content_plan)} detailed A+ prompts...'
+                    db.session.commit()
+                    from modules.aplus_prompt_generator import generate_listing_prompts
+                    _info = {
+                        'product_name': brand_kit.name or 'Product',
+                        'category': brand_kit.category or 'General',
+                        'features': [f.strip() for f in (brand_kit.description or '').split(',') if f.strip()],
+                        'brand_name': brand_kit.name or '',
+                        'style_notes': brand_kit.tone or 'premium commercial',
+                    }
+                    _ap = generate_listing_prompts(_info)[:len(content_plan)]
+                    prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
+                    print(f"[Pipeline] A+ prompts ready: {len(prompts)}")
+                else:
+                    prompts = engine.craft_prompts(content_plan, brand_analysis, brand_kit)
                 job.prompts = json.dumps(prompts)
                 job.progress = 40
                 db.session.commit()
