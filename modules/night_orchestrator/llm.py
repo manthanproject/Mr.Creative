@@ -77,7 +77,7 @@ def _call_gemini_api(api_key, prompt, system, temperature, max_tokens):
     raise Exception("All Gemini API models exhausted")
 
 
-def _call_gemini_extension(prompt, timeout=120, image_url=None):
+def _call_gemini_extension(prompt, timeout=300, image_url=None):
     """Gemini via Chrome extension — no API quota. Direct queue."""
     import uuid
     global last_provider
