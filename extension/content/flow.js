@@ -193,7 +193,7 @@ const FlowBot = {
     await MC.sleep(300);
 
     // Select count
-    this._clickFlowTab('x' + count);
+    this._clickFlowTab(count + 'x') || this._clickFlowTab('x' + count);
     await MC.sleep(300);
 
     // Close dropdown — click outside
