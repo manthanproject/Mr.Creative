@@ -70,8 +70,10 @@ IMAGE TYPES NEEDED:{type_list}
 FORMAT: Separate each prompt with exactly this line:
 ===PROMPT===
 
-Return ONLY the prompts separated by ===PROMPT===. No numbering, no labels, no explanations.
-Start directly with the first prompt."""
+IMPORTANT: Return your response inside a SINGLE code block (triple backticks).
+Inside the code block, separate each prompt with ===PROMPT=== on its own line.
+No numbering, no labels, no explanations outside the code block.
+Start directly with the first prompt inside the code block."""
 
     return prompt, types[:count]
 
