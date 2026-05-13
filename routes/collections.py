@@ -182,28 +182,33 @@ def bulk_delete():
     if not collection_ids:
         return jsonify({'error': 'No collections selected'}), 400
 
+    from models import Generation, SocialPost, AgentJob
+    import shutil
     output_folder = current_app.config.get('OUTPUT_FOLDER', 'static/outputs')
-    deleted_count = 0
 
-    for col_id in collection_ids:
-        collection = Collection.query.filter_by(id=col_id, user_id=current_user.id).first()
-        if collection:
-            # Null out all FKs referencing this collection
-            from models import Generation, SocialPost, AgentJob
-            Generation.query.filter_by(collection_id=col_id).update({'collection_id': None})
-            SocialPost.query.filter_by(collection_id=col_id).update({'collection_id': None})
-            AgentJob.query.filter_by(collection_id=col_id).update({'collection_id': None})
+    # Verify ownership — filter to only user's collections
+    valid_ids = [c.id for c in Collection.query.filter(
+        Collection.id.in_(collection_ids),
+        Collection.user_id == current_user.id
+    ).all()]
 
-            # Delete collection folder
-            col_dir = os.path.join(output_folder, f'collection_{col_id}')
-            if os.path.exists(col_dir):
-                import shutil
-                shutil.rmtree(col_dir, ignore_errors=True)
+    if not valid_ids:
+        return jsonify({'error': 'No valid collections found'}), 400
 
-            db.session.delete(collection)
-            deleted_count += 1
+    # Batch null all FKs in 3 queries
+    Generation.query.filter(Generation.collection_id.in_(valid_ids)).update({'collection_id': None}, synchronize_session=False)
+    SocialPost.query.filter(SocialPost.collection_id.in_(valid_ids)).update({'collection_id': None}, synchronize_session=False)
+    AgentJob.query.filter(AgentJob.collection_id.in_(valid_ids)).update({'collection_id': None}, synchronize_session=False)
 
+    # Batch delete collections
+    deleted_count = Collection.query.filter(Collection.id.in_(valid_ids)).delete(synchronize_session=False)
     db.session.commit()
+
+    # Cleanup folders in background
+    for col_id in valid_ids:
+        col_dir = os.path.join(output_folder, f'collection_{col_id}')
+        if os.path.exists(col_dir):
+            shutil.rmtree(col_dir, ignore_errors=True)
     return jsonify({
         'success': True,
         'deleted': deleted_count,
