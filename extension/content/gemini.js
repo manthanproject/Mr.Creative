@@ -192,28 +192,41 @@ const GeminiBot = {
         else { MC.log('Gemini: ERROR - Upload files menu item not found'); return; }
       }
 
-      // Step 3: Drag-and-drop the file onto the prompt area
-      const dropTarget = document.querySelector('.ql-editor.textarea')
-                      || document.querySelector('[contenteditable="true"]')
-                      || document.querySelector('.input-area');
-      if (!dropTarget) { MC.log('Gemini: ERROR - drop target not found'); return; }
-      MC.log('Gemini: dropping file onto prompt area...');
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      const dragEnter = new DragEvent('dragenter', { bubbles: true, dataTransfer: dt });
-      const dragOver = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt });
-      const drop = new DragEvent('drop', { bubbles: true, dataTransfer: dt });
-      dropTarget.dispatchEvent(dragEnter);
-      await MC.sleep(200);
-      dropTarget.dispatchEvent(dragOver);
-      await MC.sleep(200);
-      dropTarget.dispatchEvent(drop);
-      MC.log('Gemini: file dropped, waiting for upload processing...');
+      // Step 3: Try multiple upload methods
+      const editor = document.querySelector('.ql-editor.textarea');
+      if (!editor) { MC.log('Gemini: ERROR - editor not found'); return; }
+
+      // Method A: Clipboard paste (most reliable for Gemini)
+      MC.log('Gemini: trying clipboard paste method...');
+      editor.focus();
+      await MC.sleep(300);
+      try {
+        const clipItem = new ClipboardItem({ [file.type || 'image/png']: blob });
+        await navigator.clipboard.write([clipItem]);
+        MC.log('Gemini: image written to clipboard, pasting...');
+        document.execCommand('paste');
+        await MC.sleep(3000);
+      } catch (clipErr) {
+        MC.log('Gemini: clipboard API failed:', clipErr.message, '- trying paste event');
+      }
+
+      // Method B: Synthetic paste event with file data
+      const pasteData = new DataTransfer();
+      pasteData.items.add(file);
+      const pasteEvent = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: pasteData
+      });
+      editor.dispatchEvent(pasteEvent);
+      MC.log('Gemini: paste event dispatched');
       await MC.sleep(5000);
-      // Check if image appeared in the prompt area
-      const imgs = document.querySelectorAll('.input-area img, .ql-editor img, [class*="upload"] img, [class*="chip"] img');
-      MC.log('Gemini: images in prompt area after drop:', imgs.length);
-      MC.log('Gemini: image upload complete');
+
+      // Verify upload
+      const uploaderArea = document.querySelector('[class*="uploader"], [class*="upload-chip"], [class*="file-chip"]');
+      const chipImgs = document.querySelectorAll('[class*="chip"] img, [class*="upload"] img, [class*="thumbnail"] img');
+      MC.log('Gemini: upload chips found:', chipImgs.length, 'uploader:', !!uploaderArea);
+      MC.log('Gemini: image upload attempt complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message, e.stack);
     }
