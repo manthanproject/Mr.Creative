@@ -166,67 +166,71 @@ const GeminiBot = {
       MC.log('Gemini: image fetched, size:', blob.size, 'type:', blob.type);
       const file = new File([blob], filename || 'product.jpg', { type: blob.type || 'image/jpeg' });
 
-      // Step 2: Try hidden upload button (bypasses menu entirely)
+      // Step 2+3: Click + menu, keyboard-navigate to "Upload files", intercept file input
+      MC.log('Gemini: setting up file input observer...');
+      
+      // Watch for file input to appear anywhere in the DOM
+      let fileInputFound = false;
+      const observer = new MutationObserver(() => {
+        if (fileInputFound) return;
+        const fi = document.querySelector('input[type="file"]:not([aria-hidden])') 
+                || document.querySelector('input[type="file"]');
+        if (fi && !fi._intercepted) {
+          fi._intercepted = true;
+          fileInputFound = true;
+          observer.disconnect();
+          MC.log('Gemini: file input appeared! Injecting file...');
+          // Prevent the OS file picker from opening
+          fi.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); }, { capture: true, once: true });
+          // Inject file
+          const dt2 = new DataTransfer();
+          dt2.items.add(file);
+          fi.files = dt2.files;
+          fi.dispatchEvent(new Event('change', { bubbles: true }));
+          fi.dispatchEvent(new Event('input', { bubbles: true }));
+          MC.log('Gemini: file injected into input!');
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+      // Click the + menu button
+      const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
+      if (!plusBtn) { MC.log('Gemini: ERROR - plus button not found'); observer.disconnect(); return; }
+      MC.click(plusBtn);
+      MC.log('Gemini: + menu clicked, waiting for menu...');
+      await MC.sleep(800);
+      
+      // Use keyboard to select first item (Upload files)
+      const activeEl = document.activeElement;
+      MC.log('Gemini: active element after menu:', activeEl?.tagName, activeEl?.textContent?.substring(0,20));
+      
+      // Try clicking the hidden upload button directly (it triggers file input creation)
       const hiddenBtn = document.querySelector('button[data-test-id="hidden-local-image-upload-button"]');
       if (hiddenBtn) {
-        MC.log('Gemini: found hidden image upload button, clicking...');
+        MC.log('Gemini: clicking hidden upload button...');
         hiddenBtn.click();
-        await MC.sleep(1500);
+      }
+      
+      // Wait for file input to be caught by observer
+      await MC.sleep(3000);
+      
+      if (!fileInputFound) {
+        MC.log('Gemini: file input not caught by observer, trying keyboard navigation...');
+        // Try keyboard: press down arrow then enter to select "Upload files"
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+        await MC.sleep(200);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        await MC.sleep(2000);
+      }
+      
+      if (!fileInputFound) {
+        MC.log('Gemini: WARNING - could not upload image via file input');
+        observer.disconnect();
       } else {
-        // Fallback: click the + menu then Upload files
-        MC.log('Gemini: no hidden button, using menu approach');
-        const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
-        if (!plusBtn) { MC.log('Gemini: ERROR - plus button not found'); return; }
-        MC.click(plusBtn);
-        await MC.sleep(1000);
-        // Find "Upload files" in the menu
-        const menuItems = document.querySelectorAll('[role="menuitem"], button, [mat-menu-item]');
-        let uploadItem = null;
-        for (const item of menuItems) {
-          if ((item.textContent || '').includes('Upload files') || (item.textContent || '').includes('Upload file')) {
-            uploadItem = item;
-            break;
-          }
-        }
-        if (uploadItem) { MC.click(uploadItem); await MC.sleep(1000); }
-        else { MC.log('Gemini: ERROR - Upload files menu item not found'); return; }
+        MC.log('Gemini: waiting for image to process...');
+        await MC.sleep(5000);
+        MC.log('Gemini: image upload complete');
       }
-
-      // Step 3: Try multiple upload methods
-      const editor = document.querySelector('.ql-editor.textarea');
-      if (!editor) { MC.log('Gemini: ERROR - editor not found'); return; }
-
-      // Method A: Clipboard paste (most reliable for Gemini)
-      MC.log('Gemini: trying clipboard paste method...');
-      editor.focus();
-      await MC.sleep(300);
-      try {
-        const clipItem = new ClipboardItem({ [file.type || 'image/png']: blob });
-        await navigator.clipboard.write([clipItem]);
-        MC.log('Gemini: image written to clipboard, pasting...');
-        document.execCommand('paste');
-        await MC.sleep(3000);
-      } catch (clipErr) {
-        MC.log('Gemini: clipboard API failed:', clipErr.message, '- trying paste event');
-      }
-
-      // Method B: Synthetic paste event with file data
-      const pasteData = new DataTransfer();
-      pasteData.items.add(file);
-      const pasteEvent = new ClipboardEvent('paste', {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: pasteData
-      });
-      editor.dispatchEvent(pasteEvent);
-      MC.log('Gemini: paste event dispatched');
-      await MC.sleep(5000);
-
-      // Verify upload
-      const uploaderArea = document.querySelector('[class*="uploader"], [class*="upload-chip"], [class*="file-chip"]');
-      const chipImgs = document.querySelectorAll('[class*="chip"] img, [class*="upload"] img, [class*="thumbnail"] img');
-      MC.log('Gemini: upload chips found:', chipImgs.length, 'uploader:', !!uploaderArea);
-      MC.log('Gemini: image upload attempt complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message, e.stack);
     }
