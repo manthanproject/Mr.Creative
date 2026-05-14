@@ -156,26 +156,56 @@ const GeminiBot = {
   },
 
   async _uploadImage(imageUrl, filename) {
-    const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
-    if (!plusBtn) return;
-    MC.click(plusBtn);
-    await MC.sleep(1000);
-    const uploadBtn = document.querySelector(GSEL.uploadFilesBtn);
-    if (!uploadBtn) return;
-    MC.click(uploadBtn);
-    await MC.sleep(1000);
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput) {
-      try {
-        const resp = await fetch(imageUrl);
-        const blob = await resp.blob();
-        const file = new File([blob], filename || 'product.jpg', { type: blob.type });
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        fileInput.files = dt.files;
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-        await MC.sleep(5000);
-      } catch (e) { MC.log('Gemini: upload failed:', e.message); }
+    MC.log('Gemini: _uploadImage called with', imageUrl);
+    try {
+      // Step 1: Fetch the image first
+      MC.log('Gemini: fetching image from URL...');
+      const resp = await fetch(imageUrl);
+      if (!resp.ok) throw new Error('Fetch failed: ' + resp.status);
+      const blob = await resp.blob();
+      MC.log('Gemini: image fetched, size:', blob.size, 'type:', blob.type);
+      const file = new File([blob], filename || 'product.jpg', { type: blob.type || 'image/jpeg' });
+
+      // Step 2: Try hidden upload button (bypasses menu entirely)
+      const hiddenBtn = document.querySelector('button[data-test-id="hidden-local-image-upload-button"]');
+      if (hiddenBtn) {
+        MC.log('Gemini: found hidden image upload button, clicking...');
+        hiddenBtn.click();
+        await MC.sleep(1500);
+      } else {
+        // Fallback: click the + menu then Upload files
+        MC.log('Gemini: no hidden button, using menu approach');
+        const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
+        if (!plusBtn) { MC.log('Gemini: ERROR - plus button not found'); return; }
+        MC.click(plusBtn);
+        await MC.sleep(1000);
+        // Find "Upload files" in the menu
+        const menuItems = document.querySelectorAll('[role="menuitem"], button, [mat-menu-item]');
+        let uploadItem = null;
+        for (const item of menuItems) {
+          if ((item.textContent || '').includes('Upload files') || (item.textContent || '').includes('Upload file')) {
+            uploadItem = item;
+            break;
+          }
+        }
+        if (uploadItem) { MC.click(uploadItem); await MC.sleep(1000); }
+        else { MC.log('Gemini: ERROR - Upload files menu item not found'); return; }
+      }
+
+      // Step 3: Find file input and inject file
+      const fileInput = document.querySelector('input[type="file"]');
+      if (!fileInput) { MC.log('Gemini: ERROR - file input not found'); return; }
+      MC.log('Gemini: injecting file into input...');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+      MC.log('Gemini: file injected, waiting for upload...');
+      await MC.sleep(5000);
+      MC.log('Gemini: image upload complete');
+    } catch (e) {
+      MC.log('Gemini: upload error:', e.message, e.stack);
     }
   },
 
