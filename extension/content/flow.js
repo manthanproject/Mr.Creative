@@ -576,24 +576,55 @@
     log(`Starting job ${job_id}: ${total} prompts`);
 
     try {
-      // Ensure we're on a project page
-      if (!isProjectPage()) {
-        if (isDashboard()) {
-          // Click "New project" on the dashboard
-          log('On dashboard — clicking New Project');
-          const np = await waitFor(() => findByText('New project', 'button,div,span,a'), 5000, 'New project');
-          await click(np);
-          await MC.sleep(3000);
-          await waitFor(isProjectPage, 10_000, 'project page after new project');
-        } else if (isEditPage()) {
-          // Go back to project
-          const back = findBackBtn();
-          if (back) { await click(back); await MC.sleep(2000); }
-        } else {
-          throw new Error('Not on a Flow page. URL: ' + location.href);
+      // ── Always create a NEW project ──
+      // Clicking "New project" or back button may reload the page (kills this script).
+      // We use _onFreshProject flag + chrome.storage.local to survive reloads.
+
+      if (!job._onFreshProject) {
+        // First run — need to navigate to a fresh project
+        job._onFreshProject = true;
+
+        if (isProjectPage() || isEditPage()) {
+          // Save job so it survives page reload, then navigate to dashboard
+          log('Saving job & navigating to Flow dashboard');
+          await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
+          location.href = 'https://labs.google/fx/tools/flow';
+          return; // script will reload → init() resumes with _onFreshProject = true
         }
       }
-      MC.sendStatus(job_id, 'running', 'On project page');
+
+      // If we're on the dashboard, click "New project"
+      if (isDashboard()) {
+        log('On dashboard — clicking New Project');
+        const np = await waitFor(
+          () => findByText('New project', 'button,div,span,a,h3,h4'),
+          8000, '"+ New project" button'
+        );
+
+        // Save job again in case "New project" click triggers reload
+        await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
+        await click(np);
+        await MC.sleep(4000);
+
+        // If still alive (SPA navigation), check if we landed on project page
+        if (isProjectPage()) {
+          chrome.storage.local.remove('pendingFlowJob');
+          log('New project created (SPA navigation)');
+        } else {
+          // Page reloaded → init() will resume the job
+          return;
+        }
+      }
+
+      // At this point we must be on a project page (new or resumed)
+      if (isProjectPage()) {
+        // Clear any leftover pending job
+        chrome.storage.local.remove('pendingFlowJob');
+        log('On fresh project page');
+        MC.sendStatus(job_id, 'running', 'New project created');
+      } else {
+        throw new Error('Expected project page but got: ' + location.href);
+      }
 
       // ── Step 1: Settings ──
       await setSettings(count || 1, aspect_ratio || '1:1');
