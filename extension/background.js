@@ -320,77 +320,7 @@ startPolling();
 setInterval(() => { registerWithServer(); }, 60000);
 console.log('[MC-BG] Mr.Creative background worker loaded');
 
-// ── Debugger-based file upload (trusted mouse click + file chooser) ──
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'DEBUGGER_UPLOAD' && sender.tab) {
-    (async () => {
-      const tabId = sender.tab.id;
-      const target = { tabId };
-      try {
-        // Attach debugger
-        await chrome.debugger.attach(target, '1.3');
-        console.log('[MC-BG] Debugger attached to tab', tabId);
-
-        // Enable file chooser interception
-        await chrome.debugger.sendCommand(target, 'Page.setInterceptFileChooserDialog', { enabled: true });
-
-        // Listen for file chooser event
-        const fileChooserPromise = new Promise((resolve) => {
-          const listener = (source, method, params) => {
-            if (source.tabId === tabId && method === 'Page.fileChooserOpened') {
-              chrome.debugger.onEvent.removeListener(listener);
-              resolve(params);
-            }
-          };
-          chrome.debugger.onEvent.addListener(listener);
-          // Timeout after 10s
-          setTimeout(() => { chrome.debugger.onEvent.removeListener(listener); resolve(null); }, 10000);
-        });
-
-        // Trusted mouse click at the Upload files button coordinates
-        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-          type: 'mousePressed', x: msg.x, y: msg.y, button: 'left', clickCount: 1
-        });
-        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-          type: 'mouseReleased', x: msg.x, y: msg.y, button: 'left', clickCount: 1
-        });
-        console.log('[MC-BG] Trusted click dispatched at', msg.x, msg.y);
-
-        // Wait for file chooser
-        const chooser = await fileChooserPromise;
-        if (chooser) {
-          console.log('[MC-BG] File chooser opened, injecting file');
-          await chrome.debugger.sendCommand(target, 'DOM.setFileInputFiles', {
-            files: [],  // Clear first
-            backendNodeId: chooser.backendNodeId
-          });
-          // Alternative: use Page.handleFileChooser for newer Chrome
-          try {
-            await chrome.debugger.sendCommand(target, 'Page.handleFileChooser', {
-              action: 'accept',
-              files: [msg.fileName]
-            });
-          } catch(e) {
-            console.log('[MC-BG] handleFileChooser fallback needed');
-          }
-        } else {
-          console.log('[MC-BG] File chooser did not open');
-        }
-
-        // Detach debugger
-        await chrome.debugger.detach(target);
-        sendResponse({ success: true, chooserOpened: !!chooser });
-      } catch (e) {
-        console.error('[MC-BG] Debugger upload error:', e.message);
-        try { await chrome.debugger.detach(target); } catch(_) {}
-        sendResponse({ success: false, error: e.message });
-      }
-    })();
-    return true; // async response
-  }
-});
-
-// Override showOpenFilePicker in page MAIN world (bypasses CSP)
+// ══ OVERRIDE showOpenFilePicker in page MAIN world (bypasses CSP) ══
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'OVERRIDE_PICKER' && sender.tab) {
     chrome.scripting.executeScript({
@@ -400,13 +330,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const origPicker = window.showOpenFilePicker;
         window.showOpenFilePicker = async function() {
           window.showOpenFilePicker = origPicker;
-          console.log('[Mr.Creative] Intercepted showOpenFilePicker!');
+          console.log('[Mr.Creative] showOpenFilePicker intercepted! Returning', fileName);
           const binary = atob(b64);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          const blob = new Blob([bytes], { type: mimeType });
-          const file = new File([blob], fileName, { type: mimeType });
-          console.log('[Mr.Creative] Returning file:', fileName, file.size, 'bytes');
+          const file = new File([bytes], fileName, { type: mimeType });
+          console.log('[Mr.Creative] File created:', file.name, file.size, 'bytes');
           return [{ kind: 'file', name: fileName, getFile: async () => file }];
         };
         console.log('[Mr.Creative] showOpenFilePicker override ready');
@@ -414,6 +343,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       args: [msg.base64, msg.fileName, msg.mimeType]
     }).then(() => sendResponse({ ok: true }))
       .catch(e => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+});
+
+// ══ TRUSTED CLICK via chrome.debugger (provides user activation) ══
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'TRUSTED_CLICK' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        await chrome.debugger.attach(target, '1.3');
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mousePressed', x: msg.x, y: msg.y, button: 'left', clickCount: 1
+        });
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mouseReleased', x: msg.x, y: msg.y, button: 'left', clickCount: 1
+        });
+        console.log('[MC-BG] Trusted click dispatched at', msg.x, msg.y);
+        // Detach after a delay so the click event propagates
+        setTimeout(async () => {
+          try { await chrome.debugger.detach(target); } catch(_) {}
+        }, 3000);
+        sendResponse({ ok: true });
+      } catch (e) {
+        console.error('[MC-BG] Trusted click error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
     return true;
   }
 });

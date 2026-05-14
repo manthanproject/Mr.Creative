@@ -188,6 +188,7 @@ const GeminiBot = {
   async _uploadImage(imageUrl, filename) {
     MC.log('Gemini: uploading image:', imageUrl);
     try {
+      // 1. Fetch image and convert to base64
       const resp = await fetch(imageUrl);
       const blob = await resp.blob();
       const base64 = await new Promise(r => {
@@ -195,33 +196,46 @@ const GeminiBot = {
         fr.onload = () => r(fr.result.split(',')[1]);
         fr.readAsDataURL(blob);
       });
-      MC.log('Gemini: fetched', blob.size, 'bytes, base64 len:', base64.length);
+      const fname = filename || 'product.jpg';
+      const mimeType = blob.type || 'image/jpeg';
+      MC.log('Gemini: image ready,', blob.size, 'bytes');
 
+      // 2. Install showOpenFilePicker override in PAGE context (via background)
       await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: 'OVERRIDE_PICKER',
           base64: base64,
-          fileName: filename || 'product.jpg',
-          mimeType: blob.type || 'image/jpeg'
-        }, resp => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else resolve(resp);
-        });
+          fileName: fname,
+          mimeType: mimeType
+        }, r => chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r));
       });
       MC.log('Gemini: picker override installed');
-      await MC.sleep(300);
 
+      // 3. Open the + menu (synthetic click is fine here)
       const plusBtn = document.querySelector('button[aria-label="Open upload file menu"]');
       if (!plusBtn) throw new Error('+ button not found');
       plusBtn.click();
       await MC.sleep(1000);
 
+      // 4. Get Upload files button coordinates for trusted click
       const uploadBtn = document.querySelector('button[data-test-id="local-images-files-uploader-button"]');
       if (!uploadBtn) throw new Error('Upload files button not found');
-      MC.log('Gemini: clicking Upload files...');
-      uploadBtn.click();
-      await MC.sleep(5000);
+      const rect = uploadBtn.getBoundingClientRect();
+      const x = Math.round(rect.left + rect.width / 2);
+      const y = Math.round(rect.top + rect.height / 2);
+      MC.log('Gemini: trusted click on Upload files at', x, y);
 
+      // 5. Debugger trusted click (provides real user activation)
+      await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'TRUSTED_CLICK',
+          x: x,
+          y: y
+        }, r => chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r));
+      });
+
+      // 6. Wait for Gemini to process the uploaded image
+      await MC.sleep(5000);
       MC.log('Gemini: image upload complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);
