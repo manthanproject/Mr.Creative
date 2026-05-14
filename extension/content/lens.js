@@ -98,9 +98,9 @@ async function phase1_upload(job) {
   }, r));
   log('Job state saved to storage');
 
-  // Get button coordinates for trusted click
-  const rect = uploadBtn.getBoundingClientRect();
-  log('Upload button rect:', rect.x, rect.y, rect.width, rect.height);
+  // Get drop zone coordinates for trusted drag-and-drop
+  const rect = dropZone.getBoundingClientRect();
+  log('Drop zone rect:', rect.x, rect.y, rect.width, rect.height);
 
   // Send to background.js for debugger-based file upload
   await MC.sendStatus(job_id, 'entering_prompt', 'Uploading image to Google Lens...');

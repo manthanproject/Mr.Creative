@@ -380,46 +380,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await chrome.debugger.attach(target, '1.3');
         console.log('[MC-BG] Debugger attached');
 
-        // 3. Enable Page domain and intercept file chooser
-        await chrome.debugger.sendCommand(target, 'Page.enable');
-        await chrome.debugger.sendCommand(target, 'Page.setInterceptFileChooserDialog', { enabled: true });
-        console.log('[MC-BG] File chooser interception enabled');
+        // 3. Trusted drag-and-drop onto the drop zone
+        const dragData = {
+          items: [{ mimeType: msg.mimeType || 'image/jpeg', data: '' }],
+          files: [filePath],
+          dragOperationsMask: 1
+        };
+        const x = msg.buttonX;
+        const y = msg.buttonY;
 
-        // 4. Set up listener for file chooser opened
-        const fileChooserPromise = new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            chrome.debugger.onEvent.removeListener(handler);
-            reject(new Error('File chooser never opened'));
-          }, 10000);
-          function handler(source, method, params) {
-            if (source.tabId === tabId && method === 'Page.fileChooserOpened') {
-              chrome.debugger.onEvent.removeListener(handler);
-              clearTimeout(timeout);
-              resolve(params);
-            }
-          }
-          chrome.debugger.onEvent.addListener(handler);
+        await chrome.debugger.sendCommand(target, 'Input.dispatchDragEvent', {
+          type: 'dragEnter', x, y, data: dragData, modifiers: 0
         });
-
-        // 5. Trusted click on the upload button
-        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-          type: 'mousePressed', x: msg.buttonX, y: msg.buttonY,
-          button: 'left', clickCount: 1
+        await new Promise(r => setTimeout(r, 200));
+        await chrome.debugger.sendCommand(target, 'Input.dispatchDragEvent', {
+          type: 'dragOver', x, y, data: dragData, modifiers: 0
         });
-        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-          type: 'mouseReleased', x: msg.buttonX, y: msg.buttonY,
-          button: 'left', clickCount: 1
+        await new Promise(r => setTimeout(r, 200));
+        await chrome.debugger.sendCommand(target, 'Input.dispatchDragEvent', {
+          type: 'drop', x, y, data: dragData, modifiers: 0
         });
-        console.log('[MC-BG] Trusted click dispatched at', msg.buttonX, msg.buttonY);
-
-        // 6. Wait for file chooser to open, then provide our file
-        await fileChooserPromise;
-        console.log('[MC-BG] File chooser opened — providing file:', filePath);
-        await chrome.debugger.sendCommand(target, 'Page.handleFileChooser', {
-          action: 'accept',
-          files: [filePath]
-        });
-        console.log('[MC-BG] File chooser handled successfully');
+        console.log('[MC-BG] Trusted drag-and-drop dispatched with file:', filePath);
 
         // 7. Detach debugger after a delay
         setTimeout(async () => {
