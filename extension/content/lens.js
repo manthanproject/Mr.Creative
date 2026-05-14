@@ -308,7 +308,7 @@ async function waitForResponse(job_id, timeout = 180000) {
 
 function extractResponse() {
   // Try to get code block content first (the ===PROMPT=== formatted response)
-  const codeBlocks = document.querySelectorAll('code, pre, .code-container');
+  const codeBlocks = document.querySelectorAll('div.pCTyYe code, div.pCTyYe pre, code, pre, .code-container');
   for (const block of codeBlocks) {
     const text = block.textContent.trim();
     if (text.length > 100 && text.includes('===PROMPT===')) {
