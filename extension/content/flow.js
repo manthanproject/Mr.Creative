@@ -118,71 +118,63 @@
   const isEditPage    = () => /\/flow\/project\/[^/]+\/edit\//.test(location.pathname);
   const isDashboard   = () => /\/flow\/?$/.test(location.pathname) && !location.pathname.includes('/project/');
 
-  // ── ELEMENT FINDERS (try multiple strategies) ────────────────────────────
+  // ── ELEMENT FINDERS (exact selectors from Flow's DOM) ──────────────────
 
   function findPromptBar() {
+    // Slate.js editor — the main prompt input
     return $([
-      'textarea[placeholder*="want to create"]',
-      'textarea[placeholder*="want to change"]',
-      'input[placeholder*="want to create"]',
-      'input[placeholder*="want to change"]',
-      'div[contenteditable="true"][data-placeholder]',
-      '[role="textbox"]',
-      'div[contenteditable="true"]',
+      'div[data-slate-editor="true"]',
+      '[role="textbox"][contenteditable="true"]',
     ]);
   }
 
   function findSubmitBtn() {
-    // The circular arrow button at the far right of the prompt bar
+    // The arrow_forward/Create button — rightmost in bottom bar
+    // Class: sc-e5032833-5   Text includes: "Create"
     return $([
-      'button[aria-label*="Create" i]',
-      'button[aria-label*="Submit" i]',
-      'button[aria-label*="Send" i]',
-      'button[aria-label*="Generate" i]',
-      'button[type="submit"]',
+      'button.sc-e5032833-5',
+      'button.ghPNWI',
     ]) || (() => {
-      // Fallback: last button inside the bottom bar that contains the prompt
-      const bar = findPromptBar()?.closest('form, [class*="bar"], [class*="prompt"], [class*="input"], [class*="composer"]');
-      if (!bar) return null;
-      const btns = bar.querySelectorAll('button');
-      // The submit is the rightmost / last button
-      for (let i = btns.length - 1; i >= 0; i--) {
-        // Skip the + button (has "add" or tiny size)
-        const lbl = (btns[i].getAttribute('aria-label') || btns[i].textContent || '').toLowerCase();
-        if (lbl.includes('add') || lbl === '+') continue;
-        return btns[i];
+      // Fallback: find button whose text includes "Create" in the bottom bar
+      const btns = $$('button');
+      for (const b of btns) {
+        const t = b.textContent.trim();
+        if (t.includes('Create') && t.includes('arrow_forward')) return b;
       }
       return null;
     })();
   }
 
   function findPlusBtn() {
-    // The + button left of the prompt bar
+    // The + / reference image button — has aria-haspopup="dialog"
+    // Class: sc-3bb56e4a-0   Text includes: "add_2"
     return $([
-      'button[aria-label*="Add" i]',
-      'button[aria-label*="reference" i]',
-      'button[aria-label*="attach" i]',
-      'button[aria-label*="upload" i]',
+      'button[aria-haspopup="dialog"].sc-3bb56e4a-0',
+      'button.cRBTkw',
     ]) || (() => {
-      const bar = findPromptBar()?.closest('form, [class*="bar"], [class*="prompt"], [class*="input"], [class*="composer"]');
-      if (!bar) return null;
-      const btns = bar.querySelectorAll('button');
+      // Fallback: button with aria-haspopup="dialog" near bottom of page
+      const btns = document.querySelectorAll('button[aria-haspopup="dialog"]');
       for (const b of btns) {
-        const t = b.textContent.trim();
-        if (t === '+' || t === '\uFF0B') return b;          // + or fullwidth +
-        if (b.querySelector('svg') && b === btns[0]) return b; // first icon button
+        if (b.getBoundingClientRect().bottom > window.innerHeight - 200) return b;
       }
       return null;
     })();
   }
 
   function findSettingsArea() {
-    // Click on "Nano Banana" / count area to open the settings popup
-    return findByText('Nano Banana')
-        || findByText('x4')
-        || findByText('x3')
-        || findByText('x2')
-        || findByText('1x');
+    // The model/settings trigger — has aria-haspopup="menu" in bottom bar
+    // Class: sc-67b77035-1   Text includes: "Nano Banana"
+    return $([
+      'button[aria-haspopup="menu"].sc-67b77035-1',
+      'button.bgiflq',
+    ]) || (() => {
+      // Fallback: button with aria-haspopup="menu" near bottom that contains "Banana"
+      const btns = document.querySelectorAll('button[aria-haspopup="menu"]');
+      for (const b of btns) {
+        if (b.textContent.includes('Banana') || b.textContent.includes('Nano')) return b;
+      }
+      return null;
+    })();
   }
 
   function findDownloadBtn() {
@@ -233,14 +225,17 @@
     // --- Count ---
     const countLabel = count === 1 ? '1x' : `x${count}`;
     const countBtn = await waitFor(() => {
-      // In the popup, find buttons labelled 1x / x2 / x3 / x4
-      const btns = $$('button');
+      // Count buttons use Radix tabs with class flow_tab_slider_trigger
+      const btns = document.querySelectorAll('button.flow_tab_slider_trigger, button[role="tab"]');
       for (const b of btns) {
-        const t = b.textContent.trim();
-        if (t === countLabel) return b;
+        if (b.textContent.trim() === countLabel) return b;
+      }
+      // Fallback: any button with exact count text
+      for (const b of document.querySelectorAll('button')) {
+        if (b.textContent.trim() === countLabel) return b;
       }
       return null;
-    }, 5000, `count button "${countLabel}"`);
+    }, 8000, `count button "${countLabel}"`);
     await click(countBtn);
     log(`Count set to ${countLabel}`);
     await MC.sleep(300);
