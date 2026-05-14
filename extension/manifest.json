@@ -10,7 +10,9 @@
     "downloads",
     "scripting",
     "alarms",
-    "debugger"
+    "debugger",
+    "clipboardWrite",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://labs.google.com/pomelli/*",

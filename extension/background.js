@@ -366,3 +366,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+// ══ TRUSTED PASTE via chrome.debugger (Ctrl+V with user activation) ══
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'TRUSTED_PASTE' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        await chrome.debugger.attach(target, '1.3');
+        // Ctrl+V keydown
+        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          modifiers: 2,
+          key: 'v',
+          code: 'KeyV',
+          windowsVirtualKeyCode: 86,
+          nativeVirtualKeyCode: 86
+        });
+        // Ctrl+V keyup
+        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          modifiers: 2,
+          key: 'v',
+          code: 'KeyV',
+          windowsVirtualKeyCode: 86,
+          nativeVirtualKeyCode: 86
+        });
+        console.log('[MC-BG] Trusted Ctrl+V dispatched');
+        setTimeout(async () => {
+          try { await chrome.debugger.detach(target); } catch(_) {}
+        }, 3000);
+        sendResponse({ ok: true });
+      } catch (e) {
+        console.error('[MC-BG] Trusted paste error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
+});

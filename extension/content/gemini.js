@@ -186,56 +186,54 @@ const GeminiBot = {
   },
 
   async _uploadImage(imageUrl, filename) {
-    MC.log('Gemini: uploading image:', imageUrl);
+    MC.log('Gemini: uploading image via clipboard paste:', imageUrl);
     try {
-      // 1. Fetch image and convert to base64
+      // 1. Fetch image
       const resp = await fetch(imageUrl);
       const blob = await resp.blob();
-      const base64 = await new Promise(r => {
-        const fr = new FileReader();
-        fr.onload = () => r(fr.result.split(',')[1]);
-        fr.readAsDataURL(blob);
-      });
-      const fname = filename || 'product.jpg';
-      const mimeType = blob.type || 'image/jpeg';
-      MC.log('Gemini: image ready,', blob.size, 'bytes');
+      MC.log('Gemini: fetched', blob.size, 'bytes, type:', blob.type);
 
-      // 2. Install showOpenFilePicker override in PAGE context (via background)
+      // 2. Write image to clipboard
+      const clipType = blob.type === 'image/png' ? 'image/png' : 'image/png';
+      let pngBlob = blob;
+      if (blob.type !== 'image/png') {
+        // Convert to PNG (clipboard requires PNG)
+        const bmp = await createImageBitmap(blob);
+        const canvas = new OffscreenCanvas(bmp.width, bmp.height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bmp, 0, 0);
+        pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+        MC.log('Gemini: converted to PNG,', pngBlob.size, 'bytes');
+      }
+      const clipItem = new ClipboardItem({ 'image/png': pngBlob });
+      await navigator.clipboard.write([clipItem]);
+      MC.log('Gemini: image written to clipboard');
+
+      // 3. Focus the prompt area
+      const editor = document.querySelector('div.ql-editor.textarea');
+      if (editor) {
+        editor.focus();
+        await MC.sleep(300);
+      }
+
+      // 4. Ask background for trusted Ctrl+V via debugger
       await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({
-          type: 'OVERRIDE_PICKER',
-          base64: base64,
-          fileName: fname,
-          mimeType: mimeType
-        }, r => chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r));
+        chrome.runtime.sendMessage({ type: 'TRUSTED_PASTE' }, r => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
       });
-      MC.log('Gemini: picker override installed');
+      MC.log('Gemini: paste dispatched, waiting for image to appear...');
 
-      // 3. Open the + menu (synthetic click is fine here)
-      const plusBtn = document.querySelector('button[aria-label="Open upload file menu"]');
-      if (!plusBtn) throw new Error('+ button not found');
-      plusBtn.click();
-      await MC.sleep(1000);
-
-      // 4. Get Upload files button coordinates for trusted click
-      const uploadBtn = document.querySelector('button[data-test-id="local-images-files-uploader-button"]');
-      if (!uploadBtn) throw new Error('Upload files button not found');
-      const rect = uploadBtn.getBoundingClientRect();
-      const x = Math.round(rect.left + rect.width / 2);
-      const y = Math.round(rect.top + rect.height / 2);
-      MC.log('Gemini: trusted click on Upload files at', x, y);
-
-      // 5. Debugger trusted click (provides real user activation)
-      await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({
-          type: 'TRUSTED_CLICK',
-          x: x,
-          y: y
-        }, r => chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r));
-      });
-
-      // 6. Wait for Gemini to process the uploaded image
-      await MC.sleep(5000);
+      // 5. Wait for image thumbnail to appear in prompt area
+      for (let i = 0; i < 20; i++) {
+        await MC.sleep(500);
+        const thumb = document.querySelector('.file-thumbnail, .upload-chip, img[data-test-id], .image-chip, [data-image-upload]');
+        if (thumb) {
+          MC.log('Gemini: image thumbnail detected!');
+          break;
+        }
+      }
       MC.log('Gemini: image upload complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);
