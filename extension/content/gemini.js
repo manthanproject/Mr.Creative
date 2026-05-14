@@ -186,43 +186,49 @@ const GeminiBot = {
   },
 
   async _uploadImage(imageUrl, filename) {
-    MC.log('Gemini: uploading image:', imageUrl);
+    MC.log('Gemini: uploading image via debugger click:', imageUrl);
     try {
+      // 1. Fetch the image
       const resp = await fetch(imageUrl);
       const blob = await resp.blob();
-      const file = new File([blob], filename || 'product.jpg', { type: blob.type || 'image/jpeg' });
-      MC.log('Gemini: fetched', blob.size, 'bytes');
+      const base64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
+      MC.log('Gemini: image fetched, size:', blob.size);
 
-      // 1. Click + menu
+      // 2. Click + menu button using real coordinates via debugger
       const plusBtn = document.querySelector('button[aria-label="Open upload file menu"]');
       if (!plusBtn) throw new Error('+ button not found');
       plusBtn.click();
       await MC.sleep(1000);
 
-      // 2. Click "Upload files" — exact selector from DOM inspection
+      // 3. Find "Upload files" button and get its coordinates
       const uploadBtn = document.querySelector('button[data-test-id="local-images-files-uploader-button"]');
       if (!uploadBtn) throw new Error('Upload files button not found');
-      MC.log('Gemini: clicking Upload files...');
-      uploadBtn.click();
-      await MC.sleep(1500);
+      const rect = uploadBtn.getBoundingClientRect();
+      const x = Math.round(rect.left + rect.width / 2);
+      const y = Math.round(rect.top + rect.height / 2);
+      MC.log('Gemini: Upload files button at', x, y);
 
-      // 3. Find file input and inject
-      const fi = document.querySelector('input[type="file"]');
-      if (fi) {
-        MC.log('Gemini: file input found, injecting...');
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        fi.files = dt.files;
-        fi.dispatchEvent(new Event('change', { bubbles: true }));
-        await MC.sleep(5000);
-        MC.log('Gemini: image upload complete');
-      } else {
-        MC.log('Gemini: no file input after clicking Upload files');
-      }
+      // 4. Ask background.js to do trusted click + file chooser interception
+      const result = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'DEBUGGER_UPLOAD',
+          x: x,
+          y: y,
+          fileData: base64,
+          fileName: filename || 'product.jpg',
+          mimeType: blob.type || 'image/jpeg'
+        }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(resp);
+        });
+      });
+      MC.log('Gemini: debugger upload result:', JSON.stringify(result));
+      await MC.sleep(5000);
+      MC.log('Gemini: image upload complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);
     }
-  },
+  },,
 
   async _waitForResponse(timeout = 120000) {
     await MC.sleep(3000);

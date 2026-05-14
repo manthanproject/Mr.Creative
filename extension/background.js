@@ -319,3 +319,73 @@ startPolling();
 // Re-register every 60s to survive server restarts
 setInterval(() => { registerWithServer(); }, 60000);
 console.log('[MC-BG] Mr.Creative background worker loaded');
+
+// ── Debugger-based file upload (trusted mouse click + file chooser) ──
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'DEBUGGER_UPLOAD' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        // Attach debugger
+        await chrome.debugger.attach(target, '1.3');
+        console.log('[MC-BG] Debugger attached to tab', tabId);
+
+        // Enable file chooser interception
+        await chrome.debugger.sendCommand(target, 'Page.setInterceptFileChooserDialog', { enabled: true });
+
+        // Listen for file chooser event
+        const fileChooserPromise = new Promise((resolve) => {
+          const listener = (source, method, params) => {
+            if (source.tabId === tabId && method === 'Page.fileChooserOpened') {
+              chrome.debugger.onEvent.removeListener(listener);
+              resolve(params);
+            }
+          };
+          chrome.debugger.onEvent.addListener(listener);
+          // Timeout after 10s
+          setTimeout(() => { chrome.debugger.onEvent.removeListener(listener); resolve(null); }, 10000);
+        });
+
+        // Trusted mouse click at the Upload files button coordinates
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mousePressed', x: msg.x, y: msg.y, button: 'left', clickCount: 1
+        });
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mouseReleased', x: msg.x, y: msg.y, button: 'left', clickCount: 1
+        });
+        console.log('[MC-BG] Trusted click dispatched at', msg.x, msg.y);
+
+        // Wait for file chooser
+        const chooser = await fileChooserPromise;
+        if (chooser) {
+          console.log('[MC-BG] File chooser opened, injecting file');
+          await chrome.debugger.sendCommand(target, 'DOM.setFileInputFiles', {
+            files: [],  // Clear first
+            backendNodeId: chooser.backendNodeId
+          });
+          // Alternative: use Page.handleFileChooser for newer Chrome
+          try {
+            await chrome.debugger.sendCommand(target, 'Page.handleFileChooser', {
+              action: 'accept',
+              files: [msg.fileName]
+            });
+          } catch(e) {
+            console.log('[MC-BG] handleFileChooser fallback needed');
+          }
+        } else {
+          console.log('[MC-BG] File chooser did not open');
+        }
+
+        // Detach debugger
+        await chrome.debugger.detach(target);
+        sendResponse({ success: true, chooserOpened: !!chooser });
+      } catch (e) {
+        console.error('[MC-BG] Debugger upload error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ success: false, error: e.message });
+      }
+    })();
+    return true; // async response
+  }
+});
