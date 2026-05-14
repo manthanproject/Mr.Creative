@@ -407,3 +407,72 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+// ══ CLIPBOARD PASTE: focus tab → write image to clipboard → Ctrl+V ══
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'CLIPBOARD_PASTE' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        // 1. Focus the tab (required for clipboard API)
+        await chrome.tabs.update(tabId, { active: true });
+        await new Promise(r => setTimeout(r, 500));
+        console.log('[MC-BG] Tab focused');
+
+        // 2. Write image to clipboard in MAIN world
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: async (b64, mimeType) => {
+            // Convert base64 to PNG blob (clipboard requires PNG)
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const origBlob = new Blob([bytes], { type: mimeType });
+
+            // Convert to PNG
+            const bmp = await createImageBitmap(origBlob);
+            const canvas = new OffscreenCanvas(bmp.width, bmp.height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bmp, 0, 0);
+            const pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+
+            // Focus the editor first
+            const editor = document.querySelector('div.ql-editor.textarea');
+            if (editor) editor.focus();
+
+            // Write to clipboard
+            const item = new ClipboardItem({ 'image/png': pngBlob });
+            await navigator.clipboard.write([item]);
+            console.log('[Mr.Creative] Image written to clipboard:', pngBlob.size, 'bytes');
+          },
+          args: [msg.base64, msg.mimeType]
+        });
+        console.log('[MC-BG] Clipboard write done');
+
+        // 3. Small delay then Ctrl+V via debugger
+        await new Promise(r => setTimeout(r, 300));
+        await chrome.debugger.attach(target, '1.3');
+        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+          type: 'keyDown', modifiers: 2, key: 'v', code: 'KeyV',
+          windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
+        });
+        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+          type: 'keyUp', modifiers: 2, key: 'v', code: 'KeyV',
+          windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
+        });
+        console.log('[MC-BG] Ctrl+V dispatched');
+        setTimeout(async () => {
+          try { await chrome.debugger.detach(target); } catch(_) {}
+        }, 3000);
+        sendResponse({ ok: true });
+      } catch (e) {
+        console.error('[MC-BG] Clipboard paste error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
+});

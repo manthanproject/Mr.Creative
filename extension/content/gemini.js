@@ -186,53 +186,32 @@ const GeminiBot = {
   },
 
   async _uploadImage(imageUrl, filename) {
-    MC.log('Gemini: uploading image via clipboard paste:', imageUrl);
+    MC.log('Gemini: uploading image via clipboard paste');
     try {
-      // 1. Fetch image
       const resp = await fetch(imageUrl);
       const blob = await resp.blob();
-      MC.log('Gemini: fetched', blob.size, 'bytes, type:', blob.type);
-
-      // 2. Write image to clipboard
-      const clipType = blob.type === 'image/png' ? 'image/png' : 'image/png';
-      let pngBlob = blob;
-      if (blob.type !== 'image/png') {
-        // Convert to PNG (clipboard requires PNG)
-        const bmp = await createImageBitmap(blob);
-        const canvas = new OffscreenCanvas(bmp.width, bmp.height);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(bmp, 0, 0);
-        pngBlob = await canvas.convertToBlob({ type: 'image/png' });
-        MC.log('Gemini: converted to PNG,', pngBlob.size, 'bytes');
-      }
-      const clipItem = new ClipboardItem({ 'image/png': pngBlob });
-      await navigator.clipboard.write([clipItem]);
-      MC.log('Gemini: image written to clipboard');
-
-      // 3. Focus the prompt area
-      const editor = document.querySelector('div.ql-editor.textarea');
-      if (editor) {
-        editor.focus();
-        await MC.sleep(300);
-      }
-
-      // 4. Ask background for trusted Ctrl+V via debugger
-      await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'TRUSTED_PASTE' }, r => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else resolve(r);
-        });
+      const base64 = await new Promise(r => {
+        const fr = new FileReader();
+        fr.onload = () => r(fr.result.split(',')[1]);
+        fr.readAsDataURL(blob);
       });
-      MC.log('Gemini: paste dispatched, waiting for image to appear...');
+      MC.log('Gemini: image ready,', blob.size, 'bytes');
 
-      // 5. Wait for image thumbnail to appear in prompt area
+      // Background handles: focus tab → write clipboard → Ctrl+V
+      const result = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'CLIPBOARD_PASTE',
+          base64: base64,
+          mimeType: blob.type || 'image/jpeg'
+        }, r => chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r));
+      });
+      MC.log('Gemini: clipboard paste result:', JSON.stringify(result));
+
+      // Wait for image to appear
       for (let i = 0; i < 20; i++) {
         await MC.sleep(500);
-        const thumb = document.querySelector('.file-thumbnail, .upload-chip, img[data-test-id], .image-chip, [data-image-upload]');
-        if (thumb) {
-          MC.log('Gemini: image thumbnail detected!');
-          break;
-        }
+        const chips = document.querySelectorAll('.image-chip, .upload-chip, [data-test-id*="image"], .content-image-chip');
+        if (chips.length > 0) { MC.log('Gemini: image chip detected!'); break; }
       }
       MC.log('Gemini: image upload complete');
     } catch (e) {
