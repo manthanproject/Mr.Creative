@@ -156,62 +156,43 @@ const GeminiBot = {
   },
 
   async _uploadImage(imageUrl, filename) {
-    MC.log('Gemini: _uploadImage called with', imageUrl);
+    MC.log('Gemini: uploading image:', imageUrl);
     try {
-      // Fetch the image
-      MC.log('Gemini: fetching image...');
       const resp = await fetch(imageUrl);
-      if (!resp.ok) throw new Error('Fetch failed: ' + resp.status);
       const blob = await resp.blob();
       const file = new File([blob], filename || 'product.jpg', { type: blob.type || 'image/jpeg' });
-      MC.log('Gemini: image fetched, size:', blob.size);
+      MC.log('Gemini: fetched', blob.size, 'bytes');
 
-      // Focus the editor
-      const editor = document.querySelector('.ql-editor.textarea');
-      if (!editor) throw new Error('Editor not found');
-      editor.focus();
-      await MC.sleep(300);
+      // 1. Click + menu
+      const plusBtn = document.querySelector('button[aria-label="Open upload file menu"]');
+      if (!plusBtn) throw new Error('+ button not found');
+      plusBtn.click();
+      await MC.sleep(1000);
 
-      // Fire paste event with the image — Quill handles this natively
-      MC.log('Gemini: pasting image into editor...');
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      const pasteEvt = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
-      editor.dispatchEvent(pasteEvt);
-      await MC.sleep(3000);
-      
-      // Check if image appeared
-      const hasImg = editor.querySelector('img') || document.querySelector('[class*="upload-chip"] img, [class*="file-chip"] img, .input-area img');
-      MC.log('Gemini: image in editor after paste:', !!hasImg);
-      
-      if (!hasImg) {
-        // Fallback: click + menu, navigate to Upload files, click it
-        MC.log('Gemini: paste didnt work, trying menu approach...');
-        const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
-        if (plusBtn) {
-          MC.click(plusBtn);
-          await MC.sleep(800);
-          // The active element should be the menu list
-          const menuList = document.activeElement;
-          if (menuList) {
-            // Find first button/item in the list
-            const firstItem = menuList.querySelector('button, [role="listitem"], [role="option"], mat-list-item');
-            if (firstItem) {
-              MC.log('Gemini: clicking first menu item:', firstItem.textContent.trim().substring(0,20));
-              firstItem.click();
-              await MC.sleep(2000);
-            }
-          }
-        }
-      }
-      
-      await MC.sleep(2000);
-      MC.log('Gemini: image upload complete');
+      // 2. Click "Upload files" — exact selector from DOM inspection
+      const uploadBtn = document.querySelector('button[data-test-id="local-images-files-uploader-button"]');
+      if (!uploadBtn) throw new Error('Upload files button not found');
+      MC.log('Gemini: clicking Upload files...');
+      uploadBtn.click();
+      await MC.sleep(1500);
+
+      // 3. Find file input and inject
+      const fi = document.querySelector('input[type="file"]');
+      if (fi) {
+        MC.log('Gemini: file input found, injecting...');
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fi.files = dt.files;
+        fi.dispatchEvent(new Event('change', { bubbles: true }));
+        await MC.sleep(5000);
+        MC.log('Gemini: image upload complete');
+      } else {
+        MC.log('Gemini: no file input after clicking Upload files');
       }
     } catch (e) {
-      MC.log('Gemini: upload error:', e.message, e.stack);
+      MC.log('Gemini: upload error:', e.message);
     }
-  },
+  },,
 
   async _waitForResponse(timeout = 120000) {
     await MC.sleep(3000);
