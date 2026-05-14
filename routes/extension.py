@@ -58,9 +58,14 @@ def get_command():
             _state['profiles'][profile_id]['last_seen'] = datetime.now().isoformat()
 
         # Check for targeted command first
-        cmd = _state['pending_commands'].pop(profile_id, None)
+        cmd = _state['pending_commands'].get(profile_id)
         if cmd:
-            return jsonify(cmd)
+            # Lens jobs are handled by the direct poller (pending-for-tab), not background.js
+            if cmd.get('job_type') == 'lens':
+                pass  # Don't consume — leave for pending-for-tab
+            else:
+                _state['pending_commands'].pop(profile_id, None)
+                return jsonify(cmd)
 
         # Check for any-profile command
         if _state['pending_any']:
