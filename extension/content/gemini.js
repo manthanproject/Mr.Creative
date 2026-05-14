@@ -190,13 +190,17 @@ const GeminiBot = {
     try {
       const resp = await fetch(imageUrl);
       const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      MC.log('Gemini: fetched', blob.size, 'bytes');
+      const base64 = await new Promise(r => {
+        const fr = new FileReader();
+        fr.onload = () => r(fr.result.split(',')[1]);
+        fr.readAsDataURL(blob);
+      });
+      MC.log('Gemini: fetched', blob.size, 'bytes, base64 len:', base64.length);
 
       await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: 'OVERRIDE_PICKER',
-          blobUrl: blobUrl,
+          base64: base64,
           fileName: filename || 'product.jpg',
           mimeType: blob.type || 'image/jpeg'
         }, resp => {
@@ -218,7 +222,6 @@ const GeminiBot = {
       uploadBtn.click();
       await MC.sleep(5000);
 
-      URL.revokeObjectURL(blobUrl);
       MC.log('Gemini: image upload complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);

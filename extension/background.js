@@ -396,19 +396,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.scripting.executeScript({
       target: { tabId: sender.tab.id },
       world: 'MAIN',
-      func: (blobUrl, fileName, mimeType) => {
+      func: (b64, fileName, mimeType) => {
         const origPicker = window.showOpenFilePicker;
         window.showOpenFilePicker = async function() {
           window.showOpenFilePicker = origPicker;
           console.log('[Mr.Creative] Intercepted showOpenFilePicker!');
-          const resp = await fetch(blobUrl);
-          const blob = await resp.blob();
+          const binary = atob(b64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: mimeType });
           const file = new File([blob], fileName, { type: mimeType });
+          console.log('[Mr.Creative] Returning file:', fileName, file.size, 'bytes');
           return [{ kind: 'file', name: fileName, getFile: async () => file }];
         };
-        console.log('[Mr.Creative] showOpenFilePicker override installed');
+        console.log('[Mr.Creative] showOpenFilePicker override ready');
       },
-      args: [msg.blobUrl, msg.fileName, msg.mimeType]
+      args: [msg.base64, msg.fileName, msg.mimeType]
     }).then(() => sendResponse({ ok: true }))
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
