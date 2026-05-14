@@ -330,6 +330,115 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
+// ══ LENS FILE UPLOAD: debugger-based file chooser interception ══
+// Like Selenium: save image to disk → trusted click → intercept file chooser → provide file
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'LENS_FILE_UPLOAD' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        console.log('[MC-BG] LENS_FILE_UPLOAD: starting');
+
+        // 1. Save image to Downloads via data URI
+        const dataUrl = `data:${msg.mimeType};base64,${msg.base64}`;
+        const downloadId = await new Promise((resolve, reject) => {
+          chrome.downloads.download({
+            url: dataUrl,
+            filename: 'mc_lens_temp.jpg',
+            conflictAction: 'overwrite',
+            saveAs: false,
+          }, id => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve(id);
+          });
+        });
+        console.log('[MC-BG] Download started, id:', downloadId);
+
+        // Wait for download to complete
+        const filePath = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Download timeout')), 15000);
+          chrome.downloads.onChanged.addListener(function listener(delta) {
+            if (delta.id === downloadId && delta.state) {
+              if (delta.state.current === 'complete') {
+                chrome.downloads.onChanged.removeListener(listener);
+                clearTimeout(timeout);
+                chrome.downloads.search({ id: downloadId }, items => {
+                  resolve(items[0].filename);
+                });
+              } else if (delta.state.current === 'interrupted') {
+                chrome.downloads.onChanged.removeListener(listener);
+                clearTimeout(timeout);
+                reject(new Error('Download interrupted'));
+              }
+            }
+          });
+        });
+        console.log('[MC-BG] Image saved to:', filePath);
+
+        // 2. Attach debugger
+        await chrome.debugger.attach(target, '1.3');
+        console.log('[MC-BG] Debugger attached');
+
+        // 3. Enable Page domain and intercept file chooser
+        await chrome.debugger.sendCommand(target, 'Page.enable');
+        await chrome.debugger.sendCommand(target, 'Page.setInterceptFileChooserDialog', { enabled: true });
+        console.log('[MC-BG] File chooser interception enabled');
+
+        // 4. Set up listener for file chooser opened
+        const fileChooserPromise = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            chrome.debugger.onEvent.removeListener(handler);
+            reject(new Error('File chooser never opened'));
+          }, 10000);
+          function handler(source, method, params) {
+            if (source.tabId === tabId && method === 'Page.fileChooserOpened') {
+              chrome.debugger.onEvent.removeListener(handler);
+              clearTimeout(timeout);
+              resolve(params);
+            }
+          }
+          chrome.debugger.onEvent.addListener(handler);
+        });
+
+        // 5. Trusted click on the upload button
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mousePressed', x: msg.buttonX, y: msg.buttonY,
+          button: 'left', clickCount: 1
+        });
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mouseReleased', x: msg.buttonX, y: msg.buttonY,
+          button: 'left', clickCount: 1
+        });
+        console.log('[MC-BG] Trusted click dispatched at', msg.buttonX, msg.buttonY);
+
+        // 6. Wait for file chooser to open, then provide our file
+        await fileChooserPromise;
+        console.log('[MC-BG] File chooser opened — providing file:', filePath);
+        await chrome.debugger.sendCommand(target, 'Page.handleFileChooser', {
+          action: 'accept',
+          files: [filePath]
+        });
+        console.log('[MC-BG] File chooser handled successfully');
+
+        // 7. Detach debugger after a delay
+        setTimeout(async () => {
+          try { await chrome.debugger.detach(target); } catch(_) {}
+          // Clean up temp file
+          try { chrome.downloads.removeFile(downloadId); } catch(_) {}
+        }, 5000);
+
+        sendResponse({ ok: true, filePath });
+      } catch (e) {
+        console.error('[MC-BG] LENS_FILE_UPLOAD error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true; // async sendResponse
+  }
+});
+
 // ── Auto-start ──
 registerWithServer();
 startPolling();

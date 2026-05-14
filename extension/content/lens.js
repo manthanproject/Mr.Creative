@@ -58,23 +58,33 @@ async function phase1_upload(job) {
 
   await MC.sendStatus(job_id, 'navigating', 'Opening Google Lens...');
 
-  // Wait for the drop zone to appear
-  let dropZone = null;
+  // Wait for the upload link to appear
+  let uploadBtn = null;
   for (let i = 0; i < 30; i++) {
-    dropZone = document.querySelector(LSEL.dropZone);
-    if (dropZone && dropZone.offsetHeight > 0) break;
+    uploadBtn = document.querySelector(LSEL.uploadLink);
+    if (uploadBtn && uploadBtn.offsetHeight > 0) break;
+    // Also try drop zone as a signal the overlay is loaded
+    const dz = document.querySelector(LSEL.dropZone);
+    if (dz && dz.offsetHeight > 0) {
+      uploadBtn = document.querySelector(LSEL.uploadLink);
+      if (uploadBtn) break;
+    }
     await MC.sleep(1000);
   }
-  if (!dropZone) throw new Error('Google Lens drop zone not found');
-  log('Drop zone found');
+  if (!uploadBtn) throw new Error('Google Lens upload button not found');
+  log('Upload button found');
 
   // Fetch the image from Flask
   await MC.sendStatus(job_id, 'entering_prompt', 'Fetching product image...');
   const resp = await fetch(image_url);
   if (!resp.ok) throw new Error('Failed to fetch image: ' + resp.status);
   const blob = await resp.blob();
-  const file = new File([blob], image_filename || 'product.jpg', { type: blob.type || 'image/jpeg' });
-  log('Image fetched:', file.size, 'bytes');
+  const base64 = await new Promise(r => {
+    const fr = new FileReader();
+    fr.onload = () => r(fr.result.split(',')[1]);
+    fr.readAsDataURL(blob);
+  });
+  log('Image fetched:', blob.size, 'bytes');
 
   // Save job state to storage BEFORE upload (navigation will destroy this context)
   await new Promise(r => chrome.storage.local.set({
@@ -88,74 +98,29 @@ async function phase1_upload(job) {
   }, r));
   log('Job state saved to storage');
 
-  // Drag-and-drop onto the Lens zone
+  // Get button coordinates for trusted click
+  const rect = uploadBtn.getBoundingClientRect();
+  log('Upload button rect:', rect.x, rect.y, rect.width, rect.height);
+
+  // Send to background.js for debugger-based file upload
   await MC.sendStatus(job_id, 'entering_prompt', 'Uploading image to Google Lens...');
-  const dt = new DataTransfer();
-  dt.items.add(file);
-
-  dropZone.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  await MC.sleep(200);
-  dropZone.dispatchEvent(new DragEvent('dragover',  { bubbles: true, cancelable: true, dataTransfer: dt }));
-  await MC.sleep(200);
-  dropZone.dispatchEvent(new DragEvent('drop',      { bubbles: true, cancelable: true, dataTransfer: dt }));
-  log('Drag-and-drop dispatched');
-
-  // Wait a bit to see if the page reacts
-  await MC.sleep(3000);
-
-  // Check if page navigated (the drop might trigger navigation to search results)
-  // If still on the same page, try the fallback: click "upload a file" + MutationObserver
-  if (document.querySelector(LSEL.dropZone)) {
-    log('Drop zone still visible — trying click upload fallback');
-    await fallback_clickUpload(file, job_id);
-  }
+  const result = await new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      type: 'LENS_FILE_UPLOAD',
+      base64: base64,
+      mimeType: blob.type || 'image/jpeg',
+      filename: image_filename || 'product.jpg',
+      buttonX: Math.round(rect.left + rect.width / 2),
+      buttonY: Math.round(rect.top + rect.height / 2),
+    }, r => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(r);
+    });
+  });
+  log('Debugger upload result:', JSON.stringify(result));
 
   // Page should navigate to google.com/search — Phase 2 picks up from storage
   log('Phase 1 complete — waiting for redirect to search results');
-}
-
-
-async function fallback_clickUpload(file, job_id) {
-  // Watch for dynamically created <input type="file">
-  const inputPromise = new Promise((resolve) => {
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (node.nodeType !== 1) continue;
-          const input = node.tagName === 'INPUT' && node.type === 'file'
-            ? node
-            : node.querySelector?.('input[type="file"]');
-          if (input) {
-            observer.disconnect();
-            resolve(input);
-            return;
-          }
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    // Timeout after 10s
-    setTimeout(() => { observer.disconnect(); resolve(null); }, 10000);
-  });
-
-  // Click "upload a file"
-  const uploadLink = document.querySelector(LSEL.uploadLink);
-  if (uploadLink) {
-    MC.click(uploadLink);
-    log('Clicked "upload a file" link');
-  }
-
-  const input = await inputPromise;
-  if (input) {
-    log('File input found! Injecting file');
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    await MC.sleep(2000);
-  } else {
-    warn('No file input appeared after clicking upload — drag-and-drop might have worked');
-  }
 }
 
 
