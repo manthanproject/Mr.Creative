@@ -77,6 +77,36 @@ try {
   chrome.runtime.sendMessage({ type: 'ADD_CAPABILITY', capability: 'gemini' });
 } catch (e) {}
 
+
+// Direct polling for Gemini jobs (bypasses background.js)
+(async function geminiPoller() {
+  const SERVER = 'http://localhost:5000';
+  let busy = false;
+  async function check() {
+    if (busy) return;
+    try {
+      const res = await fetch(SERVER + '/api/ext/pending-for-tab?type=gemini');
+      if (!res.ok || res.status === 204) return;
+      const job = await res.json();
+      if (!job || !job.job_id || job.job_type !== 'gemini') return;
+      busy = true;
+      console.log('[Mr.Creative][Gemini] Direct poll: picked up job', job.job_id);
+      try {
+        const pid = await new Promise(r => chrome.storage.local.get('profileId', d => r(d.profileId || 'gemini_direct')));
+        await fetch(SERVER + '/api/ext/ack', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ job_id: job.job_id, profile_id: pid })
+        });
+      } catch(e) {}
+      await GeminiBot.run(job);
+      busy = false;
+    } catch (e) { busy = false; }
+  }
+  setInterval(check, 3000);
+  setTimeout(check, 2000);
+  console.log('[Mr.Creative][Gemini] Direct poller started (3s interval)');
+})();
+
 const GeminiBot = {
   async run(job) {
     const { prompt_type, image_url, image_filename, custom_instructions, job_id } = job;
@@ -192,7 +222,7 @@ const GeminiBot = {
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);
     }
-  },,
+  },
 
   async _waitForResponse(timeout = 120000) {
     await MC.sleep(3000);
