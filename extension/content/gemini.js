@@ -186,44 +186,63 @@ const GeminiBot = {
   },
 
   async _uploadImage(imageUrl, filename) {
-    MC.log('Gemini: uploading image via debugger click:', imageUrl);
+    MC.log('Gemini: uploading image:', imageUrl);
     try {
-      // 1. Fetch the image
+      // 1. Fetch image as blob
       const resp = await fetch(imageUrl);
       const blob = await resp.blob();
-      const base64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
-      MC.log('Gemini: image fetched, size:', blob.size);
+      MC.log('Gemini: fetched', blob.size, 'bytes');
 
-      // 2. Click + menu button using real coordinates via debugger
+      // 2. Create object URL accessible from page context
+      const blobUrl = URL.createObjectURL(blob);
+      const fname = filename || 'product.jpg';
+      const mimeType = blob.type || 'image/jpeg';
+
+      // 3. Override showOpenFilePicker in PAGE context (not extension context)
+      // This makes Gemini receive our file instead of opening the OS picker
+      const script = document.createElement('script');
+      script.textContent = `
+        (function() {
+          const origPicker = window.showOpenFilePicker;
+          window.showOpenFilePicker = async function() {
+            // Restore original immediately so it only intercepts once
+            window.showOpenFilePicker = origPicker;
+            console.log('[Mr.Creative] Intercepted showOpenFilePicker!');
+            // Fetch the blob from the URL
+            const resp = await fetch('${blobUrl}');
+            const blob = await resp.blob();
+            const file = new File([blob], '${fname}', { type: '${mimeType}' });
+            // Return a mock FileSystemFileHandle
+            const handle = {
+              kind: 'file',
+              name: '${fname}',
+              getFile: async () => file,
+              createWritable: async () => { throw new Error('read-only'); }
+            };
+            return [handle];
+          };
+          console.log('[Mr.Creative] showOpenFilePicker override installed');
+        })();
+      `;
+      document.documentElement.appendChild(script);
+      script.remove();
+      await MC.sleep(500);
+
+      // 4. Click the + menu
       const plusBtn = document.querySelector('button[aria-label="Open upload file menu"]');
       if (!plusBtn) throw new Error('+ button not found');
       plusBtn.click();
       await MC.sleep(1000);
 
-      // 3. Find "Upload files" button and get its coordinates
+      // 5. Click "Upload files" — the override will intercept the picker
       const uploadBtn = document.querySelector('button[data-test-id="local-images-files-uploader-button"]');
       if (!uploadBtn) throw new Error('Upload files button not found');
-      const rect = uploadBtn.getBoundingClientRect();
-      const x = Math.round(rect.left + rect.width / 2);
-      const y = Math.round(rect.top + rect.height / 2);
-      MC.log('Gemini: Upload files button at', x, y);
-
-      // 4. Ask background.js to do trusted click + file chooser interception
-      const result = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({
-          type: 'DEBUGGER_UPLOAD',
-          x: x,
-          y: y,
-          fileData: base64,
-          fileName: filename || 'product.jpg',
-          mimeType: blob.type || 'image/jpeg'
-        }, (resp) => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else resolve(resp);
-        });
-      });
-      MC.log('Gemini: debugger upload result:', JSON.stringify(result));
+      MC.log('Gemini: clicking Upload files (picker intercepted)...');
+      uploadBtn.click();
       await MC.sleep(5000);
+
+      // 6. Clean up blob URL
+      URL.revokeObjectURL(blobUrl);
       MC.log('Gemini: image upload complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);
