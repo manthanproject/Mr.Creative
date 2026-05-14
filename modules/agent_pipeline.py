@@ -289,6 +289,8 @@ def run_agent_pipeline(app, job_id):
                 'prompts': _prompt_texts, 'image_url': _ref_url,
                 'image_filename': os.path.basename(job.reference_image) if job.reference_image else 'product.jpg',
                 'aspect_ratio': _ar, 'count': 1,
+                'collection_id': collection.id,
+                'start_time': time.time(),
             }
 
             with _lock:

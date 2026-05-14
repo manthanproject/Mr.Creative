@@ -590,3 +590,65 @@ def get_gemini_result(job_id):
     if result.get('status') == 'success':
         del gemini_results[job_id]
     return jsonify(result)
+
+
+@bp.route('/flow-complete', methods=['POST'])
+def flow_complete():
+    import os, shutil, time as _time, glob
+    from datetime import datetime
+    data = request.get_json() or {}
+    job_id = data.get('job_id', 'unknown')
+    download_count = data.get('download_count', 0)
+    print(f"[Flow Complete] job={job_id}, downloaded={download_count}")
+
+    job_data = _state.get('job_data', {}).get(job_id, {})
+    collection_id = job_data.get('collection_id')
+    job_start = job_data.get('start_time', _time.time() - 600)
+
+    if not collection_id:
+        print(f"[Flow Complete] No collection_id for job {job_id}")
+        return jsonify({'status': 'warning', 'message': 'No collection_id'}), 200
+
+    downloads_dir = os.path.expanduser('~/Downloads')
+    collection_dir = os.path.join('static', 'collections', str(collection_id))
+    os.makedirs(collection_dir, exist_ok=True)
+
+    recent_files = []
+    for ext in ('*.png', '*.jpg', '*.jpeg', '*.webp'):
+        for f in glob.glob(os.path.join(downloads_dir, ext)):
+            if os.path.getmtime(f) >= job_start:
+                recent_files.append((f, os.path.getmtime(f)))
+
+    recent_files.sort(key=lambda x: x[1])
+    if len(recent_files) > download_count:
+        recent_files = recent_files[:download_count]
+
+    moved = []
+    for i, (filepath, _) in enumerate(recent_files):
+        filename = os.path.basename(filepath)
+        dest = os.path.join(collection_dir, filename)
+        if os.path.exists(dest):
+            name, ext = os.path.splitext(filename)
+            dest = os.path.join(collection_dir, f"{name}_{i}{ext}")
+        try:
+            shutil.move(filepath, dest)
+            moved.append(dest)
+            print(f"[Flow Complete] Moved: {filename}")
+        except Exception as e:
+            print(f"[Flow Complete] Failed: {e}")
+
+    if moved:
+        try:
+            from config import supabase
+            for i, fp in enumerate(moved):
+                supabase.table('generations').insert({
+                    'collection_id': collection_id,
+                    'image_path': fp.replace('\\', '/'),
+                    'prompt_index': i,
+                    'job_id': job_id,
+                    'created_at': datetime.utcnow().isoformat(),
+                }).execute()
+        except Exception as e:
+            print(f"[Flow Complete] DB error: {e}")
+
+    return jsonify({'status': 'ok', 'moved': len(moved)})
