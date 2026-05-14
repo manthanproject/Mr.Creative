@@ -228,7 +228,7 @@ const GeminiBot = {
     } catch (e) {
       MC.log('Gemini: upload error:', e.message);
     }
-  },,
+  },
 
   async _waitForResponse(timeout = 120000) {
     await MC.sleep(3000);
