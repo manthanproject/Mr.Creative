@@ -518,22 +518,30 @@ def finalize_job():
     return jsonify({'ok': True, 'saved': saved, 'collection_id': collection_id})
 
 
-@bp.route('/pending-for-tab', methods=['GET'])
+@bp.route('/pending-for-tab')
 def pending_for_tab():
-    """Content script polls this as backup if background dispatch failed."""
+    """Check for pending jobs. Supports ?type=gemini to filter by job type."""
+    job_type_filter = request.args.get('type')
+    
+    # Check job queue for matching type
     with _lock:
-        # Check pending_any first
-        if _state['pending_any']:
-            job = _state['pending_any']
-            _state['pending_any'] = None
+        # Check pending_commands for any profile
+        for pid, job in list(_state.get('pending_commands', {}).items()):
+            if job_type_filter and job.get('job_type') != job_type_filter:
+                continue
+            # Found a matching job — remove from pending and return it
+            _state['pending_commands'].pop(pid, None)
             return jsonify(job)
-        # Check all pending_commands
-        for pid, job in list(_state['pending_commands'].items()):
-            _state['pending_commands'].pop(pid)
+        
+        # Check job_queue
+        queue = _state.get('job_queue', [])
+        for i, job in enumerate(queue):
+            if job_type_filter and job.get('job_type') != job_type_filter:
+                continue
+            queue.pop(i)
             return jsonify(job)
-    return ('', 204)
-
-
+    
+    return '', 204
 @bp.route('/stop', methods=['POST'])
 def stop_job():
     with _lock:
