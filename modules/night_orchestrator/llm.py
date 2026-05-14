@@ -15,16 +15,18 @@ def call_llm(prompt, system='', temperature=0.7, max_tokens=3000, image_url=None
     from config import Config
     global last_provider
 
-    # If image_url provided -> SKIP API (it cant upload images)
-    # Go straight to Gemini Extension which uploads to gemini.google.com
+    # If image_url provided -> Use Google Lens + AI Mode extension
+    # (Gemini upload is broken — showOpenFilePicker blocks automation)
     if image_url:
-        print(f"[LLM] Image provided - skipping API, using Gemini Extension")
+        print(f"[LLM] Image provided - using Google Lens + AI Mode extension")
         try:
-            result = _call_gemini_extension(prompt, image_url=image_url)
+            result = _call_lens_extension(prompt, image_url=image_url)
             if result:
                 return result
         except Exception as e:
-            print(f"[LLM] Gemini Extension failed: {e}")
+            print(f"[LLM] Lens Extension failed: {e}")
+            # Fallback: try Gemini extension (text-only, no image)
+            print(f"[LLM] Falling back to text-only (no image context)")
 
     # 1. Try Gemini API (3 models, 60 RPD free) - text only
     gemini_key = Config.GEMINI_API_KEY
@@ -144,6 +146,55 @@ def _call_gemini_extension(prompt, timeout=300, image_url=None):
                 return cj['gemini_result']
 
     raise Exception(f"Gemini extension timeout ({timeout}s)")
+
+
+def _call_lens_extension(prompt, timeout=300, image_url=None):
+    """Google Lens + AI Mode via Chrome extension — uploads image to Lens, prompts via AI Mode."""
+    import uuid
+    global last_provider
+
+    job_id = f'lens_{uuid.uuid4().hex[:8]}'
+
+    from routes.extension import _state, _lock, lens_results
+
+    # Find profile with lens capability (any google.com tab)
+    routed = False
+    with _lock:
+        for pid, info in _state.get('profiles', {}).items():
+            caps = info.get('capabilities', [])
+            print(f"[LLM-LENS] Profile {pid}: caps={caps}")
+            if 'lens' in caps:
+                job = {
+                    'job_id': job_id,
+                    'job_type': 'lens',
+                    'prompt_text': prompt,
+                    'image_url': image_url,
+                    'image_filename': 'product.jpg',
+                }
+                _state['job_data'][job_id] = job
+                _state['pending_commands'][pid] = job
+                routed = True
+                print(f"[LLM-LENS] Job {job_id} routed to {pid}")
+                break
+
+    if not routed:
+        raise Exception("No profile with lens capability found — open google.com/?olud in a Chrome tab")
+
+    # Poll for result
+    start = time.time()
+    while time.time() - start < timeout:
+        time.sleep(3)
+        entry = lens_results.get(job_id)
+        if entry and entry.get('result'):
+            try:
+                del lens_results[job_id]
+            except KeyError:
+                pass
+            last_provider = 'lens-aimode'
+            print(f"[LLM-LENS] Got result ({len(entry['result'])} chars)")
+            return entry['result']
+
+    raise Exception(f"Lens extension timeout ({timeout}s)")
 
 
 def _call_groq(api_key, prompt, system, temperature, max_tokens):

@@ -20,7 +20,10 @@
     "https://labs.google/fx/tools/flow*",
     "http://localhost:5000/*",
     "http://127.0.0.1:5000/*",
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://www.google.com/*",
+    "https://google.com/*",
+    "https://lens.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -66,6 +69,18 @@
       ],
       "run_at": "document_start",
       "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.google.com/*",
+        "https://google.com/*",
+        "https://lens.google.com/*"
+      ],
+      "js": [
+        "lib/utils.js",
+        "content/lens.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "action": {

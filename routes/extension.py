@@ -20,6 +20,7 @@ import requests  # type: ignore[import-untyped]
 import time
 
 gemini_results = {}
+lens_results = {}
 from datetime import datetime, timedelta
 from threading import Lock
 
@@ -598,6 +599,22 @@ def get_gemini_result(job_id):
     if result.get('status') == 'success':
         del gemini_results[job_id]
     return jsonify(result)
+
+
+@bp.route('/lens-result', methods=['POST'])
+def post_lens_result():
+    data = request.get_json(force=True)
+    job_id = data.get('job_id')
+    if not job_id:
+        return jsonify({'ok': False, 'error': 'missing job_id'}), 400
+    import time as _time
+    lens_results[job_id] = {
+        'result': data.get('result'),
+        'status': data.get('status', 'success'),
+        'timestamp': _time.time()
+    }
+    print(f"[Lens] Result received for {job_id} ({len(data.get('result', ''))} chars)")
+    return jsonify({'ok': True})
 
 
 @bp.route('/flow-complete', methods=['POST'])

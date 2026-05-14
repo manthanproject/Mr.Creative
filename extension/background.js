@@ -312,6 +312,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
+// ── Relay lens results from content script to Flask ──
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'LENS_RESULT' && msg.result) {
+        fetch(`${SERVER}/api/ext/lens-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                job_id: msg.job_id,
+                result: msg.result,
+                status: 'success'
+            })
+        }).then(() => console.log('[MC-BG] Lens result relayed to server'))
+          .catch(e => console.error('[MC-BG] Failed to relay lens result:', e));
+        sendResponse({ ok: true });
+        return true;
+    }
+});
+
 // ── Auto-start ──
 registerWithServer();
 startPolling();
