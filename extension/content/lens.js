@@ -20,7 +20,7 @@ const LSEL = {
   moreBtn:       'button[aria-label="More options"]',
 };
 
-# chrome.storage guard
+// chrome.storage guard
 const _storage = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
 const STORAGE_KEY = 'mc_lens_pending';
 const TAG = '[Mr.Creative][Lens]';
