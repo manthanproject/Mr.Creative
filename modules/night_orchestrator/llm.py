@@ -15,7 +15,18 @@ def call_llm(prompt, system='', temperature=0.7, max_tokens=3000, image_url=None
     from config import Config
     global last_provider
 
-    # 1. Try Gemini API (3 models, 60 RPD free)
+    # If image_url provided -> SKIP API (it cant upload images)
+    # Go straight to Gemini Extension which uploads to gemini.google.com
+    if image_url:
+        print(f"[LLM] Image provided - skipping API, using Gemini Extension")
+        try:
+            result = _call_gemini_extension(prompt, image_url=image_url)
+            if result:
+                return result
+        except Exception as e:
+            print(f"[LLM] Gemini Extension failed: {e}")
+
+    # 1. Try Gemini API (3 models, 60 RPD free) - text only
     gemini_key = Config.GEMINI_API_KEY
     if gemini_key:
         try:
@@ -25,13 +36,14 @@ def call_llm(prompt, system='', temperature=0.7, max_tokens=3000, image_url=None
         except Exception as e:
             print(f"[LLM] Gemini API exhausted: {e}")
 
-    # 2. Try Gemini Extension (no quota limits)
-    try:
-        result = _call_gemini_extension(prompt, image_url=image_url)
-        if result:
-            return result
-    except Exception as e:
-        print(f"[LLM] Gemini Extension failed: {e}")
+    # 2. Try Gemini Extension (no quota limits) - fallback for text too
+    if not image_url:
+        try:
+            result = _call_gemini_extension(prompt, image_url=image_url)
+            if result:
+                return result
+        except Exception as e:
+            print(f"[LLM] Gemini Extension failed: {e}")
 
     # 3. Groq as last resort
     groq_key = Config.GROQ_API_KEY
