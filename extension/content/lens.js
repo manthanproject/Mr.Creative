@@ -20,6 +20,8 @@ const LSEL = {
   moreBtn:       'button[aria-label="More options"]',
 };
 
+# chrome.storage guard
+const _storage = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
 const STORAGE_KEY = 'mc_lens_pending';
 const TAG = '[Mr.Creative][Lens]';
 const SERVER = 'http://localhost:5000';
@@ -87,7 +89,7 @@ async function phase1_upload(job) {
   log('Image fetched:', blob.size, 'bytes');
 
   // Save job state to storage BEFORE upload (navigation will destroy this context)
-  await new Promise(r => chrome.storage.local.set({
+  await new Promise(r => (_storage || {set:(d,cb)=>cb&&cb()}).set({
     [STORAGE_KEY]: {
       job_id,
       prompt_text,
@@ -257,7 +259,7 @@ async function phase2_aimode(pendingJob) {
   });
 
   // Clear pending job from storage
-  chrome.storage.local.remove(STORAGE_KEY);
+  (_storage || {remove:()=>{}}).remove(STORAGE_KEY);
 
   await MC.sendStatus(job_id, 'complete', 'Prompts generated successfully');
   log('Phase 2 complete!');
@@ -355,13 +357,13 @@ function extractResponse() {
     // Phase 2: Check storage for pending job (cross-page state)
     if (phase === 'aimode') {
       try {
-        const data = await new Promise(r => chrome.storage.local.get(STORAGE_KEY, r));
+        const data = await new Promise(r => (_storage || {get:(k,cb)=>cb({})}).get(STORAGE_KEY, r));
         const pending = data[STORAGE_KEY];
         if (pending && pending.phase === 'waiting_aimode') {
           // Check freshness (expire after 5 minutes)
           if (Date.now() - pending.timestamp > 300000) {
             log('Pending job expired, clearing');
-            chrome.storage.local.remove(STORAGE_KEY);
+            (_storage || {remove:()=>{}}).remove(STORAGE_KEY);
             return;
           }
           busy = true;
@@ -371,7 +373,7 @@ function extractResponse() {
           } catch (e) {
             log('Phase 2 error:', e.message);
             await MC.sendStatus(pending.job_id, 'error', 'AI Mode failed: ' + e.message);
-            chrome.storage.local.remove(STORAGE_KEY);
+            (_storage || {remove:()=>{}}).remove(STORAGE_KEY);
           }
           busy = false;
           return;
@@ -391,7 +393,7 @@ function extractResponse() {
         try {
           // Ack the job
           const pid = await new Promise(r =>
-            chrome.storage.local.get('profileId', d => r(d.profileId || 'lens_direct')));
+            (_storage || {get:(k,cb)=>cb({})}).get('profileId', d => r(d.profileId || 'lens_direct')));
           await fetch(SERVER + '/api/ext/ack', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ job_id: job.job_id, profile_id: pid })
@@ -400,7 +402,7 @@ function extractResponse() {
         } catch (e) {
           log('Phase 1 error:', e.message);
           await MC.sendStatus(job.job_id, 'error', 'Lens upload failed: ' + e.message);
-          chrome.storage.local.remove(STORAGE_KEY);
+          (_storage || {remove:()=>{}}).remove(STORAGE_KEY);
         }
         busy = false;
       } catch (e) { busy = false; }
