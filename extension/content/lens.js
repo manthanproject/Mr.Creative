@@ -101,7 +101,8 @@ async function phase1_upload(job) {
   log('Job state saved to storage');
 
   // Get drop zone coordinates for trusted drag-and-drop
-  const rect = dropZone.getBoundingClientRect();
+  const dz = document.querySelector("div.BH9rn") || uploadBtn.closest("div");
+  const rect = dz.getBoundingClientRect();
   log('Drop zone rect:', rect.x, rect.y, rect.width, rect.height);
 
   // Send to background.js for debugger-based file upload
