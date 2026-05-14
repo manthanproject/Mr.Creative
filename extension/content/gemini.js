@@ -158,78 +158,55 @@ const GeminiBot = {
   async _uploadImage(imageUrl, filename) {
     MC.log('Gemini: _uploadImage called with', imageUrl);
     try {
-      // Step 1: Fetch the image first
-      MC.log('Gemini: fetching image from URL...');
+      // Fetch the image
+      MC.log('Gemini: fetching image...');
       const resp = await fetch(imageUrl);
       if (!resp.ok) throw new Error('Fetch failed: ' + resp.status);
       const blob = await resp.blob();
-      MC.log('Gemini: image fetched, size:', blob.size, 'type:', blob.type);
       const file = new File([blob], filename || 'product.jpg', { type: blob.type || 'image/jpeg' });
+      MC.log('Gemini: image fetched, size:', blob.size);
 
-      // Step 2+3: Click + menu, keyboard-navigate to "Upload files", intercept file input
-      MC.log('Gemini: setting up file input observer...');
-      
-      // Watch for file input to appear anywhere in the DOM
-      let fileInputFound = false;
-      const observer = new MutationObserver(() => {
-        if (fileInputFound) return;
-        const fi = document.querySelector('input[type="file"]:not([aria-hidden])') 
-                || document.querySelector('input[type="file"]');
-        if (fi && !fi._intercepted) {
-          fi._intercepted = true;
-          fileInputFound = true;
-          observer.disconnect();
-          MC.log('Gemini: file input appeared! Injecting file...');
-          // Prevent the OS file picker from opening
-          fi.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); }, { capture: true, once: true });
-          // Inject file
-          const dt2 = new DataTransfer();
-          dt2.items.add(file);
-          fi.files = dt2.files;
-          fi.dispatchEvent(new Event('change', { bubbles: true }));
-          fi.dispatchEvent(new Event('input', { bubbles: true }));
-          MC.log('Gemini: file injected into input!');
-        }
-      });
-      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      // Focus the editor
+      const editor = document.querySelector('.ql-editor.textarea');
+      if (!editor) throw new Error('Editor not found');
+      editor.focus();
+      await MC.sleep(300);
 
-      // Click the + menu button
-      const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
-      if (!plusBtn) { MC.log('Gemini: ERROR - plus button not found'); observer.disconnect(); return; }
-      MC.click(plusBtn);
-      MC.log('Gemini: + menu clicked, waiting for menu...');
-      await MC.sleep(800);
-      
-      // Use keyboard to select first item (Upload files)
-      const activeEl = document.activeElement;
-      MC.log('Gemini: active element after menu:', activeEl?.tagName, activeEl?.textContent?.substring(0,20));
-      
-      // Try clicking the hidden upload button directly (it triggers file input creation)
-      const hiddenBtn = document.querySelector('button[data-test-id="hidden-local-image-upload-button"]');
-      if (hiddenBtn) {
-        MC.log('Gemini: clicking hidden upload button...');
-        hiddenBtn.click();
-      }
-      
-      // Wait for file input to be caught by observer
+      // Fire paste event with the image — Quill handles this natively
+      MC.log('Gemini: pasting image into editor...');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const pasteEvt = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
+      editor.dispatchEvent(pasteEvt);
       await MC.sleep(3000);
       
-      if (!fileInputFound) {
-        MC.log('Gemini: file input not caught by observer, trying keyboard navigation...');
-        // Try keyboard: press down arrow then enter to select "Upload files"
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
-        await MC.sleep(200);
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-        await MC.sleep(2000);
+      // Check if image appeared
+      const hasImg = editor.querySelector('img') || document.querySelector('[class*="upload-chip"] img, [class*="file-chip"] img, .input-area img');
+      MC.log('Gemini: image in editor after paste:', !!hasImg);
+      
+      if (!hasImg) {
+        // Fallback: click + menu, navigate to Upload files, click it
+        MC.log('Gemini: paste didnt work, trying menu approach...');
+        const plusBtn = document.querySelector(GSEL.uploadMenuBtn);
+        if (plusBtn) {
+          MC.click(plusBtn);
+          await MC.sleep(800);
+          // The active element should be the menu list
+          const menuList = document.activeElement;
+          if (menuList) {
+            // Find first button/item in the list
+            const firstItem = menuList.querySelector('button, [role="listitem"], [role="option"], mat-list-item');
+            if (firstItem) {
+              MC.log('Gemini: clicking first menu item:', firstItem.textContent.trim().substring(0,20));
+              firstItem.click();
+              await MC.sleep(2000);
+            }
+          }
+        }
       }
       
-      if (!fileInputFound) {
-        MC.log('Gemini: WARNING - could not upload image via file input');
-        observer.disconnect();
-      } else {
-        MC.log('Gemini: waiting for image to process...');
-        await MC.sleep(5000);
-        MC.log('Gemini: image upload complete');
+      await MC.sleep(2000);
+      MC.log('Gemini: image upload complete');
       }
     } catch (e) {
       MC.log('Gemini: upload error:', e.message, e.stack);
