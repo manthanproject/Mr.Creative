@@ -192,17 +192,27 @@ const GeminiBot = {
         else { MC.log('Gemini: ERROR - Upload files menu item not found'); return; }
       }
 
-      // Step 3: Find file input and inject file
-      const fileInput = document.querySelector('input[type="file"]');
-      if (!fileInput) { MC.log('Gemini: ERROR - file input not found'); return; }
-      MC.log('Gemini: injecting file into input...');
+      // Step 3: Drag-and-drop the file onto the prompt area
+      const dropTarget = document.querySelector('.ql-editor.textarea')
+                      || document.querySelector('[contenteditable="true"]')
+                      || document.querySelector('.input-area');
+      if (!dropTarget) { MC.log('Gemini: ERROR - drop target not found'); return; }
+      MC.log('Gemini: dropping file onto prompt area...');
       const dt = new DataTransfer();
       dt.items.add(file);
-      fileInput.files = dt.files;
-      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-      fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-      MC.log('Gemini: file injected, waiting for upload...');
+      const dragEnter = new DragEvent('dragenter', { bubbles: true, dataTransfer: dt });
+      const dragOver = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt });
+      const drop = new DragEvent('drop', { bubbles: true, dataTransfer: dt });
+      dropTarget.dispatchEvent(dragEnter);
+      await MC.sleep(200);
+      dropTarget.dispatchEvent(dragOver);
+      await MC.sleep(200);
+      dropTarget.dispatchEvent(drop);
+      MC.log('Gemini: file dropped, waiting for upload processing...');
       await MC.sleep(5000);
+      // Check if image appeared in the prompt area
+      const imgs = document.querySelectorAll('.input-area img, .ql-editor img, [class*="upload"] img, [class*="chip"] img');
+      MC.log('Gemini: images in prompt area after drop:', imgs.length);
       MC.log('Gemini: image upload complete');
     } catch (e) {
       MC.log('Gemini: upload error:', e.message, e.stack);
