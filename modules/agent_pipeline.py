@@ -133,8 +133,10 @@ def run_agent_pipeline(app, job_id):
                         'brand_name': getattr(brand_kit, 'name', '') if brand_kit else '',
                     }
                     _ref_url = None
+                    print(f"[Pipeline DEBUG] job.reference_image = {repr(job.reference_image)}")
                     if job.reference_image:
                         _ref_url = f'http://127.0.0.1:5000/static/{job.reference_image}'
+                    print(f"[Pipeline DEBUG] _ref_url = {repr(_ref_url)}")
                     _ap = generate_listing_prompts(_info, count=job.target_count, image_url=_ref_url)
                     prompts = [{'prompt': p['prompt'], 'width': 1024, 'height': 1024, 'aspect_ratio': '1:1'} for p in _ap]
                     content_plan = [{'type': 'a_plus', 'id': i+1} for i in range(len(prompts))]

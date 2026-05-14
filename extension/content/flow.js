@@ -73,9 +73,11 @@
   async function click(el) {
     el.scrollIntoView({ behavior: 'instant', block: 'center' });
     await MC.sleep(150 + Math.random() * 200);
-    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    el.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true }));
-    el.dispatchEvent(new MouseEvent('click',     { bubbles: true }));
+    // Use native click first (works best with React/Radix UI)
+    el.click();
+    // Also dispatch pointer events for Radix UI components
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
   }
 
   /** Type text into input/textarea/contenteditable */
@@ -162,19 +164,18 @@
   }
 
   function findSettingsArea() {
-    // The model/settings trigger — has aria-haspopup="menu" in bottom bar
-    // Class: sc-67b77035-1   Text includes: "Nano Banana"
-    return $([
-      'button[aria-haspopup="menu"].sc-67b77035-1',
-      'button.bgiflq',
-    ]) || (() => {
-      // Fallback: button with aria-haspopup="menu" near bottom that contains "Banana"
-      const btns = document.querySelectorAll('button[aria-haspopup="menu"]');
-      for (const b of btns) {
-        if (b.textContent.includes('Banana') || b.textContent.includes('Nano')) return b;
-      }
-      return null;
-    })();
+    // The model/settings trigger in the bottom bar
+    // Uses aria-haspopup="menu" and contains "Nano Banana" or "Banana"
+    const btns = document.querySelectorAll('button[aria-haspopup="menu"]');
+    for (const b of btns) {
+      const t = b.textContent || '';
+      if (t.includes('Banana') || t.includes('Nano') || t.includes('banana')) return b;
+    }
+    // Fallback: any button with aria-haspopup="menu" near bottom of page
+    for (const b of btns) {
+      if (b.getBoundingClientRect().bottom > window.innerHeight - 200) return b;
+    }
+    return null;
   }
 
   function findDownloadBtn() {
@@ -217,10 +218,17 @@
   async function setSettings(count = 1, aspectRatio) {
     log('Setting count →', count, aspectRatio ? `aspect → ${aspectRatio}` : '');
 
-    // Open the settings popup
+    // Open the settings popup (retry up to 3 times)
     const area = await waitFor(findSettingsArea, ELEM_TIMEOUT, 'settings area');
-    await click(area);
-    await MC.sleep(800);
+    log('Found settings area:', area.textContent.trim().substring(0, 40));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await click(area);
+      await MC.sleep(1200);
+      // Check if popup appeared by looking for count buttons
+      const testBtn = document.querySelector('button.flow_tab_slider_trigger, button[role="tab"]');
+      if (testBtn) { log('Settings popup opened on attempt', attempt + 1); break; }
+      log('Settings popup not open yet, retrying click...');
+    }
 
     // --- Count ---
     const countLabel = count === 1 ? '1x' : `x${count}`;
@@ -621,9 +629,14 @@
         throw new Error('Expected project page but got: ' + location.href);
       }
 
-      // ── Step 1: Settings ──
-      await setSettings(count || 1, aspect_ratio || '1:1');
-      MC.sendStatus(job_id, 'running', 'Settings configured');
+      // ── Step 1: Settings (best-effort) ──
+      try {
+        await setSettings(count || 1, aspect_ratio || '1:1');
+        MC.sendStatus(job_id, 'running', 'Settings configured');
+      } catch (settingsErr) {
+        warn('Settings step failed, continuing with current defaults:', settingsErr.message);
+        MC.sendStatus(job_id, 'running', 'Settings skipped, using current defaults');
+      }
 
       // ── Steps 2-5: Generate all images ──
       for (let i = 0; i < total; i++) {
