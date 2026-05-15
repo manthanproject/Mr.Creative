@@ -420,45 +420,95 @@
 
   /** Step 4 — Click the submit/create button */
   async function clickSubmit() {
+    // Count images BEFORE submit so we can verify generation actually started
+    const imgsBefore = document.querySelectorAll('img[alt="Generated image"]').length;
+
     const btn = await waitFor(findSubmitBtn, ELEM_TIMEOUT, 'submit button');
-    await click(btn);
-    log('Submit clicked');
+
+    // Strategy 1: Click the button with full event sequence
+    btn.scrollIntoView({ behavior: 'instant', block: 'center' });
+    await MC.sleep(300);
+    btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    await MC.sleep(50);
+    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    log('Submit clicked (pointer+mouse)');
+
+    // Wait 2s and check if generation started
+    await MC.sleep(2000);
+    const txt = document.body.innerText.toLowerCase();
+    const hasNewProgress = txt.includes('generating') || txt.includes('loading') ||
+      document.querySelectorAll('img[alt="Generated image"]').length > imgsBefore;
+
+    if (!hasNewProgress) {
+      // Strategy 2: keyboard Enter on the prompt bar
+      log('Click may not have worked — trying Enter key on prompt bar');
+      const bar = findPromptBar();
+      if (bar) {
+        bar.focus();
+        await MC.sleep(200);
+        // Try Enter
+        bar.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+          bubbles: true, cancelable: true
+        }));
+        await MC.sleep(500);
+        // Try Ctrl+Enter
+        bar.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+          bubbles: true, cancelable: true, ctrlKey: true
+        }));
+        await MC.sleep(1000);
+      }
+
+      // Strategy 3: click the icon inside the button
+      const icon = btn.querySelector('i');
+      if (icon) {
+        icon.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        icon.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+        icon.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        log('Clicked icon inside submit button');
+      }
+    }
+
+    // Store imgsBefore for waitForGeneration
+    btn._imgsBefore = imgsBefore;
+    log('Submit done, images before:', imgsBefore);
   }
 
   // ────────────────────────────────────────────────────────────────────────
 
-  /** Step 5 — Wait for image generation to complete (0% → done) */
+  /** Step 5 — Wait for image generation to complete */
   async function waitForGeneration() {
     log('Waiting for generation...');
-    await MC.sleep(3000); // initial delay for generation to start
+
+    // Primary method: wait for a NEW img[alt="Generated image"] to appear
+    // This is more reliable than checking percentages (which can be leftover from ref processing)
+    const imgsBefore = document.querySelectorAll('img[alt="Generated image"]').length;
+    log('Images in gallery before generation:', imgsBefore);
+
+    await MC.sleep(5000); // generation takes at least 5s to start
 
     const t0 = Date.now();
-    let lastPct = -1;
-    let seenProgress = false;
+    let lastLogTime = 0;
 
     while (Date.now() - t0 < GEN_TIMEOUT) {
-      const txt = document.body.innerText;
-      const matches = txt.match(/\b(\d{1,3})%/g) || [];
-      const pcts = matches.map(m => parseInt(m));
-
-      if (pcts.length) {
-        seenProgress = true;
-        const lowest = Math.min(...pcts);
-        if (lowest !== lastPct) {
-          lastPct = lowest;
-          if (lowest % 20 === 0 || lowest > 90) log(`Generation: ${lowest}%`);
-        }
-        if (pcts.every(p => p >= 99)) {
-          log('Generation complete (>=99%)');
-          await MC.sleep(1500);
-          return;
-        }
-      } else if (seenProgress) {
-        // Was showing %, now isn't → image finished rendering
-        log('Generation complete (indicator gone)');
-        await MC.sleep(1000);
+      const imgsNow = document.querySelectorAll('img[alt="Generated image"]').length;
+      if (imgsNow > imgsBefore) {
+        log(`Generation complete — new image appeared (${imgsBefore} → ${imgsNow})`);
+        await MC.sleep(2000); // let it fully render
         return;
       }
+
+      // Secondary: check for percentage progress (but only if < 99% — skip leftover 99%)
+      const txt = document.body.innerText;
+      const matches = txt.match(/\b(\d{1,2})%/g) || []; // only match 0-99, not 100
+      const pcts = matches.map(m => parseInt(m)).filter(p => p < 99);
+      if (pcts.length && Date.now() - lastLogTime > 10000) {
+        log(`Generation in progress: ${Math.max(...pcts)}%`);
+        lastLogTime = Date.now();
+      }
+
       await MC.sleep(POLL);
     }
     warn('Generation timeout — continuing anyway');
