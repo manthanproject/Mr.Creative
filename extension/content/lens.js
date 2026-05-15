@@ -268,38 +268,29 @@ async function phase2_aimode(pendingJob) {
 
 
 async function waitForResponse(job_id, timeout = 180000) {
-  // Wait for the Copy button to appear — signals response is fully generated
+  // Wait for response to complete — check for ===PROMPT=== in page text
   await MC.sleep(5000); // Initial wait for response to start
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
-    // Check for Copy button (appears after response is complete)
-    const copyBtn = document.querySelector(LSEL.copyBtn);
-    if (copyBtn && copyBtn.offsetHeight > 0) {
-      // Also check that the response box has substantial content
-      const responseBoxes = document.querySelectorAll(LSEL.responseBox);
-      const lastBox = responseBoxes[responseBoxes.length - 1];
-      if (lastBox && lastBox.textContent.trim().length > 100) {
-        // Check if code block with prompts has rendered
-        const codeEl = document.querySelector('div.pCTyYe code');
-        if (codeEl && codeEl.textContent.includes('===PROMPT===')) {
-          log('Response complete — code block with prompts found, length:', codeEl.textContent.length);
-          await MC.sleep(2000);
-          return;
-        }
-        // Code block not yet rendered — keep waiting (up to 30s more)
-        if (Date.now() - start > 60000) {
-          log('Response complete — Copy button visible but no code block, using fallback. content length:', lastBox.textContent.trim().length);
-          await MC.sleep(2000);
-          return;
-        }
+    // Primary check: look for ===PROMPT=== anywhere in code/pre elements
+    const codeEls = document.querySelectorAll('code, pre');
+    for (const el of codeEls) {
+      if (el.textContent.includes('===PROMPT===') && el.textContent.length > 500) {
+        log('Response complete — found ===PROMPT=== in code block, length:', el.textContent.length);
+        await MC.sleep(3000); // Extra buffer for full render
+        return;
       }
     }
 
-    // Also check for Good/Bad response buttons as completion signal
+    // Secondary: check for copy/feedback buttons as a "response started" signal
+    const copyBtn = document.querySelector(LSEL.copyBtn) || document.querySelector('button[aria-label="Copy code text to clipboard."]');
     const goodBtn = document.querySelector(LSEL.goodBtn);
-    if (goodBtn && goodBtn.offsetHeight > 0) {
-      log('Response complete — feedback buttons visible');
+    const hasButtons = (copyBtn && copyBtn.offsetHeight > 0) || (goodBtn && goodBtn.offsetHeight > 0);
+
+    if (hasButtons && Date.now() - start > 60000) {
+      // Buttons visible but no code block after 60s — use whatever we have
+      log('Response complete — buttons visible, no code block after 60s (fallback)');
       await MC.sleep(2000);
       return;
     }
@@ -317,13 +308,32 @@ async function waitForResponse(job_id, timeout = 180000) {
 
 
 function extractResponse() {
-  // Try to get code block content first (the ===PROMPT=== formatted response)
-  const codeBlocks = document.querySelectorAll('div.pCTyYe code, div.pCTyYe pre, code, pre, .code-container');
-  for (const block of codeBlocks) {
-    const text = block.textContent.trim();
-    if (text.length > 100 && text.includes('===PROMPT===')) {
-      log('Found code block with ===PROMPT=== markers');
-      return text;
+  // Strategy 1: Scan ALL code/pre/span elements for ===PROMPT=== content
+  // Pick the longest match (the full response, not a partial)
+  let best = '';
+  const candidates = document.querySelectorAll('code, pre, span');
+  for (const el of candidates) {
+    const t = el.textContent.trim();
+    if (t.includes('===PROMPT===') && t.length > best.length) {
+      best = t;
+    }
+  }
+  if (best.length > 200) {
+    log('Found ===PROMPT=== content, length:', best.length);
+    return best;
+  }
+
+  // Strategy 2: Find the code block copy button and walk up to its container
+  const codeBtn = document.querySelector('button[aria-label="Copy code text to clipboard."]');
+  if (codeBtn) {
+    let parent = codeBtn.closest('div');
+    for (let i = 0; i < 5 && parent; i++) {
+      const code = parent.querySelector('code, pre');
+      if (code && code.textContent.trim().length > 200) {
+        log('Found code via copy button parent walk, length:', code.textContent.trim().length);
+        return code.textContent.trim();
+      }
+      parent = parent.parentElement;
     }
   }
 
