@@ -179,37 +179,35 @@
   }
 
   function findDownloadBtn() {
-    return $([
-      'button[aria-label*="ownload" i]',
-      'a[aria-label*="ownload" i]',
-      'button[title*="ownload" i]',
-    ]) || (() => {
-      // In the edit view toolbar (top-right area), the download icon (arrow-down)
-      const btns = $$('header button, [class*="toolbar"] button, [class*="action"] button');
-      for (const b of btns) {
-        const svg = b.querySelector('svg');
-        if (!svg) continue;
-        // download icon usually has an arrow-down path
-        const paths = svg.querySelectorAll('path');
-        for (const p of paths) {
-          const d = (p.getAttribute('d') || '').toLowerCase();
-          if (d.includes('m') && (d.includes('v') || d.includes('l')) && b.offsetWidth < 60) return b;
-        }
+    // In edit view: download icon button in the top toolbar
+    // It's a button containing google-symbols icon "download" or "arrow_downward"
+    const btns = document.querySelectorAll('button');
+    for (const b of btns) {
+      const icon = b.querySelector('i.google-symbols, i[class*="google-symbols"]');
+      if (icon) {
+        const iconText = icon.textContent.trim();
+        if (iconText === 'download' || iconText === 'file_download' || iconText === 'arrow_downward') return b;
       }
-      return null;
-    })();
+      // Also check aria-label
+      const label = (b.getAttribute('aria-label') || '').toLowerCase();
+      if (label.includes('download')) return b;
+    }
+    return null;
   }
 
   function findBackBtn() {
-    return $([
-      'button[aria-label*="ack" i]',
-      'a[aria-label*="ack" i]',
-      'button[aria-label*="eturn" i]',
-    ]) || (() => {
-      // First button in the header / top-left area — usually the back arrow
-      const topBtns = $$('header button, [class*="toolbar"] button:first-child, [class*="header"] button');
-      return topBtns[0] || null;
-    })();
+    // Back button has google-symbols icon "arrow_back" and span "Back"
+    const btns = document.querySelectorAll('button');
+    for (const b of btns) {
+      const icon = b.querySelector('i.google-symbols, i[class*="google-symbols"]');
+      if (icon && icon.textContent.trim() === 'arrow_back') return b;
+    }
+    // Fallback: button with span text "Back"
+    for (const b of btns) {
+      const span = b.querySelector('span');
+      if (span && span.textContent.trim() === 'Back') return b;
+    }
+    return null;
   }
 
   // ── FLOW BOT ACTIONS ────────────────────────────────────────────────────
@@ -470,21 +468,27 @@
 
   /** Get all clickable image cards in the gallery */
   function getGalleryCards() {
-    // Images in the project gallery are rendered as cards/tiles
-    // We need elements that have images and are clickable
-    const candidates = $$('[class*="card"], [class*="tile"], [class*="grid-item"], [class*="gallery"] > div > div');
-    const cards = [];
-    for (const c of candidates) {
-      if (c.querySelector('img') || c.querySelector('canvas') || c.style.backgroundImage) {
-        // Exclude tiny elements (icons, thumbnails < 50px)
-        if (c.offsetWidth > 80 && c.offsetHeight > 80) cards.push(c);
-      }
+    // Generated images have alt="Generated image"
+    const imgs = document.querySelectorAll('img[alt="Generated image"]');
+    if (imgs.length) {
+      // Return clickable wrappers (parent div or the img itself)
+      return Array.from(imgs).map(img => {
+        // Walk up to find a clickable container
+        let el = img;
+        for (let i = 0; i < 4; i++) {
+          if (el.parentElement && el.parentElement.offsetWidth > 80) {
+            el = el.parentElement;
+            // Stop at a reasonable container (not the whole page)
+            if (el.offsetWidth > 800) { el = img; break; }
+          }
+        }
+        return el;
+      });
     }
-    if (cards.length) return cards;
 
     // Fallback: any large img in the main content area
-    const imgs = $$('main img, [class*="content"] img, [class*="project"] img');
-    return Array.from(imgs).filter(i => i.offsetWidth > 80);
+    const allImgs = $$('main img, [class*="content"] img, [class*="project"] img');
+    return Array.from(allImgs).filter(i => i.offsetWidth > 80 && i.offsetHeight > 80);
   }
 
   /** Download all generated images by entering each edit view */
@@ -521,12 +525,30 @@
       }
       await MC.sleep(1500);
 
-      // Click download
+      // Click download icon → opens 1K/2K/4K dropdown
       const dlBtn = await waitFor(findDownloadBtn, ELEM_TIMEOUT, 'download button');
       await click(dlBtn);
-      log('Download button clicked');
+      log('Download button clicked — waiting for size menu');
+      await MC.sleep(1000);
 
-      // Wait for "Upscaling complete" / "has been downloaded"
+      // Select from the dropdown menu (1K Original or 2K Upscaled)
+      const sizeBtn = await waitFor(() => {
+        const items = document.querySelectorAll('button[role="menuitem"]');
+        for (const item of items) {
+          const text = item.textContent.trim();
+          // Prefer 2K if available (not disabled), else 1K
+          if (text.includes('2K') && !item.hasAttribute('aria-disabled')) return item;
+        }
+        for (const item of items) {
+          const text = item.textContent.trim();
+          if (text.includes('1K')) return item;
+        }
+        return null;
+      }, 8000, 'download size option');
+      await click(sizeBtn);
+      log('Selected size:', sizeBtn.textContent.trim().replace(/\s+/g, ' '));
+
+      // Wait for download to complete
       await waitForDownloadDone();
       downloaded++;
 
