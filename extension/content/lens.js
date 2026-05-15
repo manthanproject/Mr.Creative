@@ -280,9 +280,19 @@ async function waitForResponse(job_id, timeout = 180000) {
       const responseBoxes = document.querySelectorAll(LSEL.responseBox);
       const lastBox = responseBoxes[responseBoxes.length - 1];
       if (lastBox && lastBox.textContent.trim().length > 100) {
-        log('Response complete — Copy button visible, content length:', lastBox.textContent.trim().length);
-        await MC.sleep(2000); // Extra buffer for any final rendering
-        return;
+        // Check if code block with prompts has rendered
+        const codeEl = document.querySelector('div.pCTyYe code');
+        if (codeEl && codeEl.textContent.includes('===PROMPT===')) {
+          log('Response complete — code block with prompts found, length:', codeEl.textContent.length);
+          await MC.sleep(2000);
+          return;
+        }
+        // Code block not yet rendered — keep waiting (up to 30s more)
+        if (Date.now() - start > 60000) {
+          log('Response complete — Copy button visible but no code block, using fallback. content length:', lastBox.textContent.trim().length);
+          await MC.sleep(2000);
+          return;
+        }
       }
     }
 
