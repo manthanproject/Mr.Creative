@@ -21,13 +21,14 @@ import time
 
 gemini_results = {}
 lens_results = {}
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from threading import Lock
+from typing import Any
 
 bp = Blueprint('extension', __name__, url_prefix='/api/ext')
 
 # ── In-memory job state (shared between extension and dashboard) ──
-_state = {
+_state: dict[str, Any] = {
     'pending_commands': {},       # profile_id → job (targeted commands)
     'pending_any': None,          # Job for any available profile
     'current_jobs': {},           # profile_id → job info
@@ -669,14 +670,14 @@ def flow_complete():
 
     if moved:
         try:
-            from config import supabase
+            from config import supabase  # type: ignore[attr-defined]
             for i, fp in enumerate(moved):
                 supabase.table('generations').insert({
                     'collection_id': collection_id,
                     'image_path': fp.replace('\\', '/'),
                     'prompt_index': i,
                     'job_id': job_id,
-                    'created_at': datetime.utcnow().isoformat(),
+                    'created_at': datetime.now(timezone.utc).isoformat(),
                 }).execute()
         except Exception as e:
             print(f"[Flow Complete] DB error: {e}")
