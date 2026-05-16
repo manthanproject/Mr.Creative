@@ -98,11 +98,14 @@
       el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
       // contenteditable (Slate.js) — human-like Ctrl+V paste via debugger
+      // Step 1: Click inside editor like a human would
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      await MC.sleep(500 + Math.random() * 300);
       el.click();
       el.focus();
-      await MC.sleep(300);
+      await MC.sleep(600 + Math.random() * 400);
 
-      // Write text to clipboard and paste via trusted Ctrl+V
+      // Step 2: Write text to clipboard and paste via trusted Ctrl+V
       const result = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: 'FLOW_PASTE',
@@ -114,7 +117,8 @@
       });
       console.log('[Flow] FLOW_PASTE result:', JSON.stringify(result));
 
-      await MC.sleep(500);
+      // Step 3: Human pause after pasting (reading what was pasted)
+      await MC.sleep(1500 + Math.random() * 1000);
       const clean = (s) => (s || '').replace(/\u200B/g, '').replace(/\uFEFF/g, '').trim();
       console.log('[Flow] Text in editor after paste:', clean(el.textContent).length, 'chars');
     }
@@ -433,24 +437,33 @@
 
   // ────────────────────────────────────────────────────────────────────────
 
-  /** Step 4 — Click the submit/create button via debugger trusted click */
+  /** Step 4 — Click the submit/create button (human-like, no debugger) */
   async function clickSubmit() {
     const btn = await waitFor(findSubmitBtn, ELEM_TIMEOUT, 'submit button');
-    btn.scrollIntoView({ behavior: 'instant', block: 'center' });
-    await MC.sleep(500);
 
-    const rect = btn.getBoundingClientRect();
-    const result = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        type: 'FLOW_CLICK',
-        x: Math.round(rect.left + rect.width / 2),
-        y: Math.round(rect.top + rect.height / 2),
-      }, r => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(r);
-      });
-    });
-    log('Submit clicked via debugger:', JSON.stringify(result));
+    // Human-like: hover first, then click
+    btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await MC.sleep(800 + Math.random() * 500);
+
+    // Move mouse over the button first (hover)
+    btn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    btn.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await MC.sleep(200 + Math.random() * 300);
+
+    // Full click sequence with timing gaps
+    btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
+    btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await MC.sleep(80 + Math.random() * 40);
+    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
+    btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    await MC.sleep(10);
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    // Also try the native click
+    btn.click();
+
+    log('Submit clicked (human-like)');
+    await MC.sleep(1000 + Math.random() * 500);
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -710,7 +723,7 @@
 
         // Human-like pause between prompts
         if (i < total - 1) {
-          const pause = 5000 + Math.random() * 7000;
+          const pause = 8000 + Math.random() * 12000; // 8-20s between prompts
           log(`Pausing ${(pause / 1000).toFixed(1)}s before next prompt`);
           await MC.sleep(pause);
         }

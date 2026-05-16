@@ -319,11 +319,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const tabId = sender.tab.id;
       const target = { tabId };
       try {
-        // 1. Focus the tab
-        await chrome.tabs.update(tabId, { active: true });
-        await new Promise(r => setTimeout(r, 300));
-
-        // 2. Write text to clipboard via MAIN world
+        // 1. Write text to clipboard via MAIN world
         await chrome.scripting.executeScript({
           target: { tabId },
           world: 'MAIN',
@@ -331,26 +327,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           args: [msg.text]
         });
         console.log('[MC-BG] Clipboard written');
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 500));
 
-        // 3. Attach debugger and dispatch trusted Ctrl+V
+        // 2. Attach debugger briefly for Ctrl+V only
         await chrome.debugger.attach(target, '1.3');
-        // Ctrl+V keydown
         await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
           type: 'keyDown', modifiers: 2, key: 'v', code: 'KeyV',
           windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
         });
         await new Promise(r => setTimeout(r, 100));
-        // Ctrl+V keyup
         await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
           type: 'keyUp', modifiers: 2, key: 'v', code: 'KeyV',
           windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
         });
-        console.log('[MC-BG] Trusted Ctrl+V dispatched');
-        await new Promise(r => setTimeout(r, 500));
-
-        // 4. Detach
+        // Detach immediately
         try { await chrome.debugger.detach(target); } catch(_) {}
+        console.log('[MC-BG] Ctrl+V done, debugger detached');
+
         sendResponse({ ok: true });
       } catch (e) {
         console.error('[MC-BG] FLOW_PASTE error:', e.message);
