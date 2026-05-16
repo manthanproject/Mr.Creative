@@ -312,6 +312,87 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
+// ══ FLOW PASTE: write clipboard + debugger Ctrl+V for Slate.js ══
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'FLOW_PASTE' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        // 1. Focus the tab
+        await chrome.tabs.update(tabId, { active: true });
+        await new Promise(r => setTimeout(r, 300));
+
+        // 2. Write text to clipboard via MAIN world
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: (text) => navigator.clipboard.writeText(text),
+          args: [msg.text]
+        });
+        console.log('[MC-BG] Clipboard written');
+        await new Promise(r => setTimeout(r, 300));
+
+        // 3. Attach debugger and dispatch trusted Ctrl+V
+        await chrome.debugger.attach(target, '1.3');
+        // Ctrl+V keydown
+        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+          type: 'keyDown', modifiers: 2, key: 'v', code: 'KeyV',
+          windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
+        });
+        await new Promise(r => setTimeout(r, 100));
+        // Ctrl+V keyup
+        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+          type: 'keyUp', modifiers: 2, key: 'v', code: 'KeyV',
+          windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
+        });
+        console.log('[MC-BG] Trusted Ctrl+V dispatched');
+        await new Promise(r => setTimeout(r, 500));
+
+        // 4. Detach
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: true });
+      } catch (e) {
+        console.error('[MC-BG] FLOW_PASTE error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
+});
+
+// ══ FLOW CLICK: debugger trusted mouse click ══
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'FLOW_CLICK' && sender.tab) {
+    (async () => {
+      const tabId = sender.tab.id;
+      const target = { tabId };
+      try {
+        await chrome.debugger.attach(target, '1.3');
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mousePressed', x: msg.x, y: msg.y,
+          button: 'left', clickCount: 1
+        });
+        await new Promise(r => setTimeout(r, 50));
+        await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+          type: 'mouseReleased', x: msg.x, y: msg.y,
+          button: 'left', clickCount: 1
+        });
+        console.log('[MC-BG] Trusted click at', msg.x, msg.y);
+        await new Promise(r => setTimeout(r, 300));
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: true });
+      } catch (e) {
+        console.error('[MC-BG] FLOW_CLICK error:', e.message);
+        try { await chrome.debugger.detach(target); } catch(_) {}
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
+});
+
 // ── Relay lens results from content script to Flask ──
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === 'LENS_RESULT' && msg.result) {

@@ -97,66 +97,26 @@
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
-      // contenteditable (Slate.js) — click + select + type
-      // Step A: Click the editor to fully activate Slate
+      // contenteditable (Slate.js) — human-like Ctrl+V paste via debugger
       el.click();
-      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
       el.focus();
-      await MC.sleep(400);
+      await MC.sleep(300);
 
-      // Step B: Place cursor inside using Selection API
-      const sel = window.getSelection();
-      const range = document.createRange();
-      const textNode = el.querySelector('[data-slate-zero-width]') ||
-                       el.querySelector('[data-slate-leaf]') ||
-                       el.querySelector('span') || el;
-      try {
-        range.selectNodeContents(textNode);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      } catch(e) { console.warn('[Flow] Range setup failed:', e); }
-      await MC.sleep(200);
+      // Write text to clipboard and paste via trusted Ctrl+V
+      const result = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'FLOW_PASTE',
+          text: text,
+        }, r => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
+      });
+      console.log('[Flow] FLOW_PASTE result:', JSON.stringify(result));
 
+      await MC.sleep(500);
       const clean = (s) => (s || '').replace(/\u200B/g, '').replace(/\uFEFF/g, '').trim();
-
-      // Strategy 1: execCommand with proper selection
-      console.log('[Flow] S1: execCommand insertText');
-      document.execCommand('insertText', false, text);
-      await MC.sleep(500);
-      console.log('[Flow] S1 result:', clean(el.textContent).length, 'chars');
-      if (clean(el.textContent).length >= 20) return;
-
-      // Strategy 2: Clipboard paste
-      console.log('[Flow] S2: ClipboardEvent paste');
-      el.focus();
-      try {
-        const dt = new DataTransfer();
-        dt.setData('text/plain', text);
-        el.dispatchEvent(new ClipboardEvent('paste', {
-          clipboardData: dt, bubbles: true, cancelable: true, composed: true
-        }));
-      } catch(e) {}
-      await MC.sleep(500);
-      console.log('[Flow] S2 result:', clean(el.textContent).length, 'chars');
-      if (clean(el.textContent).length >= 20) return;
-
-      // Strategy 3: beforeinput insertText
-      console.log('[Flow] S3: beforeinput');
-      el.focus();
-      el.dispatchEvent(new InputEvent('beforeinput', {
-        inputType: 'insertText', data: text, bubbles: true, cancelable: true, composed: true
-      }));
-      await MC.sleep(500);
-      console.log('[Flow] S3 result:', clean(el.textContent).length, 'chars');
-      if (clean(el.textContent).length >= 20) return;
-
-      // Strategy 4: innerHTML last resort
-      console.log('[Flow] S4: innerHTML (last resort)');
-      el.innerHTML = '<p data-slate-node="element"><span data-slate-node="text"><span data-slate-leaf="true">' + text + '</span></span></p>';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      console.log('[Flow] S4 result:', clean(el.textContent).length, 'chars');
+      console.log('[Flow] Text in editor after paste:', clean(el.textContent).length, 'chars');
     }
     await MC.sleep(100);
   }
@@ -473,62 +433,24 @@
 
   // ────────────────────────────────────────────────────────────────────────
 
-  /** Step 4 — Click the submit/create button */
+  /** Step 4 — Click the submit/create button via debugger trusted click */
   async function clickSubmit() {
-    // Count images BEFORE submit so we can verify generation actually started
-    const imgsBefore = document.querySelectorAll('img[alt="Generated image"]').length;
-
     const btn = await waitFor(findSubmitBtn, ELEM_TIMEOUT, 'submit button');
-
-    // Strategy 1: Click the button with full event sequence
     btn.scrollIntoView({ behavior: 'instant', block: 'center' });
-    await MC.sleep(300);
-    btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
-    await MC.sleep(50);
-    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
-    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    log('Submit clicked (pointer+mouse)');
+    await MC.sleep(500);
 
-    // Wait 2s and check if generation started
-    await MC.sleep(2000);
-    const txt = document.body.innerText.toLowerCase();
-    const hasNewProgress = txt.includes('generating') || txt.includes('loading') ||
-      document.querySelectorAll('img[alt="Generated image"]').length > imgsBefore;
-
-    if (!hasNewProgress) {
-      // Strategy 2: keyboard Enter on the prompt bar
-      log('Click may not have worked — trying Enter key on prompt bar');
-      const bar = findPromptBar();
-      if (bar) {
-        bar.focus();
-        await MC.sleep(200);
-        // Try Enter
-        bar.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-          bubbles: true, cancelable: true
-        }));
-        await MC.sleep(500);
-        // Try Ctrl+Enter
-        bar.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-          bubbles: true, cancelable: true, ctrlKey: true
-        }));
-        await MC.sleep(1000);
-      }
-
-      // Strategy 3: click the icon inside the button
-      const icon = btn.querySelector('i');
-      if (icon) {
-        icon.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-        icon.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-        icon.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        log('Clicked icon inside submit button');
-      }
-    }
-
-    // Store imgsBefore for waitForGeneration
-    btn._imgsBefore = imgsBefore;
-    log('Submit done, images before:', imgsBefore);
+    const rect = btn.getBoundingClientRect();
+    const result = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: 'FLOW_CLICK',
+        x: Math.round(rect.left + rect.width / 2),
+        y: Math.round(rect.top + rect.height / 2),
+      }, r => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(r);
+      });
+    });
+    log('Submit clicked via debugger:', JSON.stringify(result));
   }
 
   // ────────────────────────────────────────────────────────────────────────
