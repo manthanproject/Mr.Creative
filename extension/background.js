@@ -480,7 +480,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         setTimeout(async () => {
           try { await chrome.debugger.detach(target); } catch(_) {}
           // Clean up temp file
-          try { chrome.downloads.removeFile(downloadId); } catch(_) {}
+          try { chrome.downloads.removeFile(downloadId); chrome.downloads.erase({ id: downloadId }); } catch(_) {}
         }, 5000);
 
         sendResponse({ ok: true, filePath });
