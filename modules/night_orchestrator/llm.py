@@ -99,7 +99,7 @@ def _call_gemini_extension(prompt, timeout=300, image_url=None):
     job_id = f'llm_{uuid.uuid4().hex[:8]}'
 
     # Import extension state directly (no HTTP to self)
-    from routes.extension import _state, _lock, gemini_results
+    from routes.extension import _state, _lock, gemini_results  # type: ignore[attr-defined]
 
     # Find profile with gemini capability
     routed = False
@@ -155,7 +155,7 @@ def _call_lens_extension(prompt, timeout=300, image_url=None):
 
     job_id = f'lens_{uuid.uuid4().hex[:8]}'
 
-    from routes.extension import _state, _lock, lens_results
+    from routes.extension import _state, _lock, lens_results  # type: ignore[attr-defined]
 
     # Find profile with lens capability (any google.com tab)
     routed = False

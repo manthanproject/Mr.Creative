@@ -264,7 +264,7 @@ def run_agent_pipeline(app, job_id):
 
             # Extension-based Flow (no Selenium)
             import uuid as _uuid
-            from routes.extension import _state, _lock
+            from routes.extension import _state, _lock  # type: ignore[attr-defined]
 
             _prompt_texts: list[str] = []
             for p in prompts:
