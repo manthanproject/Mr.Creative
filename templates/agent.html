@@ -547,6 +547,7 @@ function pollJobStatus() {
     if (pollInterval) clearInterval(pollInterval);
     pollInterval = setInterval(async function() {
         try {
+            if (!currentJobId) return;
             var res = await fetch('/agent/status/' + currentJobId);
             var d = await res.json();
 
