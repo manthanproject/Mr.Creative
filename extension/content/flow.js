@@ -97,45 +97,66 @@
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
-      // contenteditable (Slate.js) — try multiple strategies to sync with Slate's model
+      // contenteditable (Slate.js) — click + select + type
+      // Step A: Click the editor to fully activate Slate
+      el.click();
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
       el.focus();
+      await MC.sleep(400);
+
+      // Step B: Place cursor inside using Selection API
+      const sel = window.getSelection();
+      const range = document.createRange();
+      const textNode = el.querySelector('[data-slate-zero-width]') ||
+                       el.querySelector('[data-slate-leaf]') ||
+                       el.querySelector('span') || el;
+      try {
+        range.selectNodeContents(textNode);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch(e) { console.warn('[Flow] Range setup failed:', e); }
       await MC.sleep(200);
 
-      // Strategy 1: Clipboard paste (Slate has native paste handler — best chance)
+      const clean = (s) => (s || '').replace(/\u200B/g, '').replace(/\uFEFF/g, '').trim();
+
+      // Strategy 1: execCommand with proper selection
+      console.log('[Flow] S1: execCommand insertText');
+      document.execCommand('insertText', false, text);
+      await MC.sleep(500);
+      console.log('[Flow] S1 result:', clean(el.textContent).length, 'chars');
+      if (clean(el.textContent).length >= 20) return;
+
+      // Strategy 2: Clipboard paste
+      console.log('[Flow] S2: ClipboardEvent paste');
+      el.focus();
       try {
         const dt = new DataTransfer();
         dt.setData('text/plain', text);
         el.dispatchEvent(new ClipboardEvent('paste', {
           clipboardData: dt, bubbles: true, cancelable: true, composed: true
         }));
-        await MC.sleep(500);
-        if ((el.textContent || '').trim().length >= 20) {
-          // Paste worked — Slate model is in sync
-          await MC.sleep(100);
-          return;
-        }
       } catch(e) {}
+      await MC.sleep(500);
+      console.log('[Flow] S2 result:', clean(el.textContent).length, 'chars');
+      if (clean(el.textContent).length >= 20) return;
 
-      // Strategy 2: beforeinput insertText (Slate v0.72+)
+      // Strategy 3: beforeinput insertText
+      console.log('[Flow] S3: beforeinput');
       el.focus();
       el.dispatchEvent(new InputEvent('beforeinput', {
-        inputType: 'insertText', data: text, bubbles: true, cancelable: true
+        inputType: 'insertText', data: text, bubbles: true, cancelable: true, composed: true
       }));
       await MC.sleep(500);
-      if ((el.textContent || '').trim().length >= 20) return;
+      console.log('[Flow] S3 result:', clean(el.textContent).length, 'chars');
+      if (clean(el.textContent).length >= 20) return;
 
-      // Strategy 3: execCommand insertText (updates DOM + may trigger MutationObserver)
-      el.focus();
-      document.execCommand('selectAll', false, null);
-      document.execCommand('delete', false, null);
-      document.execCommand('insertText', false, text);
-      await MC.sleep(300);
-      if ((el.textContent || '').trim().length >= 20) return;
-
-      // Strategy 4: innerHTML with Slate DOM structure (last resort — may desync model)
+      // Strategy 4: innerHTML last resort
+      console.log('[Flow] S4: innerHTML (last resort)');
       el.innerHTML = '<p data-slate-node="element"><span data-slate-node="text"><span data-slate-leaf="true">' + text + '</span></span></p>';
       el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log('[Flow] S4 result:', clean(el.textContent).length, 'chars');
     }
     await MC.sleep(100);
   }
