@@ -97,11 +97,31 @@
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
-      // contenteditable — use execCommand for React compat
+      // contenteditable (Slate.js) — set innerHTML with Slate structure + dispatch events
       el.focus();
-      document.execCommand('selectAll', false, null);
-      document.execCommand('delete', false, null);
-      document.execCommand('insertText', false, text);
+      await MC.sleep(200);
+      // Set Slate-compatible HTML structure
+      el.innerHTML = '<p data-slate-node="element"><span data-slate-node="text"><span data-slate-leaf="true">' + text + '</span></span></p>';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      await MC.sleep(300);
+      // If Slate didnt sync, try paste event as fallback
+      if ((el.textContent || '').trim().length < 20) {
+        el.focus();
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        el.dispatchEvent(new ClipboardEvent('paste', {
+          clipboardData: dt, bubbles: true, cancelable: true, composed: true
+        }));
+        await MC.sleep(300);
+      }
+      // Last fallback: execCommand
+      if ((el.textContent || '').trim().length < 20) {
+        el.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        document.execCommand('insertText', false, text);
+      }
     }
     await MC.sleep(100);
   }
