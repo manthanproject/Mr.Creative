@@ -221,11 +221,11 @@
                 <div class="ag-group">
                     <label class="ag-label">Content types</label>
                     <div class="ag-pills" id="contentPills">
-                        <div class="ag-pill active" data-type="social_post" onclick="togglePill(this)">📱 Social posts</div>
-                        <div class="ag-pill active" data-type="banner" onclick="togglePill(this)">🖼 Banners</div>
-                        <div class="ag-pill active" data-type="a_plus" onclick="togglePill(this)">📊 A+ content</div>
-                        <div class="ag-pill active" data-type="lifestyle" onclick="togglePill(this)">🌿 Lifestyle</div>
-                        <div class="ag-pill active" data-type="ad_creative" onclick="togglePill(this)">📣 Ad creatives</div>
+                        <div class="ag-pill" data-type="social_post" onclick="togglePill(this)">📱 Social posts</div>
+                        <div class="ag-pill" data-type="banner" onclick="togglePill(this)">🖼 Banners</div>
+                        <div class="ag-pill" data-type="a_plus" onclick="togglePill(this)">📊 A+ content</div>
+                        <div class="ag-pill" data-type="lifestyle" onclick="togglePill(this)">🌿 Lifestyle</div>
+                        <div class="ag-pill" data-type="ad_creative" onclick="togglePill(this)">📣 Ad creatives</div>
                         <div class="ag-pill" data-type="model_photography" onclick="togglePill(this)">👤 Model Photography</div>
                     </div>
                 </div>
@@ -671,16 +671,40 @@ async function stopJob() {
     var data = await res.json();
     if (data.success) {
         clearInterval(pollInterval);
+        try { await fetch('/api/ext/stop-flow', { method: 'POST' }); } catch(_) {}
         document.getElementById('stopBtn').disabled = true;
         document.getElementById('stopBtn').textContent = '⏹ Stopped';
-        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('pauseBtn').textContent = '▶ Resume';
+        document.getElementById('pauseBtn').onclick = resumeJob;
         document.getElementById('agentIcon').textContent = '🛑';
         document.getElementById('agentName').textContent = 'Stopped';
-        document.getElementById('agentMsg').textContent = 'Job stopped by user';
-        var btn = document.getElementById('launchBtn');
-        btn.disabled = false;
-        btn.textContent = '🤖 Launch Agent Pipeline';
-        document.getElementById('jobControls').style.display = 'none';
+        document.getElementById('agentMsg').textContent = 'Job stopped — click Resume to continue';
+    }
+}
+
+async function resumeJob() {
+    try {
+        var res = await fetch('/api/ext/resume-flow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        var data = await res.json();
+        if (data.ok) {
+            showToast('Resuming from prompt ' + (data.resumed_from + 1), 'success');
+            document.getElementById('pauseBtn').textContent = '⏸ Pause';
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('stopBtn').textContent = '⏹ Stop';
+            document.getElementById('agentIcon').textContent = '🤖';
+            document.getElementById('agentName').textContent = 'Resuming';
+            document.getElementById('agentMsg').textContent = 'Continuing from prompt ' + (data.resumed_from + 1);
+        } else {
+            showToast(data.error || 'Cannot resume', 'error');
+        }
+    } catch(e) {
+        showToast('Resume failed: ' + e.message, 'error');
     }
 }
 

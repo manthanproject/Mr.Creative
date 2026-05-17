@@ -623,6 +623,87 @@ def post_lens_result():
     return jsonify({'ok': True})
 
 
+@bp.route('/stop-flow', methods=['POST'])
+def stop_flow():
+    """Signal the Flow extension bot to stop, or clear the flag."""
+    data = request.get_json(silent=True) or {}
+    clear = data.get('clear', False)
+    with _lock:
+        _state['flow_stop'] = not clear
+    print(f"[Extension] Flow stop signal {'cleared' if clear else 'set'}")
+    return jsonify({'ok': True})
+
+
+@bp.route('/check-stop', methods=['GET'])
+def check_stop():
+    """Check if Flow bot should stop."""
+    with _lock:
+        should_stop = _state.get('flow_stop', False)
+    return jsonify({'stop': should_stop})
+
+
+@bp.route('/save-progress', methods=['POST'])
+def save_progress():
+    """Save Flow job progress for resume."""
+    data = request.get_json() or {}
+    job_id = data.get('job_id')
+    if not job_id:
+        return jsonify({'error': 'No job_id'}), 400
+    with _lock:
+        jd = _state.get('job_data')
+        if isinstance(jd, dict) and job_id in jd:
+            jd[job_id]['completed_index'] = data.get('completed_index', 0)
+            jd[job_id]['project_url'] = data.get('project_url', '')
+            print(f"[Extension] Progress saved: job={job_id}, completed={data.get('completed_index')}")
+    return jsonify({'ok': True})
+
+
+@bp.route('/resume-flow', methods=['POST'])
+def resume_flow():
+    """Resume a stopped Flow job from where it left off."""
+    data = request.get_json() or {}
+    job_id = data.get('job_id')
+
+    with _lock:
+        jd = _state.get('job_data', {})
+        if not job_id:
+            for jid, jdata in jd.items():
+                if jdata.get('completed_index') and jdata.get('job_type') == 'flow':
+                    job_id = jid
+                    break
+        if not job_id:
+            return jsonify({'error': 'No stopped Flow job found'}), 404
+
+        job = jd.get(job_id)
+        if not job:
+            return jsonify({'error': 'Job not found'}), 404
+
+        completed = job.get('completed_index', 0)
+        project_url = job.get('project_url', '')
+        if not completed:
+            return jsonify({'error': 'No progress to resume from'}), 400
+
+        resume_job = dict(job)
+        resume_job['start_index'] = completed
+        resume_job['project_url'] = project_url
+        resume_job['_onFreshProject'] = True
+        _state['flow_stop'] = False
+
+        _profiles = dict(_state.get('profiles') or {})
+        routed = False
+        for pid, info in _profiles.items():
+            caps = info.get('capabilities', [])
+            if 'flow_active' in caps:
+                _state['pending_commands'][pid] = resume_job
+                routed = True
+                print(f"[Extension] Resume job {job_id} from prompt {completed + 1}, routed to {pid}")
+                break
+
+    if not routed:
+        return jsonify({'error': 'No Flow profile connected'}), 400
+    return jsonify({'ok': True, 'resumed_from': completed})
+
+
 @bp.route('/flow-complete', methods=['POST'])
 def flow_complete():
     import os, shutil, glob

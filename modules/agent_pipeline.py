@@ -337,6 +337,23 @@ def run_agent_pipeline(app, job_id):
                             _msg = _cur.get('message', '')
                             if _msg:
                                 job.message = f'Flow: {_msg}'
+
+                                # Calculate real-time progress from Flow bot status
+                                import re
+                                _pm = re.search(r'Prompt\s+(\d+)/(\d+)', _msg)
+                                _dm = re.search(r'Download\s+(\d+)/(\d+)', _msg)
+                                if _msg.startswith('Downloading') or _msg.startswith('Download'):
+                                    if _dm:
+                                        _di, _dt = int(_dm.group(1)), int(_dm.group(2))
+                                        job.progress = 80 + int((_di / max(_dt, 1)) * 15)
+                                    else:
+                                        job.progress = 80
+                                elif _pm:
+                                    _pi, _pt = int(_pm.group(1)), int(_pm.group(2))
+                                    job.progress = 45 + int((_pi / max(_pt, 1)) * 35)
+                                elif 'complete' in _msg.lower():
+                                    job.progress = 95
+
                                 try: db.session.commit()
                                 except Exception: pass
                 if not _check_job_control(job, db):

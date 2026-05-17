@@ -570,12 +570,13 @@
   }
 
   /** Download all generated images by entering each edit view */
-  async function downloadAllImages(count) {
+  async function downloadAllImages(count, job_id) {
     log(`Downloading ${count} images`);
     let downloaded = 0;
 
     for (let i = 0; i < count; i++) {
       log(`Download ${i + 1}/${count}: opening edit view`);
+      if (job_id) MC.sendStatus(job_id, 'running', `Download ${i + 1}/${count}`);
 
       const cards = getGalleryCards();
       if (i >= cards.length) {
@@ -699,81 +700,121 @@
 
   // ── MAIN JOB HANDLER ───────────────────────────────────────────────────
 
+  /** Check if stop was requested via Flask */
+  async function shouldStop() {
+    try {
+      const res = await fetch(`${MC.SERVER}/api/ext/check-stop`);
+      const data = await res.json();
+      return data.stop === true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function runJob(job) {
     const { job_id, prompts, image_url, aspect_ratio, count } = job;
     const total = prompts.length;
     log(`Starting job ${job_id}: ${total} prompts`);
 
+    // Clear any previous stop flag
     try {
-      // ── Always create a NEW project ──
-      // Clicking "New project" or back button may reload the page (kills this script).
-      // We use _onFreshProject flag + chrome.storage.local to survive reloads.
+      await fetch(`${MC.SERVER}/api/ext/stop-flow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clear: true })
+      });
+    } catch (_) {}
 
-      if (!job._onFreshProject) {
-        // First run — need to navigate to a fresh project
-        job._onFreshProject = true;
+    try {
+      const isResume = (job.start_index || 0) > 0;
 
-        if (isProjectPage() || isEditPage()) {
-          // Save job so it survives page reload, then navigate to dashboard
-          log('Saving job & navigating to Flow dashboard');
+      if (isResume && job.project_url) {
+        // ── RESUME: navigate to existing project ──
+        log(`Resuming job on existing project: ${job.project_url}`);
+        if (location.href !== job.project_url && !isProjectPage()) {
           await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
-          location.href = 'https://labs.google/fx/tools/flow';
-          return; // script will reload → init() resumes with _onFreshProject = true
-        }
-      }
-
-      // If we're on the dashboard, click "New project"
-      if (isDashboard()) {
-        log('On dashboard — clicking New Project');
-        const np = await waitFor(
-          () => findByText('New project', 'button,div,span,a,h3,h4'),
-          8000, '"+ New project" button'
-        );
-
-        // Save job again in case "New project" click triggers reload
-        await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
-        await click(np);
-        await MC.sleep(4000);
-
-        // If still alive (SPA navigation), check if we landed on project page
-        if (isProjectPage()) {
-          chrome.storage.local.remove('pendingFlowJob');
-          log('New project created (SPA navigation)');
-        } else {
-          // Page reloaded → init() will resume the job
+          location.href = job.project_url;
           return;
         }
-      }
-
-      // At this point we must be on a project page (new or resumed)
-      if (isProjectPage()) {
-        // Clear any leftover pending job
-        chrome.storage.local.remove('pendingFlowJob');
-        log('On fresh project page');
-        MC.sendStatus(job_id, 'running', 'New project created');
+        if (isProjectPage()) {
+          chrome.storage.local.remove('pendingFlowJob');
+          log('On existing project page — resuming');
+          MC.sendStatus(job_id, 'running', `Resuming from prompt ${job.start_index + 1}`);
+        }
       } else {
-        throw new Error('Expected project page but got: ' + location.href);
-      }
+        // ── NEW JOB: create a new project ──
+        if (!job._onFreshProject) {
+          job._onFreshProject = true;
+          if (isProjectPage() || isEditPage()) {
+            log('Saving job & navigating to Flow dashboard');
+            await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
+            location.href = 'https://labs.google/fx/tools/flow';
+            return;
+          }
+        }
 
-      // ── Step 1: Settings (best-effort) ──
-      try {
-        await setSettings(count || 1, aspect_ratio || '1:1');
-        MC.sendStatus(job_id, 'running', 'Settings configured');
-      } catch (settingsErr) {
-        warn('Settings step failed, continuing with current defaults:', settingsErr.message);
-        MC.sendStatus(job_id, 'running', 'Settings skipped, using current defaults');
+        if (isDashboard()) {
+          log('On dashboard — clicking New Project');
+          const np = await waitFor(
+            () => findByText('New project', 'button,div,span,a,h3,h4'),
+            8000, '"+ New project" button'
+          );
+          await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
+          await click(np);
+          await MC.sleep(4000);
+          if (isProjectPage()) {
+            chrome.storage.local.remove('pendingFlowJob');
+            log('New project created (SPA navigation)');
+          } else {
+            return;
+          }
+        }
+
+        if (isProjectPage()) {
+          chrome.storage.local.remove('pendingFlowJob');
+          log('On fresh project page');
+          MC.sendStatus(job_id, 'running', 'New project created');
+        } else {
+          throw new Error('Expected project page but got: ' + location.href);
+        }
+
+        // ── Step 1: Settings (best-effort) ──
+        try {
+          await setSettings(count || 1, aspect_ratio || '1:1');
+          MC.sendStatus(job_id, 'running', 'Settings configured');
+        } catch (settingsErr) {
+          warn('Settings step failed, continuing with current defaults:', settingsErr.message);
+          MC.sendStatus(job_id, 'running', 'Settings skipped, using current defaults');
+        }
       }
 
       // ── Steps 2-5: Generate all images ──
-      for (let i = 0; i < total; i++) {
+      const startIndex = job.start_index || 0;
+      if (startIndex > 0) log(`Resuming from prompt ${startIndex + 1}/${total}`);
+
+      for (let i = startIndex; i < total; i++) {
         const label = `Prompt ${i + 1}/${total}`;
         MC.sendStatus(job_id, 'running', label);
         log(`\n──── ${label} ────`);
 
+        // Check if stop was requested
+        if (await shouldStop()) {
+          warn(`Stop requested — saving progress at prompt ${i}/${total}`);
+          MC.sendStatus(job_id, 'stopped', `Stopped at prompt ${i}/${total}`);
+          try {
+            await fetch(`${MC.SERVER}/api/ext/save-progress`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ job_id, completed_index: i, total, project_url: location.href }),
+            });
+          } catch (_) {}
+          break;
+        }
+
         // Attach reference image
         if (image_url) {
-          if (i === 0) await uploadRefImage(image_url);
-          else         await selectRefFromLibrary();
+          if (i === 0 && startIndex === 0) await uploadRefImage(image_url);
+          else                              await selectRefFromLibrary();
         }
 
         // Type prompt + submit in one debugger session (paste + click)
@@ -804,7 +845,7 @@
       MC.sendStatus(job_id, 'running', 'Downloading images');
 
       // ── Step 6: Download all ──
-      const dlCount = await downloadAllImages(generatedCount);
+      const dlCount = await downloadAllImages(generatedCount, job_id);
 
       // ── Done ──
       MC.sendStatus(job_id, 'complete', `Done: ${dlCount}/${total} images downloaded`);
