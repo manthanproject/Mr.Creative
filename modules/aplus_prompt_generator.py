@@ -57,12 +57,19 @@ def build_mega_prompt(count, brand_info=None):
 Generate exactly {count} unique AI image generation prompts for this product's Amazon A+ listing.
 {brand_context}
 
+CRITICAL — REFERENCE IMAGE RULES:
+- A reference image of the product will be provided to the AI image generator
+- The product in the generated image MUST look IDENTICAL to the reference image
+- DO NOT describe the product appearance in detail — instead say the product from the reference image
+- DO NOT change, redesign, or reimagine the product label, text, colors, shape, logo, or packaging
+- The prompt should describe the SCENE, BACKGROUND, LIGHTING, COMPOSITION around the unchanged product
+
 Each prompt MUST:
 - Be 100-200 words, completely self-contained
-- Describe the EXACT product you see in the image (not a generic product)
-- Include: scene description, lighting (3-point studio), camera (85mm f/8 ISO 100), composition
-- Include ALL text/headlines that should appear in the image
-- End with negative prompt (no blur, no low quality, no cartoonish)
+- Reference the product as the exact product from the reference image (never describe it from scratch)
+- Include: scene/background description, lighting (3-point studio), camera (85mm f/8 ISO 100), composition
+- For infographic types: describe text overlays, icons, layout alongside the unchanged product
+- End with negative prompt: no blur, no low quality, no cartoonish, no product modification, no label changes
 - Be ultra photorealistic, 12K UHD quality
 
 IMAGE TYPES NEEDED:{type_list}

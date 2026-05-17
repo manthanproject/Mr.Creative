@@ -360,38 +360,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
           });
           console.log('[MC-BG] Enter key pressed');
-
-          // If Enter doesn't submit, click the button with mouse
-          await new Promise(r => setTimeout(r, 1500));
-
-          // Get submit button position from page
-          const [posResult] = await chrome.scripting.executeScript({
-            target: { tabId },
-            world: 'MAIN',
-            func: () => {
-              const btns = document.querySelectorAll('button');
-              for (const b of btns) {
-                const icon = b.querySelector('i');
-                if (icon && icon.textContent.trim() === 'arrow_forward') {
-                  const r = b.getBoundingClientRect();
-                  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-                }
-              }
-              return null;
-            }
-          });
-
-          if (posResult?.result) {
-            const { x, y } = posResult.result;
-            await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-              type: 'mousePressed', x, y, button: 'left', clickCount: 1
-            });
-            await new Promise(r => setTimeout(r, 80));
-            await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-              type: 'mouseReleased', x, y, button: 'left', clickCount: 1
-            });
-            console.log('[MC-BG] Submit clicked at', x, y);
-          }
         }
 
         // 5. Detach
