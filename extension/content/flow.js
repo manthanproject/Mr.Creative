@@ -597,7 +597,7 @@
       log('Download button clicked');
       await MC.sleep(600);
 
-      // Select 1K (fastest, no upscale wait)
+      // Select 2K upscaled
       const sizeBtn = await waitFor(() => {
         const items = document.querySelectorAll('button[role="menuitem"]');
         for (const item of items) {
@@ -608,36 +608,40 @@
       await click(sizeBtn);
       log('Selected 2K');
 
-      // Brief wait for download to start (no long confirmation wait)
-      await MC.sleep(3000);
+      // Wait for upscale + download confirmation
+      await waitForDownloadDone();
       downloaded++;
 
       // Go back to gallery
       const back = await waitFor(findBackBtn, 5000, 'back button');
       await click(back);
-      await MC.sleep(1500);
+      await MC.sleep(2000);
 
-      // Confirm we're back
+      // Confirm we're back and gallery is loaded
       try {
         await waitFor(isProjectPage, 5000, 'project page');
       } catch (_) {
         history.back();
-        await MC.sleep(1500);
+        await MC.sleep(2000);
       }
-      await MC.sleep(500);
+      // Wait for gallery cards to re-render before next download
+      await waitFor(() => getGalleryCards().length > 0, 8000, 'gallery cards to load');
+      await MC.sleep(1000);
     }
 
     log(`Downloaded ${downloaded}/${count} images`);
     return downloaded;
   }
 
-  /** Wait for the download notification (shortened) */
+  /** Wait for the download notification — jumps immediately when detected */
   async function waitForDownloadDone() {
     log('Waiting for download...');
     const t0 = Date.now();
     while (Date.now() - t0 < DL_TIMEOUT) {
       const txt = document.body.innerText.toLowerCase();
-      if (txt.includes('upscaling complete') || txt.includes('has been downloaded') || txt.includes('download complete')) {
+      if (txt.includes('upscaling complete') || txt.includes('has been downloaded') ||
+          txt.includes('download complete') || txt.includes('been downloaded') ||
+          txt.includes('download will start')) {
         log('Download confirmed!');
         await MC.sleep(500);
         const dismiss = findByText('Dismiss', 'button,span,a');
