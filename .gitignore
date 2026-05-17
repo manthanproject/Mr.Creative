@@ -62,3 +62,4 @@ scan_result.png
 *.bak
 .claude/
 .env 
+static/collections/

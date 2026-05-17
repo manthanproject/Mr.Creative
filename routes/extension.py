@@ -625,61 +625,121 @@ def post_lens_result():
 
 @bp.route('/flow-complete', methods=['POST'])
 def flow_complete():
-    import os, shutil, time as _time, glob
-    from datetime import datetime
+    import os, shutil, glob
+    from datetime import datetime as _dt
+    from models import db, Collection, Generation, User
+
     data = request.get_json() or {}
     job_id = data.get('job_id', 'unknown')
     download_count = data.get('download_count', 0)
-    print(f"[Flow Complete] job={job_id}, downloaded={download_count}")
+    total_prompts = data.get('total_prompts', 0)
+    print(f"[Flow Complete] job={job_id}, downloaded={download_count}, total={total_prompts}")
 
-    job_data = _state.get('job_data', {}).get(job_id, {})
+    # Get job data from state
+    job_data = {}
+    with _lock:
+        jd = _state.get('job_data')
+        if isinstance(jd, dict):
+            job_data = jd.get(job_id, {})
+
     collection_id = job_data.get('collection_id')
-    job_start = job_data.get('start_time', _time.time() - 600)
+    job_start = job_data.get('start_time', time.time() - 600)
+    prompts = job_data.get('prompts', [])
 
+    print(f"[Flow Complete] collection_id={collection_id}, job_start={job_start}, prompts={len(prompts)}")
+
+    # Auto-create collection if missing
     if not collection_id:
-        print(f"[Flow Complete] No collection_id for job {job_id}")
-        return jsonify({'status': 'warning', 'message': 'No collection_id'}), 200
+        user = User.query.first()
+        if user:
+            col = Collection(
+                user_id=user.id,
+                name=f"Flow — {_dt.now().strftime('%b %d %H:%M')}",
+                description=f'Auto-created by Flow bot | {download_count} images'
+            )
+            db.session.add(col)
+            db.session.commit()
+            collection_id = col.id
+            print(f"[Flow Complete] Auto-created collection: {collection_id}")
+        else:
+            print("[Flow Complete] No user found, cannot create collection")
+            return jsonify({'status': 'error', 'message': 'No user'}), 400
 
-    downloads_dir = os.path.expanduser('~/Downloads')
-    collection_dir = os.path.join('static', 'collections', str(collection_id))
+    # Ensure collection directory exists
+    collection_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'static', 'collections', str(collection_id)
+    )
     os.makedirs(collection_dir, exist_ok=True)
 
+    # Scan Downloads folder for recent image files
+    downloads_dir = os.path.expanduser('~/Downloads')
     recent_files = []
     for ext in ('*.png', '*.jpg', '*.jpeg', '*.webp'):
         for f in glob.glob(os.path.join(downloads_dir, ext)):
-            if os.path.getmtime(f) >= job_start:
-                recent_files.append((f, os.path.getmtime(f)))
+            try:
+                mtime = os.path.getmtime(f)
+                if mtime >= job_start:
+                    recent_files.append((f, mtime))
+            except OSError:
+                continue
 
+    # Sort by modification time (oldest first)
     recent_files.sort(key=lambda x: x[1])
-    if len(recent_files) > download_count:
-        recent_files = recent_files[:download_count]
 
-    moved = []
+    # Take only the expected count (avoid grabbing unrelated downloads)
+    if download_count > 0 and len(recent_files) > download_count:
+        recent_files = recent_files[-download_count:]  # take the LATEST N files
+
+    print(f"[Flow Complete] Found {len(recent_files)} recent files in Downloads")
+
+    # Get user for Generation records
+    user = User.query.first()
+    if not user:
+        return jsonify({'status': 'error', 'message': 'No user'}), 400
+
+    moved = 0
     for i, (filepath, _) in enumerate(recent_files):
         filename = os.path.basename(filepath)
-        dest = os.path.join(collection_dir, filename)
-        if os.path.exists(dest):
-            name, ext = os.path.splitext(filename)
-            dest = os.path.join(collection_dir, f"{name}_{i}{ext}")
-        try:
-            shutil.move(filepath, dest)
-            moved.append(dest)
-            print(f"[Flow Complete] Moved: {filename}")
-        except Exception as e:
-            print(f"[Flow Complete] Failed: {e}")
+        # Clean filename — add prompt context if available
+        prompt_snippet = ''
+        if i < len(prompts):
+            prompt_snippet = prompts[i][:50].replace(' ', '_').replace('/', '_').replace('\\', '_')
+            prompt_snippet = ''.join(c for c in prompt_snippet if c.isalnum() or c in '_-')
 
-    if moved:
-        try:
-            from config import supabase  # type: ignore[attr-defined]
-            for i, fp in enumerate(moved):
-                supabase.table('generations').insert({
-                    'collection_id': collection_id,
-                    'image_path': fp.replace('\\', '/'),
-                    'prompt_index': i,
-                    'job_id': job_id,
-                    'created_at': datetime.now(timezone.utc).isoformat(),
-                }).execute()
-        except Exception as e:
-            print(f"[Flow Complete] DB error: {e}")
+        timestamp = _dt.now().strftime('%Y%m%d%H%M')
+        name, ext = os.path.splitext(filename)
+        new_name = f"{prompt_snippet}_{timestamp}{ext}" if prompt_snippet else f"{name}_{timestamp}{ext}"
+        dest = os.path.join(collection_dir, new_name)
 
-    return jsonify({'status': 'ok', 'moved': len(moved)})
+        try:
+            shutil.copy2(filepath, dest)  # copy, not move — safer
+            rel_path = f"collections/{collection_id}/{new_name}"
+
+            # Create Generation record via ORM
+            gen = Generation(
+                user_id=user.id,
+                collection_id=collection_id,
+                input_type='image',
+                output_type='image',
+                output_path=rel_path,
+                pomelli_feature='flow',
+                status='completed',
+                file_size=os.path.getsize(dest),
+                completed_at=_dt.now(),
+            )
+            db.session.add(gen)
+            moved += 1
+            print(f"[Flow Complete] Saved: {new_name}")
+        except Exception as e:
+            print(f"[Flow Complete] Failed to save {filename}: {e}")
+
+    if moved > 0:
+        try:
+            db.session.commit()
+            print(f"[Flow Complete] Committed {moved} Generation records")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[Flow Complete] DB commit error: {e}")
+
+    return jsonify({'status': 'ok', 'saved': moved, 'collection_id': str(collection_id)})
