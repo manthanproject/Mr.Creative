@@ -48,6 +48,12 @@ document.addEventListener('error', function(e) {
         setTimeout(function() {
             main.innerHTML = newMain.innerHTML;
 
+            // Kill entry animations — PJAX already does its own fade transition
+            main.querySelectorAll('.animate-fade-up, .animate-fade-in, .idea-card, .set-stat, [class*="delay-"]').forEach(function(el) {
+                el.style.animation = 'none';
+                el.style.opacity = '1';
+            });
+
             // Copy any new CSS from head
             doc.querySelectorAll('style, link[rel=stylesheet]').forEach(function(s) {
                 var id = s.id || s.getAttribute('href');
@@ -272,6 +278,11 @@ document.addEventListener('error', function(e) {
 
                 if (newMain) {
                     main.innerHTML = newMain.innerHTML;
+                    // Kill entry animations on soft reload
+                    main.querySelectorAll('.animate-fade-up, .animate-fade-in, .idea-card, .set-stat, [class*="delay-"]').forEach(function(el) {
+                        el.style.animation = 'none';
+                        el.style.opacity = '1';
+                    });
                     // Re-run inline scripts in main
                     main.querySelectorAll('script').forEach(function(oldScript) {
                         var newScript = document.createElement('script');
