@@ -312,44 +312,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
-// ══ FLOW PASTE + SUBMIT: single debugger session for paste and click ══
+// ══ FLOW PASTE + SUBMIT: single debugger session — Input.insertText (no clipboard) ══
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'FLOW_PASTE' && sender.tab) {
     (async () => {
       const tabId = sender.tab.id;
       const target = { tabId };
       try {
-        // 1. Write text to clipboard via MAIN world
-        await chrome.scripting.executeScript({
-          target: { tabId },
-          world: 'MAIN',
-          func: (text) => navigator.clipboard.writeText(text),
-          args: [msg.text]
-        });
-        console.log('[MC-BG] Clipboard written');
-        await new Promise(r => setTimeout(r, 500));
-
-        // 2. Attach debugger once
+        // 1. Attach debugger
         await chrome.debugger.attach(target, '1.3');
 
-        // 3. Ctrl+V to paste
-        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
-          type: 'keyDown', modifiers: 2, key: 'v', code: 'KeyV',
-          windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
+        // 2. Insert text directly via debugger (no clipboard needed)
+        await chrome.debugger.sendCommand(target, 'Input.insertText', {
+          text: msg.text
         });
-        await new Promise(r => setTimeout(r, 100));
-        await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
-          type: 'keyUp', modifiers: 2, key: 'v', code: 'KeyV',
-          windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
-        });
-        console.log('[MC-BG] Ctrl+V done');
+        console.log('[MC-BG] Text inserted via Input.insertText (' + msg.text.length + ' chars)');
 
-        // 4. If submit requested, press Enter via debugger (same session as paste)
+        // 3. If submit requested, press Enter after human-like delay
         if (msg.doSubmit) {
-          // Wait 2-3s (human reads what they pasted)
           await new Promise(r => setTimeout(r, 5000 + Math.random() * 3000));
 
-          // Press Enter key — Slate.js may trigger form submit
           await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
             type: 'rawKeyDown', key: 'Enter', code: 'Enter',
             windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
@@ -362,7 +344,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           console.log('[MC-BG] Enter key pressed');
         }
 
-        // 5. Detach
+        // 4. Detach
         await new Promise(r => setTimeout(r, 300));
         try { await chrome.debugger.detach(target); } catch(_) {}
         sendResponse({ ok: true });
