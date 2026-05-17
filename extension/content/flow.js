@@ -19,7 +19,7 @@
   const TAG       = '[Mr.Creative][Flow]';
   const POLL      = 400;           // ms between DOM checks
   const GEN_TIMEOUT  = 180_000;    // 3 min max per image generation
-  const DL_TIMEOUT   = 30_000;     // 30s max per download
+  const DL_TIMEOUT   = 15_000;     // 30s max per download
   const REF_TIMEOUT  = 45_000;     // 45s max for ref image processing
   const ELEM_TIMEOUT = 12_000;     // 12s max to find a DOM element
 
