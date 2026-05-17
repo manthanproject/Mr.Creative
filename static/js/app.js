@@ -137,11 +137,10 @@ document.addEventListener('error', function(e) {
         var href = link.getAttribute('href');
         if (!href || !href.startsWith('/') || href.match(/^\/(api|static|auth|login|logout)\//)) return;
         if (_cache[href] || _prefetching[href]) return;
-        _prefetching[href] = true;
-        fetch(href, { headers: { 'X-PJAX': '1' } })
+        _prefetching[href] = fetch(href, { headers: { 'X-PJAX': '1' } })
             .then(function(r) { if (r.ok) return r.text(); })
-            .then(function(html) { if (html) cacheSet(href, html); })
-            .catch(function() {})
+            .then(function(html) { if (html) cacheSet(href, html); return html; })
+            .catch(function() { return null; })
             .finally(function() { delete _prefetching[href]; });
     });
 
@@ -180,6 +179,16 @@ document.addEventListener('error', function(e) {
         var cached = cacheGet(href);
         if (cached) {
             swapContent(cached, href);
+            return;
+        }
+
+        // If prefetch is in-flight, wait for it instead of firing duplicate
+        if (_prefetching[href]) {
+            _prefetching[href].then(function(html) {
+                var c = cacheGet(href);
+                if (c) { swapContent(c, href); }
+                else { window.location.href = href; }
+            });
             return;
         }
 

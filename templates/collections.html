@@ -276,6 +276,9 @@
             <button class="bulk-mode-trigger" id="bulkModeBtn" onclick="toggleBulkMode()">
                 ☐ Select
             </button>
+            <button class="bulk-mode-trigger" style="color:#f87171;border-color:rgba(248,113,113,0.3);" onclick="deleteAllCollections()">
+                🗑 Delete All
+            </button>
             {% endif %}
             <button class="btn btn-primary" onclick="openModal('createCollectionModal')">+ New Collection</button>
         </div>
@@ -374,12 +377,12 @@ var bulkMode = false;
 var selectedIds = new Set();
 var allCollectionIds = [];
 
-// Gather all collection IDs on page load
-document.addEventListener('DOMContentLoaded', function() {
+// Gather all collection IDs (runs immediately — works on first load and PJAX)
+(function() {
     document.querySelectorAll('.collection-card[data-id]').forEach(function(card) {
         allCollectionIds.push(card.dataset.id);
     });
-});
+})();
 
 // ════════════════════════════
 // TOGGLE BULK MODE
@@ -630,6 +633,61 @@ async function deleteCollection(id, name) {
         updateBulkUI();
 
         showToast('Collection deleted!', 'success');
+    }
+}
+
+async function deleteAllCollections() {
+    var n = allCollectionIds.length;
+    if (n === 0) return;
+    if (!await showConfirm('Delete ALL ' + n + ' collection' + (n > 1 ? 's' : '') + '? This cannot be undone.')) return;
+
+    try {
+        var res = await fetch('/collections/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: allCollectionIds.slice() })
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            // Animate all cards out
+            document.querySelectorAll('.collection-card').forEach(function(card, i) {
+                setTimeout(function() {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.85) translateY(8px)';
+                    setTimeout(function() { card.remove(); }, 300);
+                }, i * 40);
+            });
+
+            allCollectionIds = [];
+            selectedIds.clear();
+            showToast(data.message || 'All collections deleted!', 'success');
+
+            // Show empty state after animation
+            var totalDelay = n * 40 + 350;
+            setTimeout(function() {
+                exitBulkMode();
+                var grid = document.getElementById('collectionsGrid');
+                if (grid) {
+                    grid.outerHTML = '<div class="empty-state">' +
+                        '<div class="empty-icon">◫</div>' +
+                        '<h3>No collections yet</h3>' +
+                        '<p>Create your first collection to organize generated creatives</p>' +
+                        '<button class="btn btn-primary" onclick="openModal(\'createCollectionModal\')">+ Create Collection</button>' +
+                        '</div>';
+                }
+                var bmBtn = document.getElementById('bulkModeBtn');
+                if (bmBtn) bmBtn.style.display = 'none';
+                // Hide delete all button too
+                var daBtn = bmBtn ? bmBtn.nextElementSibling : null;
+                if (daBtn && daBtn.textContent.includes('Delete All')) daBtn.style.display = 'none';
+            }, totalDelay);
+        } else {
+            showToast(data.error || 'Failed to delete.', 'error');
+        }
+    } catch (err) {
+        showToast('Error deleting collections.', 'error');
     }
 }
 

@@ -213,6 +213,7 @@
 (function(){
   var loader=document.getElementById('page-loader');
   document.addEventListener('click',function(e){
+    if(e.defaultPrevented)return;
     var a=e.target.closest('a[href]');
     if(!a||a.target==='_blank'||a.href.startsWith('javascript')||a.href.startsWith('#')||a.download||a.href.includes('/static/'))return;
     if(a.origin!==location.origin)return;
