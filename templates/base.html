@@ -133,7 +133,7 @@
     {% endif %}
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    {% block scripts %}{% endblock %}
+    <div id="pjax-scripts">{% block scripts %}{% endblock %}</div>
 
     <!-- Custom Confirm Modal -->
     <div id="mcConfirmOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(27,27,27,0.85);align-items:center;justify-content:center;">

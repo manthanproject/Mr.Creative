@@ -432,7 +432,7 @@ function handleCardClick(event, id, url) {
         toggleCardSelect(id);
         return false;
     }
-    window.location.href = url;
+    window.pjaxNavigate(url);
 }
 
 function toggleCardSelect(id) {

@@ -56,13 +56,33 @@ document.addEventListener('error', function(e) {
                 }
             });
 
-            // Execute inline scripts
+            // Execute inline scripts inside main
             main.querySelectorAll('script').forEach(function(old) {
                 var s = document.createElement('script');
                 if (old.src) { s.src = old.src; }
                 else { s.textContent = old.textContent; }
                 old.parentNode.replaceChild(s, old);
             });
+
+            // Swap page-specific scripts ({% block scripts %})
+            var oldScriptsDiv = document.getElementById('pjax-scripts');
+            var newScriptsDiv = doc.getElementById('pjax-scripts');
+            if (oldScriptsDiv) {
+                oldScriptsDiv.innerHTML = '';
+                if (newScriptsDiv) {
+                    var scripts = newScriptsDiv.querySelectorAll('script');
+                    scripts.forEach(function(old) {
+                        var s = document.createElement('script');
+                        if (old.src) { s.src = old.src; }
+                        else { s.textContent = old.textContent; }
+                        oldScriptsDiv.appendChild(s);
+                    });
+                    // Also copy non-script content (rare but safe)
+                    newScriptsDiv.querySelectorAll(':not(script)').forEach(function(el) {
+                        oldScriptsDiv.appendChild(el.cloneNode(true));
+                    });
+                }
+            }
 
             // Fade in
             main.style.opacity = '1';
@@ -74,10 +94,58 @@ document.addEventListener('error', function(e) {
             // Scroll to top
             main.scrollTop = 0;
             window.scrollTo(0, 0);
+
+            // Reset page loader
+            var loader = document.getElementById('page-loader');
+            if (loader) {
+                loader.className = 'done';
+                setTimeout(function() { loader.className = ''; }, 500);
+            }
         }, 100);
     }
 
-    // Intercept sidebar link clicks
+    // PJAX response cache (short-lived, max 10 pages)
+    var _cache = {};
+    var _cacheOrder = [];
+    var _cacheMax = 10;
+    var _cacheTTL = 30000; // 30s
+
+    function cacheSet(url, html) {
+        _cache[url] = { html: html, ts: Date.now() };
+        _cacheOrder = _cacheOrder.filter(function(u) { return u !== url; });
+        _cacheOrder.push(url);
+        if (_cacheOrder.length > _cacheMax) {
+            delete _cache[_cacheOrder.shift()];
+        }
+    }
+
+    function cacheGet(url) {
+        var entry = _cache[url];
+        if (!entry) return null;
+        if (Date.now() - entry.ts > _cacheTTL) {
+            delete _cache[url];
+            return null;
+        }
+        return entry.html;
+    }
+
+    // Prefetch on hover (sidebar + any internal link)
+    var _prefetching = {};
+    document.addEventListener('mouseover', function(e) {
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || !href.startsWith('/') || href.match(/^\/(api|static|auth|login|logout)\//)) return;
+        if (_cache[href] || _prefetching[href]) return;
+        _prefetching[href] = true;
+        fetch(href, { headers: { 'X-PJAX': '1' } })
+            .then(function(r) { if (r.ok) return r.text(); })
+            .then(function(html) { if (html) cacheSet(href, html); })
+            .catch(function() {})
+            .finally(function() { delete _prefetching[href]; });
+    });
+
+    // Intercept link clicks
     document.addEventListener('click', function(e) {
         if (!_pjaxEnabled) return;
 
@@ -89,12 +157,13 @@ document.addEventListener('error', function(e) {
         if (link.target === '_blank') return;
         if (e.ctrlKey || e.metaKey || e.shiftKey) return;
         if (link.hasAttribute('data-no-pjax')) return;
+        if (link.hasAttribute('download')) return;
 
         // Only PJAX internal navigation links
         if (!href.startsWith('/')) return;
 
-        // Skip API calls, static files, auth
-        if (href.match(/^\/(api|static|auth|login|logout)\//)) return;
+        // Skip API calls, static files, auth, downloads
+        if (href.match(/^\/(api|static|auth|login|logout|download)\//)) return;
 
         e.preventDefault();
 
@@ -107,12 +176,22 @@ document.addEventListener('error', function(e) {
             main.style.opacity = '0.3';
         }
 
+        // Try cache first
+        var cached = cacheGet(href);
+        if (cached) {
+            swapContent(cached, href);
+            return;
+        }
+
         fetch(href, { headers: { 'X-PJAX': '1' } })
             .then(function(r) {
                 if (!r.ok) throw new Error(r.status);
                 return r.text();
             })
-            .then(function(html) { swapContent(html, href); })
+            .then(function(html) {
+                cacheSet(href, html);
+                swapContent(html, href);
+            })
             .catch(function() { window.location.href = href; });
     });
 
@@ -128,6 +207,34 @@ document.addEventListener('error', function(e) {
 
     // Save initial state
     history.replaceState({pjax: true, url: window.location.href}, '');
+
+    // Expose for programmatic navigation (replaces window.location.href = url)
+    window.pjaxNavigate = function(url) {
+        if (!_pjaxEnabled || !url.startsWith('/')) {
+            window.location.href = url;
+            return;
+        }
+        var main = getMain();
+        if (main) {
+            main.style.transition = 'opacity 0.08s';
+            main.style.opacity = '0.3';
+        }
+        var cached = cacheGet(url);
+        if (cached) {
+            swapContent(cached, url);
+            return;
+        }
+        fetch(url, { headers: { 'X-PJAX': '1' } })
+            .then(function(r) {
+                if (!r.ok) throw new Error(r.status);
+                return r.text();
+            })
+            .then(function(html) {
+                cacheSet(url, html);
+                swapContent(html, url);
+            })
+            .catch(function() { window.location.href = url; });
+    };
 })();
 
 // ══════════════════════════════════════════════
@@ -138,7 +245,7 @@ document.addEventListener('error', function(e) {
 (function() {
     var _origReload = location.reload.bind(location);
 
-    // Soft reload: fetch current page, swap main content with fade
+    // Soft reload: fetch current page, swap main content + scripts with fade
     window.softReload = function(callback) {
         var main = document.querySelector('.main-content') || document.querySelector('main') || document.querySelector('.content-area');
         if (!main) { _origReload(); return; }
@@ -156,12 +263,25 @@ document.addEventListener('error', function(e) {
 
                 if (newMain) {
                     main.innerHTML = newMain.innerHTML;
-                    // Re-run any inline scripts
+                    // Re-run inline scripts in main
                     main.querySelectorAll('script').forEach(function(oldScript) {
                         var newScript = document.createElement('script');
                         if (oldScript.src) { newScript.src = oldScript.src; }
                         else { newScript.textContent = oldScript.textContent; }
                         oldScript.parentNode.replaceChild(newScript, oldScript);
+                    });
+                }
+
+                // Also swap page scripts block
+                var oldScriptsDiv = document.getElementById('pjax-scripts');
+                var newScriptsDiv = doc.getElementById('pjax-scripts');
+                if (oldScriptsDiv && newScriptsDiv) {
+                    oldScriptsDiv.innerHTML = '';
+                    newScriptsDiv.querySelectorAll('script').forEach(function(old) {
+                        var s = document.createElement('script');
+                        if (old.src) { s.src = old.src; }
+                        else { s.textContent = old.textContent; }
+                        oldScriptsDiv.appendChild(s);
                     });
                 }
 
@@ -182,32 +302,6 @@ document.addEventListener('error', function(e) {
         setTimeout(function() { window.location.href = url; }, 100);
     };
 })();
-
-
-// ── Instant Navigation ──
-// Prefetch pages on hover, show loading indicator on click
-document.addEventListener('DOMContentLoaded', function() {
-    // Prefetch on hover
-    document.querySelectorAll('.sidebar a[href]').forEach(function(link) {
-        link.addEventListener('mouseenter', function() {
-            var href = this.getAttribute('href');
-            if (href && href.startsWith('/') && !document.querySelector('link[href="'+href+'"]')) {
-                var pf = document.createElement('link');
-                pf.rel = 'prefetch';
-                pf.href = href;
-                document.head.appendChild(pf);
-            }
-        });
-        // Instant fade-out on click
-        link.addEventListener('click', function() {
-            var main = document.querySelector('.main-content') || document.querySelector('main') || document.querySelector('.content');
-            if (main) {
-                main.style.transition = 'opacity 0.1s';
-                main.style.opacity = '0.4';
-            }
-        });
-    });
-});
 
 // ── Smart Reload Helper ──
 // Use instead of location.reload() — updates only the changed element
