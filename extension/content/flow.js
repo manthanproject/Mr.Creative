@@ -597,19 +597,42 @@
       log('Download button clicked');
       await MC.sleep(600);
 
-      // Select 2K upscaled
-      const sizeBtn = await waitFor(() => {
+      // Try 2K first
+      const sizeBtn2K = await waitFor(() => {
         const items = document.querySelectorAll('button[role="menuitem"]');
         for (const item of items) {
           if (item.textContent.trim().includes('2K')) return item;
         }
         return null;
       }, 5000, 'download size option');
-      await click(sizeBtn);
+      await click(sizeBtn2K);
       log('Selected 2K');
 
-      // Wait for upscale + download confirmation
-      await waitForDownloadDone();
+      // Wait for 2K download — check for success or failure
+      const dlResult = await waitForDownloadDone();
+
+      if (dlResult === 'failed') {
+        // 2K failed — fallback to 1K
+        log('2K upscale failed — falling back to 1K');
+        await MC.sleep(1000);
+
+        // Click download button again
+        const dlBtn2 = await waitFor(findDownloadBtn, 5000, 'download button (retry)');
+        await click(dlBtn2);
+        await MC.sleep(600);
+
+        // Select 1K
+        const sizeBtn1K = await waitFor(() => {
+          const items = document.querySelectorAll('button[role="menuitem"]');
+          for (const item of items) {
+            if (item.textContent.trim().includes('1K')) return item;
+          }
+          return null;
+        }, 5000, '1K download option');
+        await click(sizeBtn1K);
+        log('Selected 1K fallback');
+        await MC.sleep(3000); // 1K downloads instantly
+      }
       downloaded++;
 
       // Go back to gallery
@@ -633,12 +656,23 @@
     return downloaded;
   }
 
-  /** Wait for the download notification — jumps immediately when detected */
+  /** Wait for download — returns 'success', 'failed', or 'timeout' */
   async function waitForDownloadDone() {
     log('Waiting for download...');
     const t0 = Date.now();
     while (Date.now() - t0 < DL_TIMEOUT) {
       const txt = document.body.innerText.toLowerCase();
+
+      // Check for failure first
+      if (txt.includes('upscaling failed') || txt.includes('upscale failed')) {
+        warn('Upscaling failed!');
+        await MC.sleep(500);
+        const dismiss = findByText('Dismiss', 'button,span,a');
+        if (dismiss) { try { await click(dismiss); } catch (_) {} }
+        return 'failed';
+      }
+
+      // Check for success
       if (txt.includes('upscaling complete') || txt.includes('has been downloaded') ||
           txt.includes('download complete') || txt.includes('been downloaded') ||
           txt.includes('download will start')) {
@@ -646,11 +680,12 @@
         await MC.sleep(500);
         const dismiss = findByText('Dismiss', 'button,span,a');
         if (dismiss) { try { await click(dismiss); } catch (_) {} }
-        return;
+        return 'success';
       }
       await MC.sleep(POLL);
     }
     warn('Download timeout — assuming it downloaded');
+    return 'timeout';
   }
 
   // ── MAIN JOB HANDLER ───────────────────────────────────────────────────
