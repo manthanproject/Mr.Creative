@@ -54,9 +54,12 @@ def create_app():
         if '/static/uploads/' in request.path:
             response.headers['Access-Control-Allow-Origin'] = '*'
         if '/static/' in request.path:
-            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            # Static assets: cache with revalidation (not immutable — we update in place)
+            response.headers['Cache-Control'] = 'public, max-age=3600, must-revalidate'
         elif response.content_type and 'text/html' in response.content_type:
-            response.headers['Cache-Control'] = 'public, s-maxage=60, stale-while-revalidate=300'
+            # Dynamic HTML: never cache — prevents double-render from stale-while-revalidate
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
         return response
 
     # Initialize extensions
