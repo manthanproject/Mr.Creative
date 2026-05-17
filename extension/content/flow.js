@@ -372,8 +372,7 @@
 
     await click(firstAsset);
     log('Clicked first asset');
-    await MC.sleep(1500);
-    await waitForRefProcessed();
+    await MC.sleep(2000);
     log('Reference image selected & processed');
   }
 
@@ -437,33 +436,25 @@
 
   // ────────────────────────────────────────────────────────────────────────
 
-  /** Step 4 — Click the submit/create button (human-like, no debugger) */
+  /** Step 4 — Click the submit/create button via debugger trusted click */
   async function clickSubmit() {
     const btn = await waitFor(findSubmitBtn, ELEM_TIMEOUT, 'submit button');
-
-    // Human-like: hover first, then click
     btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await MC.sleep(800 + Math.random() * 500);
 
-    // Move mouse over the button first (hover)
-    btn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    btn.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-    await MC.sleep(200 + Math.random() * 300);
-
-    // Full click sequence with timing gaps
-    btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
-    btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    await MC.sleep(80 + Math.random() * 40);
-    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
-    btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    await MC.sleep(10);
-    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-
-    // Also try the native click
-    btn.click();
-
-    log('Submit clicked (human-like)');
-    await MC.sleep(1000 + Math.random() * 500);
+    const rect = btn.getBoundingClientRect();
+    const result = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: 'FLOW_CLICK',
+        x: Math.round(rect.left + rect.width / 2),
+        y: Math.round(rect.top + rect.height / 2),
+      }, r => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(r);
+      });
+    });
+    log('Submit clicked via debugger:', JSON.stringify(result));
+    await MC.sleep(1000);
   }
 
   // ────────────────────────────────────────────────────────────────────────
