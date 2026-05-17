@@ -343,32 +343,65 @@
   async function selectRefFromLibrary() {
     log('Selecting reference from asset library');
 
-    // Click +
-    const plus = await waitFor(findPlusBtn, ELEM_TIMEOUT, '+ button');
-    await click(plus);
-    await MC.sleep(1200);
+    // Click + button (may need retry)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const plus = await waitFor(findPlusBtn, ELEM_TIMEOUT, '+ button');
+      await click(plus);
+      await MC.sleep(1500);
 
-    // The asset library popup lists assets. The FIRST item is always the original upload.
-    // Find clickable image/thumbnail items (not the "Upload image" button)
-    const firstAsset = await waitFor(() => {
-      // Strategy 1: img tags inside the popup that aren't tiny icons
-      const imgs = $$('img');
-      for (const img of imgs) {
-        if (img.naturalWidth < 20 || img.width < 20) continue;
-        // Must be inside a popup / overlay, not the gallery behind
-        const parent = img.closest('[role="dialog"], [class*="modal"], [class*="popover"], [class*="overlay"], [class*="panel"], [class*="asset"], [class*="library"]');
-        if (!parent) continue;
-        // Return the clickable wrapper
-        return img.closest('button, [role="option"], [role="listitem"], li, a, [class*="item"]') || img;
+      // Check if panel opened (any popup/overlay appeared with images)
+      const panel = document.querySelector('[role="dialog"], [class*="popover"], [class*="overlay"], [class*="panel"], [class*="asset"]');
+      if (panel) {
+        log('Asset panel opened on attempt', attempt + 1);
+        break;
       }
-      // Strategy 2: list items that are NOT "Upload image"
-      const items = $$('[role="option"], [role="listitem"], li');
-      for (const it of items) {
-        if (it.textContent.toLowerCase().includes('upload image')) continue;
-        if (it.querySelector('img')) return it;
+      // Also check for items with img (panel might not have specific role)
+      const anyAssetImg = document.querySelectorAll('img');
+      let foundPopupImg = false;
+      for (const img of anyAssetImg) {
+        const rect = img.getBoundingClientRect();
+        // Look for small thumbnails in the lower part of screen (panel area)
+        if (rect.width > 20 && rect.width < 200 && rect.top > 400) {
+          foundPopupImg = true;
+          break;
+        }
+      }
+      if (foundPopupImg) {
+        log('Asset panel detected via thumbnail on attempt', attempt + 1);
+        break;
+      }
+      log('Asset panel not detected, retrying click...');
+    }
+
+    await MC.sleep(1000);
+
+    // Find the first clickable asset item (not "Upload image")
+    const firstAsset = await waitFor(() => {
+      // Look for any element with text matching uploaded file OR containing an img thumbnail
+      const allElements = document.querySelectorAll('div, button, li, span, a');
+      for (const el of allElements) {
+        const text = el.textContent.trim();
+        // Skip "Upload image" and very large/small elements
+        if (text.toLowerCase().includes('upload image')) continue;
+        if (el.offsetWidth < 30 || el.offsetWidth > 600) continue;
+        if (el.offsetHeight < 20 || el.offsetHeight > 200) continue;
+
+        // Must have a small img inside (thumbnail) or be an asset item
+        const img = el.querySelector('img');
+        if (img && img.width > 15 && img.width < 150) {
+          // Check it's in the popup area (below the gallery)
+          const rect = el.getBoundingClientRect();
+          if (rect.top > 300) return el;
+        }
+
+        // Or text matches common patterns like ".png", ".jpg", filename
+        if ((text.endsWith('.png') || text.endsWith('.jpg') || text.endsWith('.jpeg')) && text.length < 100) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top > 300) return el;
+        }
       }
       return null;
-    }, 8000, 'first asset in library');
+    }, 12000, 'first asset in library');
 
     await click(firstAsset);
     log('Clicked first asset');
