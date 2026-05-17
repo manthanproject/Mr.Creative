@@ -312,7 +312,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
-// ══ FLOW PASTE: write clipboard + debugger Ctrl+V for Slate.js ══
+// ══ FLOW PASTE + SUBMIT: single debugger session for paste and click ══
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'FLOW_PASTE' && sender.tab) {
     (async () => {
@@ -329,8 +329,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         console.log('[MC-BG] Clipboard written');
         await new Promise(r => setTimeout(r, 500));
 
-        // 2. Attach debugger briefly for Ctrl+V only
+        // 2. Attach debugger once
         await chrome.debugger.attach(target, '1.3');
+
+        // 3. Ctrl+V to paste
         await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
           type: 'keyDown', modifiers: 2, key: 'v', code: 'KeyV',
           windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
@@ -340,10 +342,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           type: 'keyUp', modifiers: 2, key: 'v', code: 'KeyV',
           windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86
         });
-        // Detach immediately
-        try { await chrome.debugger.detach(target); } catch(_) {}
-        console.log('[MC-BG] Ctrl+V done, debugger detached');
+        console.log('[MC-BG] Ctrl+V done');
 
+        // 4. If submit coordinates provided, click submit in same session
+        if (msg.submitX !== undefined && msg.submitY !== undefined) {
+          await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000));
+          await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+            type: 'mousePressed', x: msg.submitX, y: msg.submitY,
+            button: 'left', clickCount: 1
+          });
+          await new Promise(r => setTimeout(r, 80));
+          await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased', x: msg.submitX, y: msg.submitY,
+            button: 'left', clickCount: 1
+          });
+          console.log('[MC-BG] Submit clicked at', msg.submitX, msg.submitY);
+        }
+
+        // 5. Detach
+        await new Promise(r => setTimeout(r, 300));
+        try { await chrome.debugger.detach(target); } catch(_) {}
         sendResponse({ ok: true });
       } catch (e) {
         console.error('[MC-BG] FLOW_PASTE error:', e.message);

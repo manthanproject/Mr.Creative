@@ -81,7 +81,7 @@
   }
 
   /** Type text into input/textarea/contenteditable */
-  async function typeText(el, text) {
+  async function typeText(el, text, opts = {}) {
     el.focus();
     await MC.sleep(100);
 
@@ -98,26 +98,28 @@
       el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
       // contenteditable (Slate.js) — human-like Ctrl+V paste via debugger
-      // Step 1: Click inside editor like a human would
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await MC.sleep(500 + Math.random() * 300);
       el.click();
       el.focus();
       await MC.sleep(600 + Math.random() * 400);
 
-      // Step 2: Write text to clipboard and paste via trusted Ctrl+V
+      // Build message — optionally include submit button coords
+      const msgPayload = { type: 'FLOW_PASTE', text: text };
+      if (opts && opts.submitBtn) {
+        const rect = opts.submitBtn.getBoundingClientRect();
+        msgPayload.submitX = Math.round(rect.left + rect.width / 2);
+        msgPayload.submitY = Math.round(rect.top + rect.height / 2);
+      }
+
       const result = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({
-          type: 'FLOW_PASTE',
-          text: text,
-        }, r => {
+        chrome.runtime.sendMessage(msgPayload, r => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else resolve(r);
         });
       });
       console.log('[Flow] FLOW_PASTE result:', JSON.stringify(result));
 
-      // Step 3: Human pause after pasting (reading what was pasted)
       await MC.sleep(1500 + Math.random() * 1000);
       const clean = (s) => (s || '').replace(/\u200B/g, '').replace(/\uFEFF/g, '').trim();
       console.log('[Flow] Text in editor after paste:', clean(el.textContent).length, 'chars');
@@ -408,7 +410,7 @@
   // ────────────────────────────────────────────────────────────────────────
 
   /** Step 3 — Type prompt into the prompt bar */
-  async function typePrompt(text) {
+  async function typePrompt(text, includeSubmit = false) {
     log('Typing prompt:', text.substring(0, 70) + '...');
 
     // Wait for "ingredients loading" to clear first
@@ -419,7 +421,12 @@
     }
 
     const bar = await waitFor(findPromptBar, ELEM_TIMEOUT, 'prompt bar');
-    await typeText(bar, text);
+    const opts = {};
+    if (includeSubmit) {
+      const submitBtn = findSubmitBtn();
+      if (submitBtn) opts.submitBtn = submitBtn;
+    }
+    await typeText(bar, text, opts);
     await MC.sleep(400);
 
     // Verify
@@ -432,6 +439,7 @@
       await MC.sleep(300);
     }
     log('Prompt entered');
+    if (includeSubmit) log('Submit included in paste session');
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -703,11 +711,8 @@
           else         await selectRefFromLibrary();
         }
 
-        // Type prompt
-        await typePrompt(prompts[i]);
-
-        // Submit
-        await clickSubmit();
+        // Type prompt + submit in one debugger session (paste + click)
+        await typePrompt(prompts[i], true);
 
         // Wait for generation
         await waitForGeneration();
