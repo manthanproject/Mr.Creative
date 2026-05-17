@@ -1,6 +1,7 @@
 """
 A+ Listing Prompt Generator
 Upload product image to Gemini + one mega-prompt → N unique Flow-ready prompts
+Premium prompt style: dense comma-separated descriptors with cinematic themed backgrounds
 """
 
 import logging
@@ -9,32 +10,30 @@ logger = logging.getLogger('aplus')
 
 PROMPT_TYPES = {
     1: ['hero'],
-    2: ['hero', 'features'],
-    3: ['hero', 'features', 'lifestyle'],
-    4: ['hero', 'features', 'lifestyle', 'howto'],
-    5: ['hero', 'features', 'lifestyle', 'howto', 'dimensions'],
-    6: ['hero', 'features', 'lifestyle', 'howto', 'dimensions', 'comparison'],
-    7: ['hero', 'features', 'lifestyle', 'howto', 'dimensions', 'comparison', 'multiuse'],
-    8: ['hero', 'features', 'lifestyle', 'howto', 'dimensions', 'comparison', 'multiuse', 'trust'],
+    2: ['hero', 'detail'],
+    3: ['hero', 'detail', 'application'],
+    4: ['hero', 'detail', 'application', 'durability'],
+    5: ['hero', 'detail', 'application', 'durability', 'lifestyle_collage'],
+    6: ['hero', 'detail', 'application', 'durability', 'lifestyle_collage', 'dimensions'],
+    7: ['hero', 'detail', 'application', 'durability', 'lifestyle_collage', 'dimensions', 'build_quality'],
+    8: ['hero', 'detail', 'application', 'durability', 'lifestyle_collage', 'dimensions', 'build_quality', 'lifestyle_banner'],
 }
 
 TYPE_DESCRIPTIONS = {
-    'hero': 'Hero Image — product centered on white background, no text, best angle, sharp detail',
-    'features': 'Key Features Infographic — product on one side, 4-5 feature callouts with icons + text on other side',
-    'lifestyle': 'Lifestyle Image — target audience USING the product in real-world context, editorial photography',
-    'howto': 'How To Use — 3-4 numbered usage steps with actual step titles and instructions',
-    'dimensions': 'Size & Dimensions — product with measurement lines showing actual dimensions',
-    'comparison': 'Comparison Chart — table comparing product vs 2 generic competitors with checkmarks/crosses',
-    'multiuse': 'Multi-Use Versatility — product in 4-6 different use cases, structured grid collage',
-    'trust': 'Trust & Quality Badges — product centered with 6 quality/trust badge seals around it',
+    'hero': 'PREMIUM HERO BANNER — Centered product with cinematic themed background, atmospheric effects, clean color palette, bold modern typography, ultra sharp product texture, realistic soft shadows, centered product dominance, studio lighting',
+    'detail': 'DETAIL CLOSE-UP — Extreme close-up showing product texture/material quality, zoom detail circles highlighting craftsmanship, headline about quality/precision, cinematic themed background, macro photography style',
+    'application': 'HOW TO USE / APPLY — Product being used/applied in realistic scenario, realistic interaction effects, headline about ease of use, minimal split layout, cinematic themed background',
+    'durability': 'DURABILITY / SECURE HOLD — Product demonstrating strength/durability/quality, macro zoom circles showing build quality, headline about lasting quality, cinematic themed background',
+    'lifestyle_collage': 'EVERYDAY STYLE COLLAGE — Product showcased in multiple real-world applications, floating collage arrangement on different surfaces/items, headline about versatility, premium icon section with feature badges',
+    'dimensions': 'SIZE & DIMENSIONS — Product with clean measurement arrows showing actual dimensions, technical infographic style, cinematic themed background, bold modern typography',
+    'build_quality': 'THICK PREMIUM BUILD — Angled side profile showing product depth/thickness/layers, zoom circles highlighting dense construction, headline about premium build quality',
+    'lifestyle_banner': 'LIFESTYLE BANNER — Stylish people using/wearing product in different ways, cinematic themed background, editorial fashion aesthetic, headline about style versatility',
 }
 
 
 def build_mega_prompt(count, brand_info=None):
     """Build one mega-prompt that asks Gemini for N unique image prompts."""
-    # Pick which types to use
     types = PROMPT_TYPES.get(min(count, 8), PROMPT_TYPES[8])
-    # If more than 8, repeat types with variations
     while len(types) < count:
         types.append(types[len(types) % 8])
 
@@ -52,25 +51,29 @@ def build_mega_prompt(count, brand_info=None):
         if features:
             brand_context += f"\nFeatures: {', '.join(features)}"
 
-    prompt = f"""Look at this product image carefully. You are a world-class Amazon listing image prompt engineer.
+    prompt = f"""Look at this product image carefully. You are an ultra-premium Amazon listing image prompt engineer.
 
 Generate exactly {count} unique AI image generation prompts for this product's Amazon A+ listing.
 {brand_context}
 
-CRITICAL — REFERENCE IMAGE RULES:
-- A reference image of the product will be provided to the AI image generator
-- The product in the generated image MUST look IDENTICAL to the reference image
-- DO NOT describe the product appearance in detail — instead say the product from the reference image
-- DO NOT change, redesign, or reimagine the product label, text, colors, shape, logo, or packaging
-- The prompt should describe the SCENE, BACKGROUND, LIGHTING, COMPOSITION around the unchanged product
+STYLE RULES — FOLLOW THIS EXACT FORMAT:
+Each prompt must be a SINGLE DENSE PARAGRAPH of comma-separated descriptors (NOT sentences). Study this example:
 
-Each prompt MUST:
-- Be 100-200 words, completely self-contained
-- Reference the product as the exact product from the reference image (never describe it from scratch)
-- Include: scene/background description, lighting (3-point studio), camera (85mm f/8 ISO 100), composition
-- For infographic types: describe text overlays, icons, layout alongside the unchanged product
-- End with negative prompt: no blur, no low quality, no cartoonish, no product modification, no label changes
-- Be ultra photorealistic, 12K UHD quality
+"Premium Amazon infographic design for [product type], centered [describe product in detail] with ultra realistic texture, cinematic soft-focus [themed] background with [atmospheric effects like fog, smoke, energy glow], clean [color] palette with soft accents, abstract energy wave shapes, bold modern typography, headline "[HEADLINE TEXT]", subtext "[SUBTEXT]", hyper detailed texture, realistic shadows beneath product, modern editorial composition, centered product dominance, studio lighting, professional Amazon listing image, Canon EOS R5 photography style, 85mm lens, HDR balanced rendering, masterpiece, best quality, ultra photorealistic 12K rendering, square format, clean minimal layout
+
+Negative prompt: blur, clutter, [specific negatives], watermark, cartoonish render, low quality"
+
+CRITICAL RULES:
+1. Each prompt is ONE dense paragraph — NO line breaks, NO bullet points, just comma-separated descriptors
+2. DESCRIBE THE EXACT PRODUCT you see in the image — its shape, colors, text on labels, branding, materials, every visual detail so the AI reproduces it faithfully
+3. Include CINEMATIC THEMED BACKGROUNDS related to the product's category (atmospheric fog, energy effects, themed environments matching the product's world/aesthetic)
+4. Include SPECIFIC TYPOGRAPHY in quotes — actual headline and subtext (e.g., headline "PRECISION CRAFTED", subtext "PREMIUM QUALITY MATERIALS")
+5. Include camera specs: Canon EOS R5, 85mm lens, HDR balanced rendering
+6. Include quality tags: masterpiece, best quality, ultra photorealistic 12K rendering
+7. End EACH prompt with a separate line starting with "Negative prompt:" followed by relevant negatives
+8. Each prompt must be 150-300 words (the dense paragraph + negative prompt)
+9. For infographic types include: zoom detail circles, measurement arrows, feature icon sections, headline/subtext typography as appropriate
+10. Make backgrounds CINEMATIC and THEMED — not just plain white. Use atmospheric effects, soft-focus themed environments, abstract energy shapes, fog, smoke, aura glow matching the product's world
 
 IMAGE TYPES NEEDED:{type_list}
 
@@ -79,8 +82,9 @@ FORMAT: Separate each prompt with exactly this line:
 
 IMPORTANT: Return your response inside a SINGLE code block (triple backticks).
 Inside the code block, separate each prompt with ===PROMPT=== on its own line.
-No numbering, no labels, no explanations outside the code block.
-Start directly with the first prompt inside the code block."""
+No numbering, no labels, no section titles, no "---" dividers, no explanations.
+Start directly with the first prompt paragraph inside the code block.
+Each prompt = one dense paragraph + one "Negative prompt:" line."""
 
     return prompt, types[:count]
 
@@ -130,6 +134,6 @@ def _fallback_prompts(info, types):
         prompts.append({
             'id': t,
             'name': desc,
-            'prompt': f"Ultra photorealistic 12K UHD product photography, {desc}. Product: {name}. Brand: {brand}. 85mm lens f/8 ISO 100, 3-point studio lighting. No gradients, no clutter, no cartoonish.",
+            'prompt': f"Ultra-premium Amazon infographic design for {name}, centered product with ultra realistic texture, cinematic themed background with atmospheric fog and soft energy glow, clean grey palette with soft accents, bold modern typography, hyper detailed texture, realistic soft shadows, modern editorial composition, centered product dominance, studio lighting, professional Amazon listing image, Canon EOS R5 photography style, 85mm lens, HDR balanced rendering, masterpiece, best quality, ultra photorealistic 12K rendering\n\nNegative prompt: blur, clutter, cartoonish render, watermark, low quality, fake texture",
         })
     return prompts
