@@ -19,7 +19,7 @@
   const TAG       = '[Mr.Creative][Flow]';
   const POLL      = 400;           // ms between DOM checks
   const GEN_TIMEOUT  = 180_000;    // 3 min max per image generation
-  const DL_TIMEOUT   = 90_000;     // 1.5 min max per download (upscale)
+  const DL_TIMEOUT   = 30_000;     // 30s max per download
   const REF_TIMEOUT  = 45_000;     // 45s max for ref image processing
   const ELEM_TIMEOUT = 12_000;     // 12s max to find a DOM element
 
@@ -568,98 +568,85 @@
     for (let i = 0; i < count; i++) {
       log(`Download ${i + 1}/${count}: opening edit view`);
 
-      // Find and click the image card
-      // After downloading, the order might shift, so re-query each time
       const cards = getGalleryCards();
       if (i >= cards.length) {
         warn(`Only found ${cards.length} gallery cards, expected ${count}. Stopping downloads.`);
         break;
       }
       await click(cards[i]);
-      await MC.sleep(2000);
+      await MC.sleep(1000);
 
-      // Wait for edit page URL
+      // Wait for edit page
       try {
-        await waitFor(isEditPage, 10_000, 'edit page URL');
+        await waitFor(isEditPage, 5000, 'edit page URL');
       } catch (_) {
-        // Maybe the click didn't navigate — try clicking the image itself
         warn('Edit page not detected, retrying click');
         const cards2 = getGalleryCards();
         if (cards2[i]) {
           const img = cards2[i].querySelector('img') || cards2[i];
           await click(img);
-          await MC.sleep(2000);
-          await waitFor(isEditPage, 8_000, 'edit page URL (retry)');
+          await MC.sleep(1000);
+          await waitFor(isEditPage, 5000, 'edit page URL (retry)');
         }
       }
-      await MC.sleep(1500);
+      await MC.sleep(800);
 
-      // Click download icon → opens 1K/2K/4K dropdown
-      const dlBtn = await waitFor(findDownloadBtn, ELEM_TIMEOUT, 'download button');
+      // Click download icon
+      const dlBtn = await waitFor(findDownloadBtn, 5000, 'download button');
       await click(dlBtn);
-      log('Download button clicked — waiting for size menu');
-      await MC.sleep(1000);
+      log('Download button clicked');
+      await MC.sleep(600);
 
-      // Select from the dropdown menu (1K Original or 2K Upscaled)
+      // Select 1K (fastest, no upscale wait)
       const sizeBtn = await waitFor(() => {
         const items = document.querySelectorAll('button[role="menuitem"]');
         for (const item of items) {
-          const text = item.textContent.trim();
-          // Prefer 2K if available (not disabled), else 1K
-          if (text.includes('2K') && !item.hasAttribute('aria-disabled')) return item;
-        }
-        for (const item of items) {
-          const text = item.textContent.trim();
-          if (text.includes('1K')) return item;
+          if (item.textContent.trim().includes('1K')) return item;
         }
         return null;
-      }, 8000, 'download size option');
+      }, 5000, 'download size option');
       await click(sizeBtn);
-      log('Selected size:', sizeBtn.textContent.trim().replace(/\s+/g, ' '));
+      log('Selected 1K');
 
-      // Wait for download to complete
-      await waitForDownloadDone();
+      // Brief wait for download to start (no long confirmation wait)
+      await MC.sleep(3000);
       downloaded++;
 
       // Go back to gallery
-      const back = await waitFor(findBackBtn, ELEM_TIMEOUT, 'back button');
+      const back = await waitFor(findBackBtn, 5000, 'back button');
       await click(back);
-      await MC.sleep(2000);
+      await MC.sleep(1500);
 
-      // Confirm we're back on project page
+      // Confirm we're back
       try {
-        await waitFor(isProjectPage, 8_000, 'project page');
+        await waitFor(isProjectPage, 5000, 'project page');
       } catch (_) {
-        // If URL didn't change, try browser back
-        warn('Back button may not have worked, trying history.back');
         history.back();
-        await MC.sleep(2000);
+        await MC.sleep(1500);
       }
-      await MC.sleep(1000);
+      await MC.sleep(500);
     }
 
     log(`Downloaded ${downloaded}/${count} images`);
     return downloaded;
   }
 
-  /** Wait for the download/upscale notification to confirm completion */
+  /** Wait for the download notification (shortened) */
   async function waitForDownloadDone() {
-    log('Waiting for upscale + download...');
+    log('Waiting for download...');
     const t0 = Date.now();
-
     while (Date.now() - t0 < DL_TIMEOUT) {
       const txt = document.body.innerText.toLowerCase();
       if (txt.includes('upscaling complete') || txt.includes('has been downloaded') || txt.includes('download complete')) {
         log('Download confirmed!');
-        await MC.sleep(1000);
-        // Dismiss notification
+        await MC.sleep(500);
         const dismiss = findByText('Dismiss', 'button,span,a');
         if (dismiss) { try { await click(dismiss); } catch (_) {} }
         return;
       }
       await MC.sleep(POLL);
     }
-    warn('Download confirmation timeout — assuming it downloaded');
+    warn('Download timeout — assuming it downloaded');
   }
 
   // ── MAIN JOB HANDLER ───────────────────────────────────────────────────
