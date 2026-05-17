@@ -352,20 +352,42 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
           await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000));
 
-          // Click submit button from page context
+          // Click submit button from page context using multiple approaches
           const [clickResult] = await chrome.scripting.executeScript({
             target: { tabId },
             world: 'MAIN',
             func: () => {
+              // Approach 1: Find and click the arrow_forward button with full event chain
               const btns = document.querySelectorAll('button');
+              let submitBtn = null;
               for (const b of btns) {
                 const icon = b.querySelector('i');
                 if (icon && icon.textContent.trim() === 'arrow_forward') {
-                  b.click();
-                  return 'clicked';
+                  submitBtn = b;
+                  break;
                 }
               }
-              return 'not_found';
+              if (!submitBtn) return 'not_found';
+
+              // Dispatch full trusted-like event chain
+              submitBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
+              submitBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+              submitBtn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
+              submitBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
+              submitBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+              submitBtn.click();
+
+              // Approach 2: Also try Enter on the editor
+              const editor = document.querySelector('div[data-slate-editor="true"]');
+              if (editor) {
+                editor.focus();
+                editor.dispatchEvent(new KeyboardEvent('keydown', {
+                  key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+                  bubbles: true, cancelable: true
+                }));
+              }
+
+              return 'clicked';
             }
           });
           console.log('[MC-BG] Submit click result:', clickResult?.result);
