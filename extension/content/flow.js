@@ -497,31 +497,39 @@
 
   // ────────────────────────────────────────────────────────────────────────
 
-  /** Step 5 — Wait for image generation to complete */
+  /** Step 5 — Wait for image generation to complete. Returns 'success', 'failed', or 'timeout'. */
   async function waitForGeneration() {
     log('Waiting for generation...');
 
-    // Primary method: wait for a NEW img[alt="Generated image"] to appear
-    // This is more reliable than checking percentages (which can be leftover from ref processing)
     const imgsBefore = document.querySelectorAll('img[alt="Generated image"]').length;
     log('Images in gallery before generation:', imgsBefore);
 
-    await MC.sleep(5000); // generation takes at least 5s to start
+    await MC.sleep(5000);
 
     const t0 = Date.now();
     let lastLogTime = 0;
 
     while (Date.now() - t0 < GEN_TIMEOUT) {
+      // Check for failure — "unusual activity" or "Failed"
+      const bodyText = document.body.innerText;
+      if (bodyText.includes('unusual activity') || bodyText.includes('Failed')) {
+        warn('Generation blocked — unusual activity detected, skipping this prompt');
+        // Dismiss the error banner if possible
+        const dismiss = findByText('Dismiss', 'button,span,a');
+        if (dismiss) { try { await click(dismiss); } catch (_) {} }
+        await MC.sleep(2000);
+        return 'failed';
+      }
+
       const imgsNow = document.querySelectorAll('img[alt="Generated image"]').length;
       if (imgsNow > imgsBefore) {
         log(`Generation complete — new image appeared (${imgsBefore} → ${imgsNow})`);
-        await MC.sleep(2000); // let it fully render
-        return;
+        await MC.sleep(2000);
+        return 'success';
       }
 
-      // Secondary: check for percentage progress (but only if < 99% — skip leftover 99%)
-      const txt = document.body.innerText;
-      const matches = txt.match(/\b(\d{1,2})%/g) || []; // only match 0-99, not 100
+      // Secondary: check for percentage progress
+      const matches = bodyText.match(/\b(\d{1,2})%/g) || [];
       const pcts = matches.map(m => parseInt(m)).filter(p => p < 99);
       if (pcts.length && Date.now() - lastLogTime > 10000) {
         log(`Generation in progress: ${Math.max(...pcts)}%`);
@@ -531,6 +539,7 @@
       await MC.sleep(POLL);
     }
     warn('Generation timeout — continuing anyway');
+    return 'timeout';
   }
 
   // ── DOWNLOAD PHASE ─────────────────────────────────────────────────────
@@ -771,7 +780,15 @@
         await typePrompt(prompts[i], true);
 
         // Wait for generation
-        await waitForGeneration();
+        const genResult = await waitForGeneration();
+
+        if (genResult === 'failed') {
+          warn(`Prompt ${i + 1} failed (403/unusual activity) — skipping to next`);
+          MC.sendStatus(job_id, 'running', `Prompt ${i + 1} failed, skipping`);
+          // Wait before retrying next prompt
+          await MC.sleep(15000 + Math.random() * 10000);
+          continue;
+        }
 
         // Human-like pause between prompts
         if (i < total - 1) {
@@ -781,11 +798,13 @@
         }
       }
 
-      log('\nAll images generated — starting downloads');
+      // Count actually generated images (not including ref)
+      const generatedCount = getGalleryCards().length;
+      log(`\n${generatedCount} images generated — starting downloads`);
       MC.sendStatus(job_id, 'running', 'Downloading images');
 
       // ── Step 6: Download all ──
-      const dlCount = await downloadAllImages(total);
+      const dlCount = await downloadAllImages(generatedCount);
 
       // ── Done ──
       MC.sendStatus(job_id, 'complete', `Done: ${dlCount}/${total} images downloaded`);
