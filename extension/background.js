@@ -344,55 +344,54 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         console.log('[MC-BG] Ctrl+V done');
 
-        // 4. If submit requested, click via MAIN world (fresh position, no debugger)
+        // 4. If submit requested, press Enter via debugger (same session as paste)
         if (msg.doSubmit) {
-          // Detach debugger FIRST (before clicking)
-          try { await chrome.debugger.detach(target); } catch(_) {}
-          console.log('[MC-BG] Debugger detached after paste');
+          // Wait 2-3s (human reads what they pasted)
+          await new Promise(r => setTimeout(r, 2000 + Math.random() * 1500));
 
-          await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000));
+          // Press Enter key — Slate.js may trigger form submit
+          await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+            type: 'rawKeyDown', key: 'Enter', code: 'Enter',
+            windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
+          });
+          await new Promise(r => setTimeout(r, 50));
+          await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
+            type: 'keyUp', key: 'Enter', code: 'Enter',
+            windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13
+          });
+          console.log('[MC-BG] Enter key pressed');
 
-          // Click submit button from page context using multiple approaches
-          const [clickResult] = await chrome.scripting.executeScript({
+          // If Enter doesn't submit, click the button with mouse
+          await new Promise(r => setTimeout(r, 1500));
+
+          // Get submit button position from page
+          const [posResult] = await chrome.scripting.executeScript({
             target: { tabId },
             world: 'MAIN',
             func: () => {
-              // Approach 1: Find and click the arrow_forward button with full event chain
               const btns = document.querySelectorAll('button');
-              let submitBtn = null;
               for (const b of btns) {
                 const icon = b.querySelector('i');
                 if (icon && icon.textContent.trim() === 'arrow_forward') {
-                  submitBtn = b;
-                  break;
+                  const r = b.getBoundingClientRect();
+                  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
                 }
               }
-              if (!submitBtn) return 'not_found';
-
-              // Dispatch full trusted-like event chain
-              submitBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
-              submitBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
-              submitBtn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
-              submitBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
-              submitBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
-              submitBtn.click();
-
-              // Approach 2: Also try Enter on the editor
-              const editor = document.querySelector('div[data-slate-editor="true"]');
-              if (editor) {
-                editor.focus();
-                editor.dispatchEvent(new KeyboardEvent('keydown', {
-                  key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-                  bubbles: true, cancelable: true
-                }));
-              }
-
-              return 'clicked';
+              return null;
             }
           });
-          console.log('[MC-BG] Submit click result:', clickResult?.result);
-          sendResponse({ ok: true, submitClicked: clickResult?.result });
-          return;
+
+          if (posResult?.result) {
+            const { x, y } = posResult.result;
+            await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+              type: 'mousePressed', x, y, button: 'left', clickCount: 1
+            });
+            await new Promise(r => setTimeout(r, 80));
+            await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+              type: 'mouseReleased', x, y, button: 'left', clickCount: 1
+            });
+            console.log('[MC-BG] Submit clicked at', x, y);
+          }
         }
 
         // 5. Detach
