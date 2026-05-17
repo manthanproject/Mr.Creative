@@ -601,12 +601,12 @@
       const sizeBtn = await waitFor(() => {
         const items = document.querySelectorAll('button[role="menuitem"]');
         for (const item of items) {
-          if (item.textContent.trim().includes('1K')) return item;
+          if (item.textContent.trim().includes('2K')) return item;
         }
         return null;
       }, 5000, 'download size option');
       await click(sizeBtn);
-      log('Selected 1K');
+      log('Selected 2K');
 
       // Brief wait for download to start (no long confirmation wait)
       await MC.sleep(3000);
