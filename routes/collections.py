@@ -5,6 +5,7 @@ from modules.collection_mgr import (
     save_upload_to_collection, export_collection_as_zip,
     get_collection_files, allowed_file
 )
+from sqlalchemy import func
 from datetime import datetime, UTC
 import os
 
@@ -16,16 +17,55 @@ collections_bp = Blueprint('collections', __name__)
 def index():
     collections = Collection.query.filter_by(user_id=current_user.id)\
         .order_by(Collection.updated_at.desc()).all()
+
+    if collections:
+        col_ids = [c.id for c in collections]
+
+        # Batch: item counts in 1 query
+        count_rows = db.session.query(
+            Generation.collection_id, func.count(Generation.id)
+        ).filter(
+            Generation.collection_id.in_(col_ids),
+            Generation.status == 'completed'
+        ).group_by(Generation.collection_id).all()
+        counts = dict(count_rows)
+
+        # Batch: first cover image per collection in 1 query (window function)
+        cover_sub = db.session.query(
+            Generation.collection_id,
+            Generation.output_path,
+            func.row_number().over(
+                partition_by=Generation.collection_id,
+                order_by=Generation.created_at.asc()
+            ).label('rn')
+        ).filter(
+            Generation.collection_id.in_(col_ids),
+            Generation.output_type == 'image',
+            Generation.status == 'completed'
+        ).subquery()
+        cover_rows = db.session.query(
+            cover_sub.c.collection_id, cover_sub.c.output_path
+        ).filter(cover_sub.c.rn == 1).all()
+        covers = dict(cover_rows)
+
+        # Attach as transient attrs so template skips N+1 properties
+        for c in collections:
+            c._cached_item_count = counts.get(c.id, 0)
+            c._cached_cover = c.cover_image_path or covers.get(c.id)
+
     return render_template('collections.html', collections=collections)
 
 
 @collections_bp.route('/create', methods=['POST'])
 @login_required
 def create():
-    name = request.form.get('name', '').strip()
-    description = request.form.get('description', '').strip()
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
+    name = (request.form.get('name') or (request.get_json() or {}).get('name', '')).strip()
+    description = (request.form.get('description') or (request.get_json() or {}).get('description', '')).strip()
 
     if not name:
+        if is_ajax:
+            return jsonify({'error': 'Collection name is required.'}), 400
         flash('Collection name is required.', 'error')
         return redirect(url_for('collections.index'))
 
@@ -36,6 +76,21 @@ def create():
     )
     db.session.add(collection)
     db.session.commit()
+
+    if is_ajax:
+        return jsonify({
+            'success': True,
+            'collection': {
+                'id': collection.id,
+                'name': collection.name,
+                'description': collection.description,
+                'item_count': 0,
+                'cover_image': None,
+                'is_public': False,
+                'created_at': collection.created_at.strftime('%b %d, %Y'),
+                'url': url_for('collections.view', collection_id=collection.id),
+            }
+        })
 
     flash('Collection created!', 'success')
     return redirect(url_for('collections.view', collection_id=collection.id))

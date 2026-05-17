@@ -308,8 +308,8 @@
         <div class="card-checkbox" data-id="{{ col.id }}" onclick="event.stopPropagation(); toggleCardSelect('{{ col.id }}')"></div>
 
         <div class="collection-cover" onclick="handleCardClick(event, '{{ col.id }}', '{{ url_for('collections.view', collection_id=col.id) }}')">
-            {% if col.cover_image %}
-            <img src="{{ url_for('static', filename=col.cover_image) }}" alt="{{ col.name }}">
+            {% if col._cached_cover %}
+            <img src="{{ url_for('static', filename=col._cached_cover) }}" alt="{{ col.name }}" loading="lazy">
             {% else %}
             <span>◫</span>
             {% endif %}
@@ -318,13 +318,13 @@
             <h4>{{ col.name }}</h4>
             <p>{{ col.description or 'No description' }}</p>
             <div class="collection-meta">
-                <span>{{ col.item_count }} items</span>
+                <span>{{ col._cached_item_count }} items</span>
                 <span>{{ col.created_at.strftime('%b %d, %Y') }}</span>
                 {% if col.is_public %}<span class="text-accent">🔗 Shared</span>{% endif %}
             </div>
         </div>
         <div class="collection-actions">
-            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); toggleCollectionShare('{{ col.id }}')">🔗 {% if col.is_public %}Shared{% else %}Share{% endif %}</button>
+            <button class="btn btn-ghost btn-sm" id="share-btn-{{ col.id }}" onclick="event.stopPropagation(); toggleCollectionShare('{{ col.id }}')">🔗 {% if col.is_public %}Shared{% else %}Share{% endif %}</button>
             <button class="btn btn-danger-outline btn-sm" onclick="event.stopPropagation(); deleteCollection('{{ col.id }}', '{{ col.name }}')">✕ Delete</button>
         </div>
     </div>
@@ -345,20 +345,20 @@
             <h3>New Collection</h3>
             <button class="btn btn-ghost btn-sm" onclick="closeModal('createCollectionModal')">✕</button>
         </div>
-        <form method="POST" action="{{ url_for('collections.create') }}">
+        <form id="createCollectionForm" onsubmit="return createCollectionAjax(event)">
             <div class="modal-body">
                 <div class="form-group">
                     <label>Collection Name</label>
-                    <input type="text" name="name" class="form-input" placeholder="e.g. Summer Campaign 2026" required>
+                    <input type="text" name="name" id="newColName" class="form-input" placeholder="e.g. Summer Campaign 2026" required>
                 </div>
                 <div class="form-group">
                     <label>Description (optional)</label>
-                    <textarea name="description" class="textarea" rows="3" placeholder="What's this collection about?"></textarea>
+                    <textarea name="description" id="newColDesc" class="textarea" rows="3" placeholder="What's this collection about?"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('createCollectionModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create Collection</button>
+                <button type="submit" class="btn btn-primary" id="createColBtn">Create Collection</button>
             </div>
         </form>
     </div>
@@ -637,14 +637,108 @@ async function toggleCollectionShare(id) {
     var res = await fetch('/collections/' + id + '/toggle-share', { method: 'POST' });
     var data = await res.json();
     if (data.success) {
+        var btn = document.getElementById('share-btn-' + id);
+        var card = document.getElementById('col-' + id);
+        var meta = card ? card.querySelector('.collection-meta') : null;
+
         if (data.is_public) {
+            if (btn) btn.innerHTML = '🔗 Shared';
+            // Add shared badge to meta
+            if (meta && !meta.querySelector('.text-accent')) {
+                var badge = document.createElement('span');
+                badge.className = 'text-accent';
+                badge.textContent = '🔗 Shared';
+                meta.appendChild(badge);
+            }
             copyToClipboard(window.location.origin + data.share_url);
             showToast('Share link copied!', 'success');
         } else {
+            if (btn) btn.innerHTML = '🔗 Share';
+            // Remove shared badge
+            if (meta) {
+                var badge = meta.querySelector('.text-accent');
+                if (badge) badge.remove();
+            }
             showToast('Collection unshared', 'info');
         }
-        setTimeout(function() { softReload(); }, 1000);
     }
+}
+
+async function createCollectionAjax(e) {
+    e.preventDefault();
+    var name = document.getElementById('newColName').value.trim();
+    var desc = document.getElementById('newColDesc').value.trim();
+    if (!name) return false;
+
+    var btn = document.getElementById('createColBtn');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    try {
+        var res = await fetch('/collections/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ name: name, description: desc })
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            var col = data.collection;
+            closeModal('createCollectionModal');
+            document.getElementById('newColName').value = '';
+            document.getElementById('newColDesc').value = '';
+
+            // Remove empty state if present
+            var empty = document.querySelector('.empty-state');
+            if (empty) {
+                var grid = document.createElement('div');
+                grid.className = 'collections-grid';
+                grid.id = 'collectionsGrid';
+                empty.replaceWith(grid);
+                // Show bulk mode button
+                var bmBtn = document.getElementById('bulkModeBtn');
+                if (bmBtn) bmBtn.style.display = '';
+            }
+
+            // Build new card HTML
+            var grid = document.getElementById('collectionsGrid');
+            if (grid) {
+                var card = document.createElement('div');
+                card.className = 'collection-card animate-fade-up';
+                card.id = 'col-' + col.id;
+                card.dataset.id = col.id;
+                card.innerHTML =
+                    '<div class="card-checkbox" data-id="' + col.id + '" onclick="event.stopPropagation(); toggleCardSelect(\'' + col.id + '\')"></div>' +
+                    '<div class="collection-cover" onclick="handleCardClick(event, \'' + col.id + '\', \'' + col.url + '\')">' +
+                        '<span>◫</span>' +
+                    '</div>' +
+                    '<div class="collection-info" onclick="handleCardClick(event, \'' + col.id + '\', \'' + col.url + '\')">' +
+                        '<h4>' + col.name + '</h4>' +
+                        '<p>' + (col.description || 'No description') + '</p>' +
+                        '<div class="collection-meta">' +
+                            '<span>0 items</span>' +
+                            '<span>' + col.created_at + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="collection-actions">' +
+                        '<button class="btn btn-ghost btn-sm" id="share-btn-' + col.id + '" onclick="event.stopPropagation(); toggleCollectionShare(\'' + col.id + '\')">🔗 Share</button>' +
+                        '<button class="btn btn-danger-outline btn-sm" onclick="event.stopPropagation(); deleteCollection(\'' + col.id + '\', \'' + col.name.replace(/'/g, "\\'") + '\')">✕ Delete</button>' +
+                    '</div>';
+                grid.insertBefore(card, grid.firstChild);
+                allCollectionIds.unshift(col.id);
+            }
+
+            showToast('Collection created!', 'success');
+        } else {
+            showToast(data.error || 'Failed to create.', 'error');
+        }
+    } catch (err) {
+        showToast('Error creating collection.', 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Create Collection';
+    return false;
 }
 
 // Keyboard shortcut: Escape exits bulk mode
