@@ -347,7 +347,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // 4. If submit requested, press Enter via debugger (same session as paste)
         if (msg.doSubmit) {
           // Wait 2-3s (human reads what they pasted)
-          await new Promise(r => setTimeout(r, 2000 + Math.random() * 1500));
+          await new Promise(r => setTimeout(r, 5000 + Math.random() * 3000));
 
           // Press Enter key — Slate.js may trigger form submit
           await chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', {
