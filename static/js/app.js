@@ -40,59 +40,61 @@ document.addEventListener('error', function(e) {
             }
         });
 
-        // Swap content with animation
-        main.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
+        // Swap content — all inside try-catch to ALWAYS restore opacity
+        main.style.transition = 'opacity 0.12s ease-out';
         main.style.opacity = '0';
-        main.style.transform = 'translateY(4px)';
 
         setTimeout(function() {
-            main.innerHTML = newMain.innerHTML;
+            try {
+                main.innerHTML = newMain.innerHTML;
 
-            // Kill entry animations — PJAX already does its own fade transition
-            main.querySelectorAll('.animate-fade-up, .animate-fade-in, .idea-card, .set-stat, [class*="delay-"]').forEach(function(el) {
-                el.style.animation = 'none';
-                el.style.opacity = '1';
-            });
+                // Kill entry animations — PJAX already does its own fade
+                main.querySelectorAll('.animate-fade-up, .animate-fade-in, .idea-card, .set-stat, [class*="delay-"]').forEach(function(el) {
+                    el.style.animation = 'none';
+                    el.style.opacity = '1';
+                });
 
-            // Copy any new CSS from head
-            doc.querySelectorAll('style, link[rel=stylesheet]').forEach(function(s) {
-                var id = s.id || s.getAttribute('href');
-                if (id && !document.querySelector('[id="'+id+'"], [href="'+id+'"]')) {
-                    document.head.appendChild(s.cloneNode(true));
-                }
-            });
+                // Copy any new CSS from head
+                doc.querySelectorAll('style, link[rel=stylesheet]').forEach(function(s) {
+                    var id = s.id || s.getAttribute('href');
+                    if (id && !document.querySelector('[id="'+id+'"], [href="'+id+'"]')) {
+                        document.head.appendChild(s.cloneNode(true));
+                    }
+                });
 
-            // Execute inline scripts inside main
-            main.querySelectorAll('script').forEach(function(old) {
-                var s = document.createElement('script');
-                if (old.src) { s.src = old.src; }
-                else { s.textContent = old.textContent; }
-                old.parentNode.replaceChild(s, old);
-            });
-
-            // Swap page-specific scripts ({% block scripts %})
-            var oldScriptsDiv = document.getElementById('pjax-scripts');
-            var newScriptsDiv = doc.getElementById('pjax-scripts');
-            if (oldScriptsDiv) {
-                oldScriptsDiv.innerHTML = '';
-                if (newScriptsDiv) {
-                    var scripts = newScriptsDiv.querySelectorAll('script');
-                    scripts.forEach(function(old) {
+                // Execute inline scripts inside main (safe — errors don't propagate)
+                main.querySelectorAll('script').forEach(function(old) {
+                    try {
                         var s = document.createElement('script');
                         if (old.src) { s.src = old.src; }
                         else { s.textContent = old.textContent; }
-                        oldScriptsDiv.appendChild(s);
-                    });
-                    // Also copy non-script content (rare but safe)
-                    newScriptsDiv.querySelectorAll(':not(script)').forEach(function(el) {
-                        oldScriptsDiv.appendChild(el.cloneNode(true));
-                    });
+                        old.parentNode.replaceChild(s, old);
+                    } catch(e) { console.warn('[PJAX] script error:', e); }
+                });
+
+                // Swap page-specific scripts ({% block scripts %})
+                var oldScriptsDiv = document.getElementById('pjax-scripts');
+                var newScriptsDiv = doc.getElementById('pjax-scripts');
+                if (oldScriptsDiv) {
+                    oldScriptsDiv.innerHTML = '';
+                    if (newScriptsDiv) {
+                        newScriptsDiv.querySelectorAll('script').forEach(function(old) {
+                            try {
+                                var s = document.createElement('script');
+                                if (old.src) { s.src = old.src; }
+                                else { s.textContent = old.textContent; }
+                                oldScriptsDiv.appendChild(s);
+                            } catch(e) { console.warn('[PJAX] block script error:', e); }
+                        });
+                    }
                 }
+            } catch(e) {
+                console.error('[PJAX] swap error:', e);
             }
 
-            // Fade in
+            // ALWAYS restore visibility — even if swap errored
             main.style.opacity = '1';
-            main.style.transform = 'translateY(0)';
+            main.style.transform = '';
 
             // Update URL
             history.pushState({pjax: true, url: url}, '', url);
@@ -107,7 +109,7 @@ document.addEventListener('error', function(e) {
                 loader.className = 'done';
                 setTimeout(function() { loader.className = ''; }, 500);
             }
-        }, 100);
+        }, 80);
     }
 
     // PJAX response cache (short-lived, max 10 pages)
@@ -150,6 +152,25 @@ document.addEventListener('error', function(e) {
             .finally(function() { delete _prefetching[href]; });
     });
 
+    // Helper: fetch and swap (never falls back to full page load)
+    function pjaxFetch(href) {
+        fetch(href, { headers: { 'X-PJAX': '1' } })
+            .then(function(r) {
+                if (!r.ok) throw new Error(r.status);
+                return r.text();
+            })
+            .then(function(html) {
+                cacheSet(href, html);
+                swapContent(html, href);
+            })
+            .catch(function(err) {
+                console.error('[PJAX] fetch failed:', err);
+                // Restore opacity instead of full reload
+                var main = getMain();
+                if (main) main.style.opacity = '1';
+            });
+    }
+
     // Intercept link clicks
     document.addEventListener('click', function(e) {
         if (!_pjaxEnabled) return;
@@ -188,35 +209,25 @@ document.addEventListener('error', function(e) {
             return;
         }
 
-        // If prefetch is in-flight, wait for it instead of firing duplicate
+        // If prefetch is in-flight, wait for it — then use cache or fresh fetch
         if (_prefetching[href]) {
-            _prefetching[href].then(function(html) {
+            _prefetching[href].then(function() {
                 var c = cacheGet(href);
                 if (c) { swapContent(c, href); }
-                else { window.location.href = href; }
+                else { pjaxFetch(href); }
             });
             return;
         }
 
-        fetch(href, { headers: { 'X-PJAX': '1' } })
-            .then(function(r) {
-                if (!r.ok) throw new Error(r.status);
-                return r.text();
-            })
-            .then(function(html) {
-                cacheSet(href, html);
-                swapContent(html, href);
-            })
-            .catch(function() { window.location.href = href; });
+        pjaxFetch(href);
     });
 
     // Handle back/forward buttons
     window.addEventListener('popstate', function(e) {
         if (e.state && e.state.pjax) {
-            fetch(e.state.url, { headers: { 'X-PJAX': '1' } })
-                .then(function(r) { return r.text(); })
-                .then(function(html) { swapContent(html, e.state.url); })
-                .catch(function() { window.location.reload(); });
+            var cached = cacheGet(e.state.url);
+            if (cached) { swapContent(cached, e.state.url); return; }
+            pjaxFetch(e.state.url);
         }
     });
 
@@ -239,16 +250,7 @@ document.addEventListener('error', function(e) {
             swapContent(cached, url);
             return;
         }
-        fetch(url, { headers: { 'X-PJAX': '1' } })
-            .then(function(r) {
-                if (!r.ok) throw new Error(r.status);
-                return r.text();
-            })
-            .then(function(html) {
-                cacheSet(url, html);
-                swapContent(html, url);
-            })
-            .catch(function() { window.location.href = url; });
+        pjaxFetch(url);
     };
 })();
 
