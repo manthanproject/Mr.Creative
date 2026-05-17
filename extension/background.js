@@ -344,19 +344,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         console.log('[MC-BG] Ctrl+V done');
 
-        // 4. If submit coordinates provided, click submit in same session
-        if (msg.submitX !== undefined && msg.submitY !== undefined) {
-          await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000));
-          await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-            type: 'mousePressed', x: msg.submitX, y: msg.submitY,
-            button: 'left', clickCount: 1
+        // 4. If submit requested, click via MAIN world (fresh position, no debugger)
+        if (msg.doSubmit) {
+          // Detach debugger FIRST (before clicking)
+          try { await chrome.debugger.detach(target); } catch(_) {}
+          console.log('[MC-BG] Debugger detached after paste');
+
+          await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000));
+
+          // Click submit button from page context
+          const [clickResult] = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: () => {
+              const btns = document.querySelectorAll('button');
+              for (const b of btns) {
+                const icon = b.querySelector('i');
+                if (icon && icon.textContent.trim() === 'arrow_forward') {
+                  b.click();
+                  return 'clicked';
+                }
+              }
+              return 'not_found';
+            }
           });
-          await new Promise(r => setTimeout(r, 80));
-          await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-            type: 'mouseReleased', x: msg.submitX, y: msg.submitY,
-            button: 'left', clickCount: 1
-          });
-          console.log('[MC-BG] Submit clicked at', msg.submitX, msg.submitY);
+          console.log('[MC-BG] Submit click result:', clickResult?.result);
+          sendResponse({ ok: true, submitClicked: clickResult?.result });
+          return;
         }
 
         // 5. Detach

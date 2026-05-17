@@ -104,12 +104,10 @@
       el.focus();
       await MC.sleep(600 + Math.random() * 400);
 
-      // Build message — optionally include submit button coords
+      // Build message — optionally include submit flag
       const msgPayload = { type: 'FLOW_PASTE', text: text };
-      if (opts && opts.submitBtn) {
-        const rect = opts.submitBtn.getBoundingClientRect();
-        msgPayload.submitX = Math.round(rect.left + rect.width / 2);
-        msgPayload.submitY = Math.round(rect.top + rect.height / 2);
+      if (opts && opts.doSubmit) {
+        msgPayload.doSubmit = true;
       }
 
       const result = await new Promise((resolve, reject) => {
@@ -423,8 +421,7 @@
     const bar = await waitFor(findPromptBar, ELEM_TIMEOUT, 'prompt bar');
     const opts = {};
     if (includeSubmit) {
-      const submitBtn = findSubmitBtn();
-      if (submitBtn) opts.submitBtn = submitBtn;
+      opts.doSubmit = true;
     }
     await typeText(bar, text, opts);
     await MC.sleep(400);
