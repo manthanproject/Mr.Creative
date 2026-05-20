@@ -397,6 +397,10 @@ function extractResponse() {
             (_storage || {remove:()=>{}}).remove(STORAGE_KEY);
           }
           busy = false;
+          // Return to upload page so next job can be picked up
+          log('Returning to Lens upload page for next job');
+          await MC.sleep(2000);
+          location.href = 'https://www.google.com/?olud&zx=' + Date.now();
           return;
         }
       } catch (e) {}
@@ -445,6 +449,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         log('RUN_JOB Phase 1 error:', e.message);
         MC.sendStatus(msg.job.job_id, 'error', 'Lens upload failed: ' + e.message);
       });
+    } else {
+      // Not on upload page — navigate there, job will be picked up by poller
+      log('Not on upload page (phase=' + phase + '), navigating to Lens');
+      location.href = 'https://www.google.com/?olud&zx=' + Date.now();
     }
     sendResponse({ ok: true });
   }
