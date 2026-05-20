@@ -397,36 +397,23 @@
 
     await MC.sleep(1000);
 
-    // Find the first clickable asset item (not "Upload image")
-    const firstAsset = await waitFor(() => {
-      // Look for any element with text matching uploaded file OR containing an img thumbnail
-      const allElements = document.querySelectorAll('div, button, li, span, a');
-      for (const el of allElements) {
-        const text = el.textContent.trim();
-        // Skip "Upload image" and very large/small elements
-        if (text.toLowerCase().includes('upload image')) continue;
-        if (el.offsetWidth < 30 || el.offsetWidth > 600) continue;
-        if (el.offsetHeight < 20 || el.offsetHeight > 200) continue;
-
-        // Must have a small img inside (thumbnail) or be an asset item
-        const img = el.querySelector('img');
-        if (img && img.width > 15 && img.width < 150) {
-          // Check it's in the popup area (below the gallery)
-          const rect = el.getBoundingClientRect();
-          if (rect.top > 300) return el;
-        }
-
-        // Or text matches common patterns like ".png", ".jpg", filename
-        if ((text.endsWith('.png') || text.endsWith('.jpg') || text.endsWith('.jpeg')) && text.length < 100) {
-          const rect = el.getBoundingClientRect();
-          if (rect.top > 300) return el;
-        }
+    // Find the original uploaded reference (product.png) — not a generated image
+    const refAsset = await waitFor(() => {
+      // Look for role="option" items in the asset panel
+      const options = document.querySelectorAll('[role="option"]');
+      for (const opt of options) {
+        const text = opt.textContent.trim().toLowerCase();
+        // Match "product.png" (our uploaded reference filename)
+        if (text.includes('product.png')) return opt;
       }
+      // Fallback: last option (oldest = original upload, since newest is first)
+      if (options.length > 1) return options[options.length - 1];
+      if (options.length === 1) return options[0];
       return null;
-    }, 12000, 'first asset in library');
+    }, 12000, 'product.png in asset library');
 
-    await click(firstAsset);
-    log('Clicked first asset');
+    await click(refAsset);
+    log('Clicked reference asset: product.png');
     await MC.sleep(2000);
     log('Reference image selected & processed');
   }
