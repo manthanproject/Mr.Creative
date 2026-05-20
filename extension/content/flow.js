@@ -587,20 +587,21 @@
   }
 
   /** Download all generated images by entering each edit view */
-  async function downloadAllImages(count, job_id) {
-    log(`Downloading ${count} images`);
+  async function downloadAllImages(count, job_id, skipFirst = 0) {
+    log(`Downloading ${count} images (skipping first ${skipFirst} pre-existing)`);
     let downloaded = 0;
 
     for (let i = 0; i < count; i++) {
+      const cardIndex = i + skipFirst;
       log(`Download ${i + 1}/${count}: opening edit view`);
       if (job_id) MC.sendStatus(job_id, 'running', `Download ${i + 1}/${count}`);
 
       const cards = getGalleryCards();
-      if (i >= cards.length) {
-        warn(`Only found ${cards.length} gallery cards, expected ${count}. Stopping downloads.`);
+      if (cardIndex >= cards.length) {
+        warn(`Only found ${cards.length} gallery cards, needed index ${cardIndex}. Stopping downloads.`);
         break;
       }
-      await click(cards[i]);
+      await click(cards[cardIndex]);
       await MC.sleep(1000);
 
       // Wait for edit page
@@ -609,8 +610,8 @@
       } catch (_) {
         warn('Edit page not detected, retrying click');
         const cards2 = getGalleryCards();
-        if (cards2[i]) {
-          const img = cards2[i].querySelector('img') || cards2[i];
+        if (cards2[cardIndex]) {
+          const img = cards2[cardIndex].querySelector('img') || cards2[cardIndex];
           await click(img);
           await MC.sleep(1000);
           await waitFor(isEditPage, 5000, 'edit page URL (retry)');
@@ -806,6 +807,8 @@
       }
 
       // ── Steps 2-5: Generate all images ──
+      const imagesBeforeGeneration = getGalleryCards().length;
+      log('Images already in gallery (pre-generation):', imagesBeforeGeneration);
       const startIndex = job.start_index || 0;
       if (startIndex > 0) log(`Resuming from prompt ${startIndex + 1}/${total}`);
 
@@ -875,13 +878,14 @@
         }
       }
 
-      // Count actually generated images (not including ref)
-      const generatedCount = getGalleryCards().length;
-      log(`\n${generatedCount} images generated — starting downloads`);
+      // Count only NEW images (exclude reference/pre-existing)
+      const totalInGallery = getGalleryCards().length;
+      const generatedCount = totalInGallery - imagesBeforeGeneration;
+      log(`\n${generatedCount} new images (${totalInGallery} total, ${imagesBeforeGeneration} pre-existing) — starting downloads`);
       MC.sendStatus(job_id, 'running', 'Downloading images');
 
-      // ── Step 6: Download all ──
-      const dlCount = await downloadAllImages(generatedCount, job_id);
+      // ── Step 6: Download all (skip pre-existing reference images) ──
+      const dlCount = await downloadAllImages(generatedCount, job_id, imagesBeforeGeneration);
 
       // ── Done ──
       MC.sendStatus(job_id, 'complete', `Done: ${dlCount}/${total} images downloaded`);
