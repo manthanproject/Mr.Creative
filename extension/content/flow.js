@@ -314,10 +314,10 @@
     await click(plus);
     await MC.sleep(1000);
 
-    // The asset library popup opens. Click "Upload image"
+    // The asset library popup opens. Click "Upload media" (or legacy "Upload image")
     const uploadBtn = await waitFor(
-      () => findByText('Upload image', 'button,div,span,a,label'),
-      5000, '"Upload image" button'
+      () => findByText('Upload media', 'button,div,span,a,label') || findByText('Upload image', 'button,div,span,a,label'),
+      5000, '"Upload media" button'
     );
 
     // Prepare to intercept the <input type="file"> that the button triggers
