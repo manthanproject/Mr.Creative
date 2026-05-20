@@ -184,6 +184,21 @@
                     </div>
                 </div>
 
+                <div class="ag-group">
+                    <label class="ag-label">Brand Logo</label>
+                    <div id="logoUploadArea" style="border: 1px dashed #333; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s;" onclick="document.getElementById('kitLogoInput').click();" ondragover="event.preventDefault(); this.style.borderColor='var(--ag-accent)';" ondragleave="this.style.borderColor='#333';" ondrop="event.preventDefault(); this.style.borderColor='#333'; handleLogoDrop(event);">
+                        <input type="file" id="kitLogoInput" accept="image/*" style="display:none;" onchange="handleLogoSelect(this)">
+                        <div id="logoPreview" style="display:none; margin-bottom: 0.5rem;">
+                            <img id="logoPreviewImg" style="max-height: 64px; max-width: 200px; border-radius: 4px;">
+                        </div>
+                        <div id="logoPlaceholder">
+                            <span style="font-size: 1.5rem;">🖼</span>
+                            <p style="margin: 0.25rem 0 0; color: #919282; font-size: 0.75rem;">Click or drag & drop logo (PNG/SVG preferred)</p>
+                        </div>
+                    </div>
+                    <input type="hidden" id="kitLogoPath" value="">
+                </div>
+
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
                     <button class="ag-btn ag-btn-primary" onclick="saveBrandKit()" style="flex: 1;">💾 Save Brand Kit</button>
                 </div>
@@ -203,6 +218,9 @@
                         {% for kit in brand_kits %}
                         <div class="ag-kit-card" data-id="{{ kit.id }}" onclick="selectKit(this, '{{ kit.id }}')">
                             <button type="button" class="ag-kit-delete" title="Delete brand kit" onclick="event.stopPropagation(); deleteBrandKit('{{ kit.id }}')">&times;</button>
+                            {% if kit.logo_path %}
+                            <img src="{{ url_for('static', filename=kit.logo_path) }}" style="height: 28px; max-width: 80px; object-fit: contain; margin-bottom: 4px; border-radius: 3px;">
+                            {% endif %}
                             <div class="ag-kit-colors">
                                 <span style="background: {{ kit.primary_color }};"></span>
                                 <span style="background: {{ kit.secondary_color }};"></span>
@@ -462,6 +480,33 @@ function togglePill(el) {
     el.classList.toggle('active');
 }
 
+function handleLogoSelect(input) {
+    if (input.files && input.files[0]) uploadLogo(input.files[0]);
+}
+function handleLogoDrop(e) {
+    var files = e.dataTransfer.files;
+    if (files && files[0] && files[0].type.startsWith('image/')) uploadLogo(files[0]);
+}
+async function uploadLogo(file) {
+    var fd = new FormData();
+    fd.append('logo', file);
+    document.getElementById('logoPlaceholder').innerHTML = '<span style="color:#919282;font-size:0.75rem;">Uploading...</span>';
+    try {
+        var res = await fetch('/agent/upload-logo', { method: 'POST', body: fd });
+        var data = await res.json();
+        if (data.success) {
+            document.getElementById('kitLogoPath').value = data.path;
+            document.getElementById('logoPreviewImg').src = '/static/' + data.path;
+            document.getElementById('logoPreview').style.display = '';
+            document.getElementById('logoPlaceholder').innerHTML = '<p style="margin:0;color:#919282;font-size:0.7rem;">Click to change</p>';
+        } else {
+            document.getElementById('logoPlaceholder').innerHTML = '<span style="color:#f87171;font-size:0.75rem;">' + (data.error || 'Upload failed') + '</span>';
+        }
+    } catch(e) {
+        document.getElementById('logoPlaceholder').innerHTML = '<span style="color:#f87171;font-size:0.75rem;">Upload error</span>';
+    }
+}
+
 async function saveBrandKit() {
     var name = document.getElementById('kitName').value.trim();
     if (!name) { showToast('Brand name is required', 'warning'); return; }
@@ -482,6 +527,7 @@ async function saveBrandKit() {
                 font_style: document.getElementById('kitFontStyle').value,
                 heading_font: document.getElementById('kitHeadingFont').value.trim(),
                 body_font: document.getElementById('kitBodyFont').value.trim(),
+                logo_path: document.getElementById('kitLogoPath').value,
             })
         });
         var data = await res.json();
