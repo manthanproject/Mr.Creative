@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from models import db, BrandKit, AgentJob, Collection, Generation
 from datetime import datetime
@@ -99,8 +99,7 @@ def clear_history():
     for job in jobs:
         db.session.delete(job)
     db.session.commit()
-    flash(f'Cleared {count} jobs from history', 'success')
-    return redirect(url_for('agent.index'))
+    return jsonify({'success': True, 'cleared': count})
 
 
 @agent_bp.route('/job/<job_id>/pause', methods=['POST'])

@@ -545,6 +545,14 @@
         lastLogTime = Date.now();
       }
 
+      // Check stop signal every ~5s during generation
+      if (Date.now() - t0 > 10000 && Math.floor((Date.now() - t0) / 5000) > Math.floor((Date.now() - t0 - POLL) / 5000)) {
+        if (await shouldStop()) {
+          warn('Stop requested during generation');
+          return 'stopped';
+        }
+      }
+
       await MC.sleep(POLL);
     }
     warn('Generation timeout — continuing anyway');
@@ -832,6 +840,12 @@
         // Wait for generation
         const genResult = await waitForGeneration();
 
+        if (genResult === 'stopped') {
+          warn('Stop signal received — halting immediately');
+          MC.sendStatus(job_id, 'stopped', `Stopped at prompt ${i + 1}/${total}`);
+          return;
+        }
+
         if (genResult === 'failed') {
           warn(`Prompt ${i + 1} failed (403/unusual activity) — stopping to avoid flag`);
           MC.sendStatus(job_id, 'stopped', `Stopped at prompt ${i + 1} — flagged by Flow`);
@@ -845,11 +859,19 @@
           return; // full stop — don't send any more requests
         }
 
-        // Human-like pause between prompts — longer to avoid rate limits
+        // Human-like pause between prompts — check stop every 5s
         if (i < total - 1) {
           const pause = 20000 + Math.random() * 20000; // 20-40s between prompts
           log(`Pausing ${(pause / 1000).toFixed(1)}s before next prompt`);
-          await MC.sleep(pause);
+          const end = Date.now() + pause;
+          while (Date.now() < end) {
+            await MC.sleep(Math.min(5000, end - Date.now()));
+            if (await shouldStop()) {
+              warn('Stop signal received during pause');
+              MC.sendStatus(job_id, 'stopped', `Stopped after prompt ${i + 1}/${total}`);
+              return;
+            }
+          }
         }
       }
 
