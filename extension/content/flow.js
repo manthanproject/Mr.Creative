@@ -532,22 +532,22 @@
     let lastLogTime = 0;
 
     while (Date.now() - t0 < GEN_TIMEOUT) {
-      // Check for failure — "unusual activity" or "Failed"
-      const bodyText = document.body.innerText;
-      if (bodyText.includes('unusual activity') || bodyText.includes('Failed')) {
-        warn('Generation blocked — unusual activity detected, skipping this prompt');
-        // Dismiss the error banner if possible
-        const dismiss = findByText('Dismiss', 'button,span,a');
-        if (dismiss) { try { await click(dismiss); } catch (_) {} }
-        await MC.sleep(2000);
-        return 'failed';
-      }
-
+      // Check for NEW image FIRST (image may appear despite media loading errors)
       const imgsNow = document.querySelectorAll('img[alt="Generated image"]').length;
       if (imgsNow > imgsBefore) {
         log(`Generation complete — new image appeared (${imgsBefore} → ${imgsNow})`);
         await MC.sleep(2000);
         return 'success';
+      }
+
+      // Check for actual generation failure — only "unusual activity" (not generic "Failed")
+      const bodyText = document.body.innerText;
+      if (bodyText.includes('unusual activity') || bodyText.includes('flagged') || bodyText.includes("can't complete this request")) {
+        warn('Generation blocked — unusual activity detected');
+        const dismiss = findByText('Dismiss', 'button,span,a');
+        if (dismiss) { try { await click(dismiss); } catch (_) {} }
+        await MC.sleep(2000);
+        return 'failed';
       }
 
       // Secondary: check for percentage progress
