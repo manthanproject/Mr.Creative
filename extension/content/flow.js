@@ -414,7 +414,17 @@
 
     await click(refAsset);
     log('Clicked reference asset: product.png');
-    await MC.sleep(2000);
+    await MC.sleep(1000);
+
+    // Click "Add to Prompt" button (required in new Flow UI)
+    const addBtn = findByText('Add to Prompt', 'button,div,span,a') || findByText('Add to prompt', 'button,div,span,a');
+    if (addBtn) {
+      await click(addBtn);
+      log('Clicked "Add to Prompt"');
+    } else {
+      warn('"Add to Prompt" button not found — asset may auto-attach');
+    }
+    await MC.sleep(1500);
     log('Reference image selected & processed');
   }
 
