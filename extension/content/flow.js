@@ -70,12 +70,34 @@
   }
 
   /** Scroll into view + click + dispatch MouseEvent */
-  async function click(el) {
+  async function click(el, { trusted = false } = {}) {
     el.scrollIntoView({ behavior: 'instant', block: 'center' });
     await MC.sleep(150 + Math.random() * 200);
-    // Use native click first (works best with React/Radix UI)
+
+    if (trusted) {
+      // Use debugger Input.dispatchMouseEvent for isTrusted=true
+      const rect = el.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      try {
+        await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({
+            type: 'FLOW_TRUSTED_CLICK',
+            x: Math.round(x),
+            y: Math.round(y)
+          }, resp => {
+            if (resp && resp.success) resolve();
+            else reject(new Error(resp?.error || 'trusted click failed'));
+          });
+        });
+        return;
+      } catch (e) {
+        warn('Trusted click failed, falling back to DOM click:', e.message);
+      }
+    }
+
+    // Fallback: DOM click (isTrusted=false)
     el.click();
-    // Also dispatch pointer events for Radix UI components
     el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
   }
@@ -760,7 +782,7 @@
             8000, '"+ New project" button'
           );
           await new Promise(r => chrome.storage.local.set({ pendingFlowJob: job }, r));
-          await click(np);
+          await click(np, { trusted: true });
           await MC.sleep(4000);
           if (isProjectPage()) {
             chrome.storage.local.remove('pendingFlowJob');

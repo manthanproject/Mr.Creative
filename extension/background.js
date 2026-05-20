@@ -314,6 +314,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // ══ FLOW PASTE + SUBMIT: single debugger session — Input.insertText (no clipboard) ══
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'FLOW_TRUSTED_CLICK') {
+      const tab = sender.tab;
+      chrome.debugger.attach({ tabId: tab.id }, '1.3', () => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchMouseEvent', {
+          type: 'mousePressed', x: msg.x, y: msg.y, button: 'left', clickCount: 1
+        }, () => {
+          chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased', x: msg.x, y: msg.y, button: 'left', clickCount: 1
+          }, () => {
+            chrome.debugger.detach({ tabId: tab.id }, () => {
+              sendResponse({ success: true });
+            });
+          });
+        });
+      });
+      return true; // async response
+    }
   if (msg.type === 'FLOW_PASTE' && sender.tab) {
     (async () => {
       const tabId = sender.tab.id;
