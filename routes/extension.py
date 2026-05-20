@@ -63,7 +63,7 @@ def get_command():
         if cmd:
             # Lens jobs are handled by the direct poller (pending-for-tab), not background.js
             if cmd.get('job_type') == 'lens':
-                pass  # Don't consume � leave for pending-for-tab
+                pass  # Don't consume � leave for pending-for-tab
             else:
                 _state['pending_commands'].pop(profile_id, None)
                 return jsonify(cmd)
@@ -814,6 +814,24 @@ def flow_complete():
             print(f"[Flow Complete] Saved: {new_name}")
         except Exception as e:
             print(f"[Flow Complete] Failed to save {filename}: {e}")
+
+    # ── Logo overlay (skip for A+ content) ──
+    content_types = job_data.get('content_types', [])
+    logo_path = job_data.get('logo_path', '')
+    is_aplus = content_types and all(t == 'a_plus' for t in content_types)
+
+    if logo_path and not is_aplus and moved > 0:
+        try:
+            from modules.logo_overlay import apply_logo
+            branded = 0
+            for fname in os.listdir(collection_dir):
+                fpath = os.path.join(collection_dir, fname)
+                if os.path.isfile(fpath) and fname.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                    if apply_logo(fpath, logo_path):
+                        branded += 1
+            print(f"[Flow Complete] Logo applied to {branded}/{moved} images")
+        except Exception as e:
+            print(f"[Flow Complete] Logo overlay error: {e}")
 
     if moved > 0:
         try:

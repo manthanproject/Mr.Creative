@@ -293,6 +293,8 @@ def run_agent_pipeline(app, job_id):
                 'aspect_ratio': _ar, 'count': 1,
                 'collection_id': collection.id,
                 'start_time': time.time(),
+                'content_types': json.loads(job.content_types) if job.content_types else [],
+                'logo_path': getattr(brand_kit, 'logo_path', None) or '',
             }
 
             with _lock:
