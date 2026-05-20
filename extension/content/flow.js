@@ -846,16 +846,21 @@
         const genResult = await waitForGeneration();
 
         if (genResult === 'failed') {
-          warn(`Prompt ${i + 1} failed (403/unusual activity) — skipping to next`);
-          MC.sendStatus(job_id, 'running', `Prompt ${i + 1} failed, skipping`);
-          // Wait before retrying next prompt
-          await MC.sleep(15000 + Math.random() * 10000);
-          continue;
+          warn(`Prompt ${i + 1} failed (403/unusual activity) — stopping to avoid flag`);
+          MC.sendStatus(job_id, 'stopped', `Stopped at prompt ${i + 1} — flagged by Flow`);
+          try {
+            await fetch(`${MC.SERVER}/api/ext/save-progress`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ job_id, completed_index: i, total, project_url: location.href }),
+            });
+          } catch (_) {}
+          return; // full stop — don't send any more requests
         }
 
-        // Human-like pause between prompts
+        // Human-like pause between prompts — longer to avoid rate limits
         if (i < total - 1) {
-          const pause = 8000 + Math.random() * 12000; // 8-20s between prompts
+          const pause = 20000 + Math.random() * 20000; // 20-40s between prompts
           log(`Pausing ${(pause / 1000).toFixed(1)}s before next prompt`);
           await MC.sleep(pause);
         }
